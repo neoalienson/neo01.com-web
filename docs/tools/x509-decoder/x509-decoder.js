@@ -1,71 +1,172 @@
-// Basic ASN.1 Parser
+// ASN.1 Parser using asn1js library
 class ASN1Parser {
     constructor(bytes) {
-        this.bytes = bytes;
-        this.pos = 0;
+        this.bytes = new Uint8Array(bytes);
     }
     
-    readByte() {
-        return this.bytes[this.pos++];
-    }
-    
-    readLength() {
-        const first = this.readByte();
-        if ((first & 0x80) === 0) {
-            return first;
-        }
-        
-        const lengthBytes = first & 0x7f;
-        let length = 0;
-        for (let i = 0; i < lengthBytes; i++) {
-            length = (length << 8) | this.readByte();
-        }
-        return length;
-    }
-    
-    readSequence() {
-        const tag = this.readByte();
-        const length = this.readLength();
-        const start = this.pos;
-        return { tag, length, start, end: start + length };
-    }
-    
-    readInteger() {
-        const seq = this.readSequence();
-        const bytes = this.bytes.slice(seq.start, seq.end);
-        this.pos = seq.end;
-        return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(':');
-    }
-    
-    readString() {
-        const seq = this.readSequence();
-        const bytes = this.bytes.slice(seq.start, seq.end);
-        this.pos = seq.end;
-        return String.fromCharCode(...bytes.filter(b => b >= 32 && b <= 126));
-    }
-    
-    readOID() {
-        const seq = this.readSequence();
-        const bytes = this.bytes.slice(seq.start, seq.end);
-        this.pos = seq.end;
-        
-        if (bytes.length === 0) return 'unknown';
-        
-        const oid = [];
-        oid.push(Math.floor(bytes[0] / 40));
-        oid.push(bytes[0] % 40);
-        
-        let value = 0;
-        for (let i = 1; i < bytes.length; i++) {
-            value = (value << 7) | (bytes[i] & 0x7f);
-            if ((bytes[i] & 0x80) === 0) {
-                oid.push(value);
-                value = 0;
+    parseCertificate() {
+        try {
+            const asn1 = org.pkijs.fromBER(this.bytes.buffer);
+            if (asn1.offset === -1) throw new Error('Cannot parse ASN.1 data');
+            
+            const cert = asn1.result.valueBlock.value[0]; // TBSCertificate
+            const tbsCert = cert.valueBlock.value[0];
+            
+            let fieldIndex = 0;
+            
+            // Version (optional)
+            let version = 'v1';
+            if (tbsCert.valueBlock.value[fieldIndex].idBlock.tagClass === 3) {
+                const versionValue = tbsCert.valueBlock.value[fieldIndex].valueBlock.value[0].valueBlock.valueDec;
+                version = `v${versionValue + 1}`;
+                fieldIndex++;
             }
+            
+            // Serial Number
+            const serialBytes = tbsCert.valueBlock.value[fieldIndex].valueBlock.valueHex;
+            const serialNumber = Array.from(new Uint8Array(serialBytes), b => b.toString(16).padStart(2, '0')).join(':');
+            fieldIndex++;
+            
+            // Signature Algorithm
+            const sigAlgOid = tbsCert.valueBlock.value[fieldIndex].valueBlock.value[0].valueBlock.toString();
+            const signatureAlgorithm = this.getOIDName(sigAlgOid);
+            fieldIndex++;
+            
+            // Issuer
+            const issuer = this.parseName(tbsCert.valueBlock.value[fieldIndex]);
+            fieldIndex++;
+            
+            // Validity
+            const validity = tbsCert.valueBlock.value[fieldIndex];
+            const validFrom = this.parseTime(validity.valueBlock.value[0]);
+            const validTo = this.parseTime(validity.valueBlock.value[1]);
+            fieldIndex++;
+            
+            // Subject
+            const subject = this.parseName(tbsCert.valueBlock.value[fieldIndex]);
+            fieldIndex++;
+            
+            // Public Key Info
+            const publicKeyInfo = this.parsePublicKeyInfo(tbsCert.valueBlock.value[fieldIndex]);
+            fieldIndex++;
+            
+            // Extensions
+            const extensions = this.parseExtensions(tbsCert.valueBlock.value[fieldIndex] || null);
+            
+            return {
+                version,
+                serialNumber,
+                signatureAlgorithm,
+                issuer,
+                subject,
+                validFrom,
+                validTo,
+                keyUsage: extensions.keyUsage || 'Not specified',
+                publicKeyAlgorithm: publicKeyInfo.algorithm,
+                publicKeySize: publicKeyInfo.keySize,
+                fingerprint: this.calculateFingerprint(),
+                extensions: extensions.list
+            };
+        } catch (e) {
+            console.error('Certificate parsing error:', e);
+            return {
+                version: 'Parse Error',
+                serialNumber: 'Parse Error',
+                signatureAlgorithm: 'Parse Error',
+                issuer: 'Parse Error',
+                subject: 'Parse Error',
+                validFrom: 'Parse Error',
+                validTo: 'Parse Error',
+                keyUsage: 'Parse Error',
+                publicKeyAlgorithm: 'Parse Error',
+                publicKeySize: 'Parse Error',
+                fingerprint: 'Parse Error',
+                extensions: ['Parse Error']
+            };
+        }
+    }
+    
+    parseName(nameObj) {
+        try {
+            const parts = [];
+            for (const rdn of nameObj.valueBlock.value) {
+                for (const attr of rdn.valueBlock.value) {
+                    const oid = attr.valueBlock.value[0].valueBlock.toString();
+                    const value = attr.valueBlock.value[1].valueBlock.value;
+                    const oidName = this.getOIDName(oid);
+                    parts.push(`${oidName}=${value}`);
+                }
+            }
+            return parts.join(', ');
+        } catch (e) {
+            return 'Parse Error';
+        }
+    }
+    
+    parseTime(timeObj) {
+        try {
+            const timeStr = timeObj.valueBlock.value;
+            if (timeStr.length === 13) { // UTCTime
+                const year = parseInt(timeStr.substr(0, 2));
+                const fullYear = year < 50 ? 2000 + year : 1900 + year;
+                const month = parseInt(timeStr.substr(2, 2));
+                const day = parseInt(timeStr.substr(4, 2));
+                return `${fullYear}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            } else if (timeStr.length === 15) { // GeneralizedTime
+                const year = parseInt(timeStr.substr(0, 4));
+                const month = parseInt(timeStr.substr(4, 2));
+                const day = parseInt(timeStr.substr(6, 2));
+                return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            }
+            return timeStr;
+        } catch (e) {
+            return 'Parse Error';
+        }
+    }
+    
+    parsePublicKeyInfo(pkiObj) {
+        try {
+            const algOid = pkiObj.valueBlock.value[0].valueBlock.value[0].valueBlock.toString();
+            const algorithm = this.getOIDName(algOid);
+            
+            const keyBytes = pkiObj.valueBlock.value[1].valueBlock.valueHex;
+            let keySize = 'Unknown';
+            
+            if (algorithm === 'RSA' && keyBytes.byteLength > 10) {
+                const bitLength = (keyBytes.byteLength - 1) * 8;
+                if (bitLength >= 2040 && bitLength <= 2056) keySize = '2048 bits';
+                else if (bitLength >= 3064 && bitLength <= 3080) keySize = '3072 bits';
+                else if (bitLength >= 4088 && bitLength <= 4104) keySize = '4096 bits';
+                else keySize = `~${bitLength} bits`;
+            }
+            
+            return { algorithm, keySize };
+        } catch (e) {
+            return { algorithm: 'RSA', keySize: '2048 bits' };
+        }
+    }
+    
+    parseExtensions(extObj) {
+        const extensions = { keyUsage: null, list: [] };
+        
+        try {
+            if (extObj && extObj.idBlock.tagClass === 3) {
+                const extSeq = extObj.valueBlock.value[0];
+                for (const ext of extSeq.valueBlock.value) {
+                    const oid = ext.valueBlock.value[0].valueBlock.toString();
+                    const extName = this.getExtensionName(oid);
+                    extensions.list.push(extName);
+                    
+                    if (extName === 'Key Usage') {
+                        extensions.keyUsage = 'Digital Signature, Key Encipherment';
+                    }
+                }
+            }
+        } catch (e) {
+            extensions.list = ['Basic Constraints', 'Key Usage', 'Extended Key Usage'];
         }
         
-        const oidStr = oid.join('.');
-        return this.getOIDName(oidStr);
+        return extensions;
     }
     
     getOIDName(oid) {
@@ -84,195 +185,6 @@ class ASN1Parser {
             '2.5.4.11': 'OU'
         };
         return oids[oid] || oid;
-    }
-    
-    readTime() {
-        const seq = this.readSequence();
-        const bytes = this.bytes.slice(seq.start, seq.end);
-        this.pos = seq.end;
-        const timeStr = String.fromCharCode(...bytes);
-        
-        // Parse ASN.1 time formats
-        if (timeStr.length === 13) { // UTCTime
-            const year = parseInt(timeStr.substr(0, 2));
-            const fullYear = year < 50 ? 2000 + year : 1900 + year;
-            const month = parseInt(timeStr.substr(2, 2));
-            const day = parseInt(timeStr.substr(4, 2));
-            return `${fullYear}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-        } else if (timeStr.length === 15) { // GeneralizedTime
-            const year = parseInt(timeStr.substr(0, 4));
-            const month = parseInt(timeStr.substr(4, 2));
-            const day = parseInt(timeStr.substr(6, 2));
-            return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-        }
-        return timeStr;
-    }
-    
-    skipBytes(count) {
-        this.pos += count;
-    }
-    
-    parseCertificate() {
-        try {
-            // Certificate SEQUENCE
-            this.readSequence();
-            
-            // TBSCertificate SEQUENCE
-            const tbsSeq = this.readSequence();
-            
-            // Version (optional)
-            let version = 'v1';
-            if (this.bytes[this.pos] === 0xa0) {
-                this.readSequence();
-                this.readSequence();
-                const versionNum = this.readByte();
-                version = `v${versionNum + 1}`;
-            }
-            
-            // Serial Number
-            const serialNumber = this.readInteger();
-            
-            // Signature Algorithm
-            this.readSequence();
-            const signatureAlgorithm = this.readOID();
-            
-            // Issuer
-            const issuer = this.parseName();
-            
-            // Validity
-            this.readSequence();
-            const validFrom = this.readTime();
-            const validTo = this.readTime();
-            
-            // Subject
-            const subject = this.parseName();
-            
-            // Subject Public Key Info
-            const publicKeyInfo = this.parsePublicKeyInfo();
-            
-            // Extensions (optional)
-            const extensions = this.parseExtensions();
-            
-            return {
-                version,
-                serialNumber,
-                signatureAlgorithm,
-                issuer,
-                subject,
-                validFrom,
-                validTo,
-                keyUsage: extensions.keyUsage || 'Not specified',
-                publicKeyAlgorithm: publicKeyInfo.algorithm,
-                publicKeySize: publicKeyInfo.keySize,
-                fingerprint: this.calculateFingerprint(),
-                extensions: extensions.list
-            };
-        } catch (e) {
-            return {
-                version: 'Parse Error',
-                serialNumber: 'Parse Error',
-                signatureAlgorithm: 'Parse Error',
-                issuer: 'Parse Error',
-                subject: 'Parse Error',
-                validFrom: 'Parse Error',
-                validTo: 'Parse Error',
-                keyUsage: 'Parse Error',
-                publicKeyAlgorithm: 'Parse Error',
-                publicKeySize: 'Parse Error',
-                fingerprint: 'Parse Error',
-                extensions: ['Parse Error']
-            };
-        }
-    }
-    
-    parseName() {
-        const nameSeq = this.readSequence();
-        const endPos = nameSeq.end;
-        const parts = [];
-        
-        while (this.pos < endPos) {
-            this.readSequence(); // SET
-            this.readSequence(); // SEQUENCE
-            const oid = this.readOID();
-            const value = this.readString();
-            if (oid === 'CN' || oid === '2.5.4.3') {
-                parts.push(`CN=${value}`);
-            } else {
-                parts.push(`${oid}=${value}`);
-            }
-        }
-        
-        return parts.join(', ') || 'Parse Error';
-    }
-    
-    parsePublicKeyInfo() {
-        try {
-            const pkiSeq = this.readSequence();
-            const algSeq = this.readSequence();
-            const algorithm = this.readOID();
-            
-            // Skip algorithm parameters
-            if (this.pos < pkiSeq.end) {
-                this.readSequence();
-            }
-            
-            // Public Key BIT STRING
-            const keySeq = this.readSequence();
-            const keyBytes = this.bytes.slice(keySeq.start, keySeq.end);
-            
-            let keySize = 'Unknown';
-            if (algorithm === 'RSA' && keyBytes.length > 10) {
-                // Estimate RSA key size from bit string length
-                const bitLength = (keyBytes.length - 1) * 8;
-                if (bitLength >= 2040 && bitLength <= 2056) keySize = '2048 bits';
-                else if (bitLength >= 3064 && bitLength <= 3080) keySize = '3072 bits';
-                else if (bitLength >= 4088 && bitLength <= 4104) keySize = '4096 bits';
-                else keySize = `~${bitLength} bits`;
-            }
-            
-            return { algorithm, keySize };
-        } catch (e) {
-            return { algorithm: 'RSA', keySize: '2048 bits' };
-        }
-    }
-    
-    parseExtensions() {
-        const extensions = { keyUsage: null, list: [] };
-        
-        try {
-            // Check if extensions are present (version v3)
-            if (this.pos < this.bytes.length && this.bytes[this.pos] === 0xa3) {
-                this.readSequence(); // Extensions context tag
-                const extSeq = this.readSequence(); // Extensions SEQUENCE
-                const endPos = extSeq.end;
-                
-                while (this.pos < endPos) {
-                    const extItemSeq = this.readSequence();
-                    const extOid = this.readOID();
-                    
-                    // Check for critical flag
-                    let critical = false;
-                    if (this.bytes[this.pos] === 0x01) {
-                        this.readSequence();
-                        critical = this.readByte() !== 0;
-                    }
-                    
-                    // Extension value
-                    const extValue = this.readSequence();
-                    
-                    const extName = this.getExtensionName(extOid);
-                    extensions.list.push(extName);
-                    
-                    if (extName === 'Key Usage') {
-                        extensions.keyUsage = 'Digital Signature, Key Encipherment';
-                    }
-                }
-            }
-        } catch (e) {
-            extensions.list = ['Basic Constraints', 'Key Usage', 'Extended Key Usage'];
-        }
-        
-        return extensions;
     }
     
     getExtensionName(oid) {
@@ -304,32 +216,7 @@ class X509CertificateParser {
     }
     
     parseCertificate() {
-        // Enhanced parser that returns accurate certificate data
-        const base64 = btoa(String.fromCharCode(...this.certBytes));
-        
-        // Check if this is the specific neo01.com certificate
-        if (base64.startsWith('MIIE/TCCA+WgAwIBAgISBnY9ugTPoh5t2QcBI3lLRT7N')) {
-            return {
-                version: 'v3',
-                serialNumber: '06:76:3d:ba:04:cf:a2:1e:6d:d9:07:01:23:79:4b:45:3e:cd',
-                signatureAlgorithm: 'SHA256withRSA',
-                validFrom: '2025-08-19',
-                validTo: '2025-11-17',
-                issuer: 'C=US, O=Let\'s Encrypt, CN=R11',
-                subject: 'CN=neo01.com',
-                publicKeyAlgorithm: 'RSA',
-                publicKeySize: '2048 bits',
-                keyUsage: 'Digital Signature, Key Encipherment',
-                extensions: ['Key Usage', 'Extended Key Usage', 'Basic Constraints', 'Subject Alternative Name', 'Subject Key Identifier', 'Authority Key Identifier'],
-                fingerprint: this.calculateFingerprint()
-            };
-        }
-        
-        // Fallback to basic ASN.1 parsing for other certificates
-        return this.parseWithASN1();
-    }
-    
-    parseWithASN1() {
+        // Use ASN.1 parsing for all certificates
         const parser = new ASN1Parser(this.certBytes);
         return parser.parseCertificate();
     }

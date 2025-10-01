@@ -34,7 +34,15 @@ class ASN1Parser {
         const seq = this.readSequence();
         const bytes = this.bytes.slice(seq.start, seq.end);
         this.pos = seq.end;
-        return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(':');
+        
+        // Skip leading zero bytes
+        let startIdx = 0;
+        while (startIdx < bytes.length - 1 && bytes[startIdx] === 0) {
+            startIdx++;
+        }
+        const relevantBytes = bytes.slice(startIdx);
+        
+        return Array.from(relevantBytes, b => b.toString(16).padStart(2, '0')).join(':');
     }
     
     readString() {
@@ -172,23 +180,27 @@ class ASN1Parser {
     }
     
     parseName() {
-        const nameSeq = this.readSequence();
-        const endPos = nameSeq.end;
-        const parts = [];
-        
-        while (this.pos < endPos) {
-            this.readSequence();
-            this.readSequence();
-            const oid = this.readOID();
-            const value = this.readString();
-            if (oid === 'CN' || oid === '2.5.4.3') {
-                parts.push(`CN=${value}`);
-            } else {
-                parts.push(`${oid}=${value}`);
+        try {
+            const nameSeq = this.readSequence();
+            const endPos = nameSeq.end;
+            const parts = [];
+            
+            while (this.pos < endPos) {
+                this.readSequence();
+                this.readSequence();
+                const oid = this.readOID();
+                const value = this.readString();
+                if (oid === 'CN' || oid === '2.5.4.3') {
+                    parts.push(`CN=${value}`);
+                } else {
+                    parts.push(`${oid}=${value}`);
+                }
             }
+            
+            return parts.join(', ') || 'Parse Error';
+        } catch (e) {
+            return 'Parse Error';
         }
-        
-        return parts.join(', ') || 'Parse Error';
     }
 }
 
