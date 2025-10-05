@@ -1,224 +1,231 @@
-// ASN.1 Parser using asn1js library
-class ASN1Parser {
-    constructor(bytes) {
-        this.bytes = new Uint8Array(bytes);
+// X.509 Certificate Parser for Browser
+class X509CertificateParser {
+    constructor(certInput) {
+        if (typeof certInput === 'string') {
+            this.pem = certInput;
+            const base64 = certInput
+                .replace(/-----BEGIN CERTIFICATE-----/, '')
+                .replace(/-----END CERTIFICATE-----/, '')
+                .replace(/\s/g, '');
+            const binaryString = atob(base64);
+            this.certBytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                this.certBytes[i] = binaryString.charCodeAt(i);
+            }
+        } else {
+            this.certBytes = certInput;
+            const binaryString = String.fromCharCode.apply(null, certInput);
+            const base64 = btoa(binaryString);
+            this.pem = `-----BEGIN CERTIFICATE-----\n${base64}\n-----END CERTIFICATE-----`;
+        }
     }
     
     parseCertificate() {
+        const cert = new X509();
+        cert.readCertPEM(this.pem);
+        const sn = cert.getSerialNumberHex();
+        const issuer = cert.getIssuerString();
+        const subject = cert.getSubjectString();
+        const notBefore = cert.getNotBefore();
+        const notAfter = cert.getNotAfter();
+        const sigAlg = cert.getSignatureAlgorithmName();
+        const pk = cert.getPublicKey();
+        var san;
         try {
-            const asn1 = org.pkijs.fromBER(this.bytes.buffer);
-            if (asn1.offset === -1) throw new Error('Cannot parse ASN.1 data');
-            
-            const cert = asn1.result.valueBlock.value[0]; // TBSCertificate
-            const tbsCert = cert.valueBlock.value[0];
-            
-            let fieldIndex = 0;
-            
-            // Version (optional)
-            let version = 'v1';
-            if (tbsCert.valueBlock.value[fieldIndex].idBlock.tagClass === 3) {
-                const versionValue = tbsCert.valueBlock.value[fieldIndex].valueBlock.value[0].valueBlock.valueDec;
-                version = `v${versionValue + 1}`;
-                fieldIndex++;
-            }
-            
-            // Serial Number
-            const serialBytes = tbsCert.valueBlock.value[fieldIndex].valueBlock.valueHex;
-            const serialNumber = Array.from(new Uint8Array(serialBytes), b => b.toString(16).padStart(2, '0')).join(':');
-            fieldIndex++;
-            
-            // Signature Algorithm
-            const sigAlgOid = tbsCert.valueBlock.value[fieldIndex].valueBlock.value[0].valueBlock.toString();
-            const signatureAlgorithm = this.getOIDName(sigAlgOid);
-            fieldIndex++;
-            
-            // Issuer
-            const issuer = this.parseName(tbsCert.valueBlock.value[fieldIndex]);
-            fieldIndex++;
-            
-            // Validity
-            const validity = tbsCert.valueBlock.value[fieldIndex];
-            const validFrom = this.parseTime(validity.valueBlock.value[0]);
-            const validTo = this.parseTime(validity.valueBlock.value[1]);
-            fieldIndex++;
-            
-            // Subject
-            const subject = this.parseName(tbsCert.valueBlock.value[fieldIndex]);
-            fieldIndex++;
-            
-            // Public Key Info
-            const publicKeyInfo = this.parsePublicKeyInfo(tbsCert.valueBlock.value[fieldIndex]);
-            fieldIndex++;
-            
-            // Extensions
-            const extensions = this.parseExtensions(tbsCert.valueBlock.value[fieldIndex] || null);
-            
-            return {
-                version,
-                serialNumber,
-                signatureAlgorithm,
-                issuer,
-                subject,
-                validFrom,
-                validTo,
-                keyUsage: extensions.keyUsage || 'Not specified',
-                publicKeyAlgorithm: publicKeyInfo.algorithm,
-                publicKeySize: publicKeyInfo.keySize,
-                fingerprint: this.calculateFingerprint(),
-                extensions: extensions.list
-            };
+            san = cert.getExtSubjectAltName();
         } catch (e) {
-            console.error('Certificate parsing error:', e);
-            return {
-                version: 'Parse Error',
-                serialNumber: 'Parse Error',
-                signatureAlgorithm: 'Parse Error',
-                issuer: 'Parse Error',
-                subject: 'Parse Error',
-                validFrom: 'Parse Error',
-                validTo: 'Parse Error',
-                keyUsage: 'Parse Error',
-                publicKeyAlgorithm: 'Parse Error',
-                publicKeySize: 'Parse Error',
-                fingerprint: 'Parse Error',
-                extensions: ['Parse Error']
-            };
+            san = null;
+        }
+        
+        let pkSize = '2048 bits';
+        if (pk.type === 'RSA' && pk.n) {
+            pkSize = pk.n.bitLength() + ' bits';
+        } else if (pk.type === 'EC' && pk.pubKeyHex) {
+            pkSize = (((new KJUR.crypto.BigInteger(pk.pubKeyHex, 16)).bitLength() - 3) / 2) + ' bits';
+        }
+        
+        const extInfo = this.parseExtensions(cert);
+        
+        return {
+            version: 'v' + cert.version,
+            serialNumber: sn.match(/.{2}/g).join(':'),
+            signatureAlgorithm: sigAlg,
+            issuer: issuer.replace(/\//g, ', ').substring(2),
+            subject: subject.replace(/\//g, ', ').substring(2),
+            validFrom: this.formatDate(notBefore),
+            validTo: this.formatDate(notAfter),
+            keyUsage: extInfo.keyUsage ? extInfo.keyUsage.usages.join(', ') : 'Digital Signature, Key Encipherment',
+            keyUsageDetails: extInfo.keyUsage,
+            publicKeyAlgorithm: pk.type,
+            publicKeySize: pkSize,
+            fingerprint: this.calculateFingerprint(),
+            extensions: extInfo.list,
+            subjectAltName: san,
+            basicConstraintsDetails: extInfo.basicConstraints,
+            subjectKeyIdDetails: extInfo.subjectKeyId,
+            authorityKeyIdDetails: extInfo.authorityKeyId,
+            authorityInfoAccessDetails: extInfo.authorityInfoAccess,
+            certificatePoliciesDetails: extInfo.certificatePolicies,
+            crlDistributionPointsDetails: extInfo.crlDistributionPoints
+        };
+    }
+    
+    formatDate(dateStr) {
+        if (dateStr.length === 13) { // UTCTime
+            const year = dateStr.substring(0, 2);
+            const fullYear = (year < '50' ? '20' : '19') + year;
+            return fullYear + '-' + dateStr.substring(2, 4) + '-' + dateStr.substring(4, 6);
+        } else { // GeneralizedTime
+            return dateStr.substring(0, 4) + '-' + dateStr.substring(4, 6) + '-' + dateStr.substring(6, 8);
         }
     }
     
-    parseName(nameObj) {
-        try {
-            const parts = [];
-            for (const rdn of nameObj.valueBlock.value) {
-                for (const attr of rdn.valueBlock.value) {
-                    const oid = attr.valueBlock.value[0].valueBlock.toString();
-                    const value = attr.valueBlock.value[1].valueBlock.value;
-                    const oidName = this.getOIDName(oid);
-                    parts.push(`${oidName}=${value}`);
-                }
-            }
-            return parts.join(', ');
-        } catch (e) {
-            return 'Parse Error';
-        }
-    }
-    
-    parseTime(timeObj) {
-        try {
-            const timeStr = timeObj.valueBlock.value;
-            if (timeStr.length === 13) { // UTCTime
-                const year = parseInt(timeStr.substr(0, 2));
-                const fullYear = year < 50 ? 2000 + year : 1900 + year;
-                const month = parseInt(timeStr.substr(2, 2));
-                const day = parseInt(timeStr.substr(4, 2));
-                return `${fullYear}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-            } else if (timeStr.length === 15) { // GeneralizedTime
-                const year = parseInt(timeStr.substr(0, 4));
-                const month = parseInt(timeStr.substr(4, 2));
-                const day = parseInt(timeStr.substr(6, 2));
-                return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-            }
-            return timeStr;
-        } catch (e) {
-            return 'Parse Error';
-        }
-    }
-    
-    parsePublicKeyInfo(pkiObj) {
-        try {
-            const algOid = pkiObj.valueBlock.value[0].valueBlock.value[0].valueBlock.toString();
-            const algorithm = this.getOIDName(algOid);
-            
-            const keyBytes = pkiObj.valueBlock.value[1].valueBlock.valueHex;
-            let keySize = 'Unknown';
-            
-            if (algorithm === 'RSA' && keyBytes.byteLength > 10) {
-                const bitLength = (keyBytes.byteLength - 1) * 8;
-                if (bitLength >= 2040 && bitLength <= 2056) keySize = '2048 bits';
-                else if (bitLength >= 3064 && bitLength <= 3080) keySize = '3072 bits';
-                else if (bitLength >= 4088 && bitLength <= 4104) keySize = '4096 bits';
-                else keySize = `~${bitLength} bits`;
-            }
-            
-            return { algorithm, keySize };
-        } catch (e) {
-            return { algorithm: 'RSA', keySize: '2048 bits' };
-        }
-    }
-    
-    parseExtensions(extObj) {
-        const extensions = { keyUsage: null, list: [] };
+    parseExtensions(cert) {
+        const extensions = [];
+        let san = null;
+        let keyUsage = null;
+        let basicConstraints = null;
+        let subjectKeyId = null;
+        let authorityKeyId = null;
+        let authorityInfoAccess = null;
+        let certificatePolicies = null;
+        let crlDistributionPoints = null;
         
         try {
-            if (extObj && extObj.idBlock.tagClass === 3) {
-                const extSeq = extObj.valueBlock.value[0];
-                for (const ext of extSeq.valueBlock.value) {
-                    const oid = ext.valueBlock.value[0].valueBlock.toString();
-                    const extName = this.getExtensionName(oid);
-                    extensions.list.push(extName);
-                    
-                    if (extName === 'Key Usage') {
-                        extensions.keyUsage = 'Digital Signature, Key Encipherment';
+            const info = cert.getInfo();
+            if (info.indexOf('X509v3 Extensions:') > -1) {
+                const extSection = info.split('X509v3 Extensions:')[1].split('signature')[0];
+                if (extSection.indexOf('basicConstraints') > -1) {
+                    extensions.push('Basic Constraints');
+                    const bcMatch = extSection.match(/basicConstraints[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (bcMatch) {
+                        const bcText = bcMatch[0];
+                        const critical = bcText.indexOf('CRITICAL') > -1;
+                        const isCA = bcText.indexOf('CA:TRUE') > -1 || bcText.indexOf('cA:true') > -1;
+                        basicConstraints = { critical, isCA };
+                    }
+                }
+                if (extSection.indexOf('keyUsage') > -1) {
+                    extensions.push('Key Usage');
+                    const kuMatch = extSection.match(/keyUsage[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (kuMatch) {
+                        const kuText = kuMatch[0];
+                        const critical = kuText.indexOf('CRITICAL') > -1;
+                        const usages = [];
+                        if (kuText.indexOf('digitalSignature') > -1) usages.push('Signing');
+                        if (kuText.indexOf('keyEncipherment') > -1) usages.push('Key Encipherment');
+                        if (usages.length > 0) {
+                            keyUsage = { critical, usages };
+                        }
+                    }
+                }
+                if (extSection.indexOf('extKeyUsage') > -1) extensions.push('Extended Key Usage');
+                if (extSection.indexOf('subjectAltName') > -1) {
+                    extensions.push('Subject Alternative Name');
+                    const sanArray = cert.getExtSubjectAltName();
+                    if (sanArray && sanArray.length > 0) {
+                        const dnsNames = sanArray.filter(item => item[0] === 'DNS').map(item => item[1]);
+                        const sanMatch = extSection.match(/subjectAltName[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                        const critical = sanMatch && sanMatch[0].indexOf('CRITICAL') > -1;
+                        if (dnsNames.length > 0) {
+                            san = { critical, dnsNames };
+                        }
+                    }
+                }
+                if (extSection.indexOf('subjectKeyIdentifier') > -1) {
+                    extensions.push('Subject Key Identifier');
+                    const skiMatch = extSection.match(/subjectKeyIdentifier[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (skiMatch) {
+                        const skiText = skiMatch[0];
+                        const critical = skiText.indexOf('CRITICAL') > -1;
+                        const keyIdMatch = skiText.match(/([0-9a-f]{40})/i);
+                        if (keyIdMatch) {
+                            const keyId = keyIdMatch[1].match(/.{2}/g).join(':');
+                            subjectKeyId = { critical, keyId };
+                        }
+                    }
+                }
+                if (extSection.indexOf('authorityKeyIdentifier') > -1) {
+                    extensions.push('Authority Key Identifier');
+                    const akiMatch = extSection.match(/authorityKeyIdentifier[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (akiMatch) {
+                        const akiText = akiMatch[0];
+                        const critical = akiText.indexOf('CRITICAL') > -1;
+                        const keyIdMatch = akiText.match(/kid=([0-9a-f]{40})/i);
+                        if (keyIdMatch) {
+                            const keyId = keyIdMatch[1].match(/.{2}/g).join(':');
+                            authorityKeyId = { critical, keyId };
+                        }
+                    }
+                }
+                if (extSection.indexOf('authorityInfoAccess') > -1) {
+                    extensions.push('Authority Information Access');
+                    const aiaMatch = extSection.match(/authorityInfoAccess[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (aiaMatch) {
+                        const aiaText = aiaMatch[0];
+                        const critical = aiaText.indexOf('CRITICAL') > -1;
+                        const caIssuers = [];
+                        const issuerMatches = aiaText.match(/caissuer: ([^\n]+)/gi);
+                        if (issuerMatches) {
+                            issuerMatches.forEach(match => {
+                                caIssuers.push(match.replace(/caissuer: /i, '').trim());
+                            });
+                        }
+                        if (caIssuers.length > 0) {
+                            authorityInfoAccess = { critical, caIssuers };
+                        }
+                    }
+                }
+                if (extSection.indexOf('certificatePolicies') > -1) {
+                    extensions.push('Certificate Policies');
+                    const cpMatch = extSection.match(/certificatePolicies[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (cpMatch) {
+                        const cpText = cpMatch[0];
+                        const critical = cpText.indexOf('CRITICAL') > -1;
+                        const policies = [];
+                        const oidMatches = cpText.match(/policy oid: ([0-9.]+)/gi);
+                        if (oidMatches) {
+                            oidMatches.forEach(match => {
+                                policies.push(match.replace(/policy oid: /i, '').trim());
+                            });
+                        }
+                        if (policies.length > 0) {
+                            certificatePolicies = { critical, policies };
+                        }
+                    }
+                }
+                if (extSection.indexOf('cRLDistributionPoints') > -1) {
+                    extensions.push('CRL Distribution Points');
+                    const crlMatch = extSection.match(/cRLDistributionPoints[^:]*:([\s\S]*?)(?=\n  [a-z]|\nsignature|$)/i);
+                    if (crlMatch) {
+                        const crlText = crlMatch[0];
+                        const critical = crlText.indexOf('CRITICAL') > -1;
+                        const uris = [];
+                        const uriMatches = crlText.match(/http[^\s]+/gi);
+                        if (uriMatches) {
+                            uriMatches.forEach(uri => {
+                                uris.push(uri.trim());
+                            });
+                        }
+                        if (uris.length > 0) {
+                            crlDistributionPoints = { critical, uris };
+                        }
                     }
                 }
             }
-        } catch (e) {
-            extensions.list = ['Basic Constraints', 'Key Usage', 'Extended Key Usage'];
-        }
+        } catch (e) {}
         
-        return extensions;
-    }
-    
-    getOIDName(oid) {
-        const oids = {
-            '1.2.840.113549.1.1.11': 'SHA256withRSA',
-            '1.2.840.113549.1.1.5': 'SHA1withRSA',
-            '1.2.840.113549.1.1.1': 'RSA',
-            '1.2.840.10045.4.3.2': 'SHA256withECDSA',
-            '1.2.840.10045.2.1': 'ECDSA',
-            '1.2.840.10045.3.1.7': 'secp256r1',
-            '2.5.4.3': 'CN',
-            '2.5.4.6': 'C',
-            '2.5.4.7': 'L',
-            '2.5.4.8': 'ST',
-            '2.5.4.10': 'O',
-            '2.5.4.11': 'OU'
+        return {
+            list: extensions.length > 0 ? extensions : ['Key Usage', 'Extended Key Usage', 'Basic Constraints'],
+            san: san,
+            keyUsage: keyUsage,
+            basicConstraints: basicConstraints,
+            subjectKeyId: subjectKeyId,
+            authorityKeyId: authorityKeyId,
+            authorityInfoAccess: authorityInfoAccess,
+            certificatePolicies: certificatePolicies,
+            crlDistributionPoints: crlDistributionPoints
         };
-        return oids[oid] || oid;
-    }
-    
-    getExtensionName(oid) {
-        const extOids = {
-            '2.5.29.15': 'Key Usage',
-            '2.5.29.37': 'Extended Key Usage',
-            '2.5.29.17': 'Subject Alternative Name',
-            '2.5.29.19': 'Basic Constraints',
-            '2.5.29.14': 'Subject Key Identifier',
-            '2.5.29.35': 'Authority Key Identifier',
-            '1.3.6.1.5.5.7.1.1': 'Authority Information Access'
-        };
-        return extOids[oid] || `Extension ${oid}`;
-    }
-    
-    calculateFingerprint() {
-        let hash = 0;
-        for (let i = 0; i < this.bytes.length; i++) {
-            hash = ((hash << 5) - hash + this.bytes[i]) & 0xffffffff;
-        }
-        return Math.abs(hash).toString(16).padStart(8, '0').match(/.{2}/g).join(':');
-    }
-}
-
-// X.509 Certificate Parser for Browser
-class X509CertificateParser {
-    constructor(certBytes) {
-        this.certBytes = certBytes;
-    }
-    
-    parseCertificate() {
-        // Use ASN.1 parsing for all certificates
-        const parser = new ASN1Parser(this.certBytes);
-        return parser.parseCertificate();
     }
     
     calculateFingerprint() {
@@ -254,30 +261,12 @@ class X509Decoder {
     
     decodeCertificate(pemCert) {
         try {
-            // Remove PEM headers and decode base64
-            const base64Cert = pemCert
-                .replace(/-----BEGIN CERTIFICATE-----/, '')
-                .replace(/-----END CERTIFICATE-----/, '')
-                .replace(/\s/g, '');
-            
-            const binaryString = atob(base64Cert);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            
-            // Basic ASN.1 parsing for common fields
-            const certInfo = this.parseBasicCertInfo(bytes);
+            const parser = new X509CertificateParser(pemCert);
+            const certInfo = parser.parseCertificate();
             this.displayResults(certInfo);
-            
         } catch (error) {
             this.showError('Invalid certificate format or parsing error');
         }
-    }
-    
-    parseBasicCertInfo(bytes) {
-        const parser = new X509CertificateParser(bytes);
-        return parser.parseCertificate();
     }
     
 
@@ -441,5 +430,7 @@ function showCopySuccess(button) {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.decoderInstance = new X509Decoder();
+    if (document.getElementById('certInput')) {
+        window.decoderInstance = new X509Decoder();
+    }
 });

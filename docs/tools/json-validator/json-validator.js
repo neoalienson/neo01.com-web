@@ -171,5 +171,7 @@ function showCopySuccess() {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.jsonValidator = new JsonValidator();
+    if (document.getElementById('inputJson')) {
+        window.jsonValidator = new JsonValidator();
+    }
 });

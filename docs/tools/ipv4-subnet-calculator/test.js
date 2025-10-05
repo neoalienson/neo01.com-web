@@ -1,8 +1,8 @@
 // IPv4 Subnet Calculator Tests
 framework.test('IP to integer conversion', () => {
     const ipParts = [192, 168, 1, 0];
-    const ipInt = (ipParts[0] << 24) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
-    framework.assertEqual(ipInt, -1062731776); // 192.168.1.0 as signed int
+    const ipInt = ((ipParts[0] << 24) | (ipParts[1] << 16) | (ipParts[2] << 8) | ipParts[3]) >>> 0;
+    framework.assertEqual(ipInt, 3232235776); // 192.168.1.0 as unsigned int
 });
 
 framework.test('Integer to IP conversion', () => {

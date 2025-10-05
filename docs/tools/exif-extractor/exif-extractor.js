@@ -1,6 +1,6 @@
 // EXIF Extractor
 class ExifExtractor {
-    constructor() {
+    constructor(skipInit = false) {
         this.dropZone = document.getElementById('dropZone');
         this.fileInput = document.getElementById('fileInput');
         this.output = document.getElementById('output');
@@ -13,7 +13,7 @@ class ExifExtractor {
             });
         };
         
-        this.init();
+        if (!skipInit) this.init();
     }
     
     init() {
@@ -364,5 +364,7 @@ class ExifExtractor {
 
 let exifExtractor;
 document.addEventListener('DOMContentLoaded', () => {
-    exifExtractor = new ExifExtractor();
+    if (document.getElementById('dropZone')) {
+        exifExtractor = new ExifExtractor();
+    }
 });

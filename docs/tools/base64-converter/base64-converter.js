@@ -87,21 +87,29 @@ function showMessage(text, type) {
 }
 
 // Real-time encoding/decoding on input change
-document.getElementById('inputText').addEventListener('input', function() {
-    const output = document.getElementById('outputText');
-    if (output.value) {
-        output.value = '';
-        document.getElementById('message').textContent = '';
-    }
-});
+const inputText = document.getElementById('inputText');
+if (inputText) {
+    inputText.addEventListener('input', function() {
+        const output = document.getElementById('outputText');
+        if (output && output.value) {
+            output.value = '';
+            const message = document.getElementById('message');
+            if (message) message.textContent = '';
+        }
+    });
+}
 
-document.getElementById('urlSafe').addEventListener('change', function() {
-    const output = document.getElementById('outputText');
-    if (output.value) {
-        output.value = '';
-        document.getElementById('message').textContent = '';
-    }
-});
+const urlSafe = document.getElementById('urlSafe');
+if (urlSafe) {
+    urlSafe.addEventListener('change', function() {
+        const output = document.getElementById('outputText');
+        if (output && output.value) {
+            output.value = '';
+            const message = document.getElementById('message');
+            if (message) message.textContent = '';
+        }
+    });
+}
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
