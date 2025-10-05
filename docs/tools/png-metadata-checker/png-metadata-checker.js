@@ -1,6 +1,6 @@
 // PNG Metadata Checker
 class PngMetadataChecker {
-    constructor() {
+    constructor(skipInit = false) {
         this.dropZone = document.getElementById('dropZone');
         this.fileInput = document.getElementById('fileInput');
         this.output = document.getElementById('output');
@@ -13,7 +13,7 @@ class PngMetadataChecker {
             });
         };
         
-        this.init();
+        if (!skipInit) this.init();
     }
     
     init() {
@@ -444,5 +444,7 @@ class PngMetadataChecker {
 // Initialize when DOM is loaded
 let pngChecker;
 document.addEventListener('DOMContentLoaded', () => {
-    pngChecker = new PngMetadataChecker();
+    if (document.getElementById('dropZone')) {
+        pngChecker = new PngMetadataChecker();
+    }
 });

@@ -6,7 +6,7 @@ class TestFramework {
     }
     
     test(name, fn) {
-        this.tests.push({ name, fn });
+        this.tests.push({ name, fn, tool: this.currentTool || 'unknown' });
     }
     
     assertEqual(actual, expected, message = '') {
@@ -21,6 +21,16 @@ class TestFramework {
         }
     }
     
+    assert(condition, message = '') {
+        if (!condition) {
+            throw new Error(message || 'Assertion failed');
+        }
+    }
+    
+    describe(name, fn) {
+        fn();
+    }
+    
     assertThrows(fn, message = '') {
         try {
             fn();
@@ -31,21 +41,21 @@ class TestFramework {
     }
     
     run() {
-        console.log('Running tests...\n');
+        console.log('Running tests...');
         
         this.tests.forEach(test => {
             try {
                 test.fn();
-                console.log(`✓ ${test.name}`);
+                console.log(`✓ ${test.tool}:${test.name}`);
                 this.results.passed++;
             } catch (error) {
-                console.log(`✗ ${test.name}: ${error.message}`);
+                console.log(`✗ ${test.tool}:${test.name}: ${error.message}`);
                 this.results.failed++;
             }
             this.results.total++;
         });
         
-        console.log(`\nResults: ${this.results.passed}/${this.results.total} passed`);
+        console.log(`Results: ${this.results.passed}/${this.results.total} passed`);
         return this.results.failed === 0;
     }
 }
