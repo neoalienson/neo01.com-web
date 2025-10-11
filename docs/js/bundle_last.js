@@ -39,14 +39,17 @@ var e,t;e=this,t=function(e){'use strict';const t='opt-in',o='opt-out',n='show--
             case 'POSTS':
             case 'PAGES':
                 $searchItems = array.map(function (item) {
-                    // Use config.root instead of permalink to fix url issue
-                    return searchItem('file', item.title, null, item.text.slice(0, 150), CONFIG.ROOT_URL + item.path);
+                    var url = item.permalink ? item.permalink.replace(/^https?:\/\/[^\/]+/, '') : item.path;
+                    return searchItem('file', item.title, null, item.text.slice(0, 150), url);
                 });
                 break;
             case 'CATEGORIES':
             case 'TAGS':
                 $searchItems = array.map(function (item) {
-                    return searchItem(type === 'CATEGORIES' ? 'folder' : 'tag', item.name, item.slug, null, item.permalink);
+                    var currentLang = CONFIG.LANG || 'en';
+                    var langPrefix = (currentLang === 'zh-TW' || currentLang === 'zh-CN') ? currentLang + '/' : '';
+                    var urlPath = type === 'CATEGORIES' ? 'categories/' : 'tags/';
+                    return searchItem(type === 'CATEGORIES' ? 'folder' : 'tag', item.name, item.slug, null, '/' + langPrefix + urlPath + item.slug + '/');
                 });
                 break;
             default:
@@ -159,10 +162,15 @@ var e,t;e=this,t=function(e){'use strict';const t='opt-in',o='opt-out',n='show--
     function search (json, keywords) {
         var WEIGHTS = weightFactory(keywords);
         var FILTERS = filterFactory(keywords);
-        var posts = json.posts;
-        var pages = json.pages;
-        var tags = extractToSet(json, 'tags');
-        var categories = extractToSet(json, 'categories');
+        var currentLang = CONFIG.LANG || 'en';
+        var langFilter = function(item) {
+            var itemLang = item.lang || 'en';
+            return itemLang === currentLang;
+        };
+        var posts = json.posts.filter(langFilter);
+        var pages = json.pages.filter(langFilter);
+        var tags = extractToSet({posts: posts, pages: pages}, 'tags');
+        var categories = extractToSet({posts: posts, pages: pages}, 'categories');
         return {
             posts: posts.filter(FILTERS.POST).sort(function (a, b) { return WEIGHTS.POST(b) - WEIGHTS.POST(a); }).slice(0, 5),
             pages: pages.filter(FILTERS.PAGE).sort(function (a, b) { return WEIGHTS.PAGE(b) - WEIGHTS.PAGE(a); }).slice(0, 5),
