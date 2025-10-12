@@ -1,0 +1,1118 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Claim-Check 模式：在分散式系統中處理大型訊息 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Architecture,Design Patterns,Messaging,Integration Patterns">
+    
+    
+    <meta name="description" content="了解 Claim-Check 模式如何透過將資料儲存在外部並傳遞輕量級權杖，解決訊息系統中傳輸大型負載的挑戰。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claim-Check 模式：在分散式系統中處理大型訊息">
+<meta property="og:url" content="https://neo01.com/zh-TW/2019/04/Claim-Check-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="了解 Claim-Check 模式如何透過將資料儲存在外部並傳遞輕量級權杖，解決訊息系統中傳輸大型負載的挑戰。">
+<meta property="og:locale" content="zh_TW">
+<meta property="article:published_time" content="2019-04-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-12T12:02:11.633Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="Design Patterns">
+<meta property="article:tag" content="Messaging">
+<meta property="article:tag" content="Integration Patterns">
+<meta name="twitter:card" content="summary">
+    
+    
+
+    
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/libs/titillium-web/styles.css">
+
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    
+<link rel="stylesheet" href="/css/prism-line-numbers.css">
+
+    
+<link rel="stylesheet" href="/css/prism.min.css">
+
+
+    
+
+
+    
+
+
+    
+    
+        
+<link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+
+    
+    
+        
+<link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+
+    
+
+
+<!-- hexo injector head_end start --><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="stylesheet" type="text/css" href="/cache/cookieconsent.css"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                    
+                        <h2 class="subtitle-wrap">
+                          
+                            <p class="title">解碼數位異象</p>
+                          
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+                    
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                        
+                            
+                            
+                            <a href="/2019/04/Claim-Check-Pattern/" class="lang-link">English</a>
+                        
+                            
+                            <span class="lang-sep">|</span>
+                            <a href="/zh-CN/2019/04/Claim-Check-Pattern/" class="lang-link">简体中文</a>
+                        
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                            
+                                        <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Security/">Security</a></li></ul>
+                                    
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/04/Claim-Check-Pattern-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Claim-Check 模式：在分散式系統中處理大型訊息
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-04-14T16:00:00.000Z" itemprop="datePublished">2019-04-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-12T12:02:11.633Z" itemprop="datePublished">2025-10-12</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/Architecture/">Architecture</a> <a class="tag-link" href="/zh-TW/tags/Design-Patterns/">Design Patterns</a> <a class="tag-link" href="/zh-TW/tags/Messaging/">Messaging</a> <a class="tag-link" href="/zh-TW/tags/Integration-Patterns/">Integration Patterns</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%95%8F%E9%A1%8C%EF%BC%9A%E7%95%B6%E8%A8%8A%E6%81%AF%E8%AE%8A%E5%BE%97%E5%A4%AA%E9%87%8D"><span class="toc-text">問題：當訊息變得太重</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E6%B1%BA%E6%96%B9%E6%A1%88%EF%BC%9A%E5%B0%87%E5%84%B2%E5%AD%98%E8%88%87%E8%A8%8A%E6%81%AF%E5%82%B3%E9%81%9E%E5%88%86%E9%9B%A2"><span class="toc-text">解決方案：將儲存與訊息傳遞分離</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%81%8B%E4%BD%9C%E6%96%B9%E5%BC%8F%EF%BC%9A%E6%A8%A1%E5%BC%8F%E5%AF%A6%E4%BD%9C"><span class="toc-text">運作方式：模式實作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AF%A6%E4%BD%9C%E8%80%83%E9%87%8F"><span class="toc-text">實作考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%99%82%E4%BD%BF%E7%94%A8-Claim-Check-%E6%A8%A1%E5%BC%8F"><span class="toc-text">何時使用 Claim-Check 模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%A7%8B%E5%93%81%E8%B3%AA%E5%B1%AC%E6%80%A7"><span class="toc-text">架構品質屬性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%AC%8A%E8%A1%A1%E8%88%87%E8%80%83%E9%87%8F"><span class="toc-text">權衡與考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AF%A6%E9%9A%9B%E5%AF%A6%E4%BD%9C%E6%A8%A1%E5%BC%8F"><span class="toc-text">實際實作模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%B8%E9%97%9C%E6%A8%A1%E5%BC%8F"><span class="toc-text">相關模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%83%E8%80%83%E8%B3%87%E6%96%99"><span class="toc-text">參考資料</span></a></li></ol>
+            <p>想像一下在機場託運行李的情景。你不需要帶著沉重的行李通過安檢和登機，而是在報到櫃檯交出行李，並收到一張小小的提領單。到達目的地後，你出示提領單就能取回行李。這個真實世界的流程啟發了分散式系統中一個最優雅的解決方案：Claim-Check 模式。</p>
+<h2 id="問題：當訊息變得太重">問題：當訊息變得太重</h2>
+<p>傳統訊息系統擅長處理大量的小型訊息。它們針對速度、吞吐量和可靠性進行了優化，特別是在處理輕量級資料時。然而，它們在處理大型負載時常常遇到困難，原因如下：</p>
+<ul>
+<li><strong>大小限制</strong>：大多數訊息系統對訊息大小有嚴格限制（通常為 256KB 到 1MB）</li>
+<li><strong>效能下降</strong>：大型訊息消耗更多記憶體和頻寬，拖慢整個系統</li>
+<li><strong>逾時問題</strong>：處理大型訊息可能超過逾時閾值</li>
+<li><strong>資源耗盡</strong>：多個大型訊息可能壓垮訊息基礎設施</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 實際影響</p><div class="admonition-content"><p>在設計用於處理 64KB 訊息的佇列中，單一 10MB 訊息可能導致連鎖故障，影響所有消費者，甚至可能導致整個訊息系統崩潰。</p>
+</div></div>
+<h2 id="解決方案：將儲存與訊息傳遞分離">解決方案：將儲存與訊息傳遞分離</h2>
+<p>Claim-Check 模式透過分離資料儲存和訊息傳遞的關注點，優雅地解決了這個問題：</p>
+<ol>
+<li><strong>儲存負載</strong>到針對大型物件優化的外部資料儲存</li>
+<li><strong>產生 claim-check 權杖</strong>（唯一識別碼或金鑰）</li>
+<li><strong>僅透過訊息系統傳送權杖</strong></li>
+<li><strong>在需要時使用權杖取回負載</strong></li>
+</ol>
+<div class="mermaid">sequenceDiagram
+    participant Sender as 傳送者
+    participant DataStore as 外部資料儲存
+    participant MsgSystem as 訊息系統
+    participant Receiver as 接收者
+    
+    Sender-&gt;&gt;DataStore: 1. 儲存大型負載
+    DataStore--&gt;&gt;Sender: 2. 回傳 claim-check 權杖
+    Sender-&gt;&gt;MsgSystem: 3. 傳送帶有權杖的訊息
+    MsgSystem-&gt;&gt;Receiver: 4. 傳遞帶有權杖的訊息
+    Receiver-&gt;&gt;DataStore: 5. 使用權杖取回負載
+    DataStore--&gt;&gt;Receiver: 6. 回傳負載
+    Receiver-&gt;&gt;Receiver: 7. 處理負載</div>
+<h2 id="運作方式：模式實作">運作方式：模式實作</h2>
+<p>讓我們透過一個處理帶有大型附件的客戶訂單的具體範例來說明：</p>
+<h3 id="步驟-1：儲存負載">步驟 1：儲存負載</h3>
+<p>當傳送者需要傳輸大型負載（例如高解析度圖片、影片檔案或大型文件）時：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 傳送者應用程式</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">sendLargeMessage</span><span class="token punctuation">(</span><span class="token parameter">payload</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token comment">// 將負載儲存在外部資料儲存</span>
+  <span class="token keyword">const</span> claimCheckToken <span class="token operator">=</span> <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">data</span><span class="token operator">:</span> payload<span class="token punctuation">,</span>
+    <span class="token literal-property property">expiresAt</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span><span class="token number">24</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">)</span> <span class="token comment">// 24 小時</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token keyword">return</span> claimCheckToken<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="步驟-2：傳送權杖">步驟 2：傳送權杖</h3>
+<p>訊息系統只處理輕量級權杖：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 傳送帶有 claim-check 權杖的訊息</span>
+<span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+  <span class="token literal-property property">orderId</span><span class="token operator">:</span> <span class="token string">"ORD-12345"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> claimCheckToken<span class="token punctuation">,</span>
+  <span class="token literal-property property">metadata</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">size</span><span class="token operator">:</span> payload<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">contentType</span><span class="token operator">:</span> <span class="token string">"application/pdf"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="步驟-3：取回並處理">步驟 3：取回並處理</h3>
+<p>接收者使用權杖取得實際負載：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 接收者應用程式</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">processMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token comment">// 使用 claim-check 權杖取回負載</span>
+  <span class="token keyword">const</span> payload <span class="token operator">=</span> <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">retrieve</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>claimCheck<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// 處理負載</span>
+  <span class="token keyword">await</span> <span class="token function">processOrder</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>orderId<span class="token punctuation">,</span> payload<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// 清理</span>
+  <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>claimCheck<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="實作考量">實作考量</h2>
+<p>實作 Claim-Check 模式時，請考慮以下重要面向：</p>
+<h3 id="1-負載生命週期管理">1. 負載生命週期管理</h3>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🗑️ 清理策略</p><div class="admonition-content"><p><strong>同步刪除</strong>：消費應用程式在處理後立即刪除負載。這將刪除與訊息工作流程綁定，確保及時清理。</p>
+<p><strong>非同步刪除</strong>：訊息處理工作流程之外的獨立背景程序根據存活時間（TTL）或其他條件處理清理。這將刪除程序與訊息處理解耦，但需要額外的基礎設施。</p>
+</div></div>
+<h3 id="2-條件式應用">2. 條件式應用</h3>
+<p>並非每個訊息都需要 Claim-Check 模式。實作邏輯以選擇性地應用它：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">sendMessage</span><span class="token punctuation">(</span><span class="token parameter">payload</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> <span class="token constant">MESSAGE_SIZE_THRESHOLD</span> <span class="token operator">=</span> <span class="token number">256</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">;</span> <span class="token comment">// 256KB</span>
+  
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>payload<span class="token punctuation">.</span>length <span class="token operator">&gt;</span> <span class="token constant">MESSAGE_SIZE_THRESHOLD</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 使用 Claim-Check 模式</span>
+    <span class="token keyword">const</span> token <span class="token operator">=</span> <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span>payload<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> token <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 直接傳送</span>
+    <span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">data</span><span class="token operator">:</span> payload <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>這種條件式方法：</p>
+<ul>
+<li>減少小型訊息的延遲</li>
+<li>優化資源利用</li>
+<li>提升整體吞吐量</li>
+</ul>
+<h3 id="3-安全性考量">3. 安全性考量</h3>
+<p>claim-check 權杖應該：</p>
+<ul>
+<li><strong>唯一</strong>：防止衝突和未授權存取</li>
+<li><strong>隱晦</strong>：使用 UUID 或加密雜湊，而非循序 ID</li>
+<li><strong>有時限</strong>：實作過期機制以防止無限期儲存</li>
+<li><strong>存取控制</strong>：確保只有授權的應用程式可以取回負載</li>
+</ul>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 產生安全的 claim-check 權杖</span>
+<span class="token keyword">function</span> <span class="token function">generateClaimCheck</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">id</span><span class="token operator">:</span> crypto<span class="token punctuation">.</span><span class="token function">randomUUID</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">signature</span><span class="token operator">:</span> crypto<span class="token punctuation">.</span><span class="token function">createHmac</span><span class="token punctuation">(</span><span class="token string">'sha256'</span><span class="token punctuation">,</span> secretKey<span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>id<span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">digest</span><span class="token punctuation">(</span><span class="token string">'hex'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">expiresAt</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token constant">TTL</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="何時使用-Claim-Check-模式">何時使用 Claim-Check 模式</h2>
+<h3 id="主要使用案例">主要使用案例</h3>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 理想情境</p><div class="admonition-content"><p><strong>訊息系統限制</strong>：當訊息大小超過系統限制時，將負載卸載到外部儲存。</p>
+<p><strong>效能優化</strong>：當大型訊息降低訊息系統效能時，將儲存與傳遞分離。</p>
+</div></div>
+<h3 id="次要使用案例">次要使用案例</h3>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📋 額外優勢</p><div class="admonition-content"><p><strong>敏感資料保護</strong>：將敏感資訊儲存在具有更嚴格存取控制的安全資料儲存中，使其遠離訊息系統。</p>
+<p><strong>複雜路由</strong>：當訊息穿越多個元件時，透過僅在中介層傳遞權杖來避免重複的序列化/反序列化開銷。</p>
+</div></div>
+<div class="mermaid">graph TD
+    A[訊息大小分析] --&gt; B{大小 &gt; 閾值？}
+    B --&gt;|是| C[使用 Claim-Check]
+    B --&gt;|否| D{包含敏感資料？}
+    D --&gt;|是| C
+    D --&gt;|否| E{複雜路由？}
+    E --&gt;|是| C
+    E --&gt;|否| F[直接訊息傳遞]
+    
+    style C fill:#51cf66,stroke:#2f9e44
+    style F fill:#4dabf7,stroke:#1971c2</div>
+<h2 id="架構品質屬性">架構品質屬性</h2>
+<p>Claim-Check 模式影響多個架構品質屬性：</p>
+<h3 id="可靠性">可靠性</h3>
+<p>將資料與訊息分離可實現：</p>
+<ul>
+<li><strong>資料冗餘</strong>：外部資料儲存通常提供更好的複製和備份</li>
+<li><strong>災難復原</strong>：負載可以獨立於訊息系統進行復原</li>
+<li><strong>故障隔離</strong>：訊息系統故障不會影響已儲存的負載</li>
+</ul>
+<h3 id="安全性">安全性</h3>
+<p>此模式透過以下方式增強安全性：</p>
+<ul>
+<li><strong>資料隔離</strong>：敏感資料保留在具有更嚴格存取控制的安全儲存中</li>
+<li><strong>存取控制</strong>：只有具有有效權杖的服務才能取回負載</li>
+<li><strong>稽核軌跡</strong>：獨立儲存可實現詳細的存取記錄</li>
+</ul>
+<h3 id="效能">效能</h3>
+<p>效能改進包括：</p>
+<ul>
+<li><strong>減少訊息大小</strong>：訊息系統僅處理輕量級權杖</li>
+<li><strong>優化儲存</strong>：每個系統（訊息 vs. 資料儲存）處理其最擅長的事情</li>
+<li><strong>選擇性取回</strong>：接收者僅在需要時取得負載</li>
+</ul>
+<h3 id="成本優化">成本優化</h3>
+<p>成本優勢來自：</p>
+<ul>
+<li><strong>更便宜的訊息傳遞</strong>：避免為大型訊息支援付費的進階功能</li>
+<li><strong>儲存分層</strong>：為大型負載使用具成本效益的儲存</li>
+<li><strong>資源效率</strong>：更好地利用訊息基礎設施</li>
+</ul>
+<h2 id="權衡與考量">權衡與考量</h2>
+<p>與任何模式一樣，Claim-Check 引入了權衡：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 潛在缺點</p><div class="admonition-content"><p><strong>增加複雜性</strong>：需要額外的基礎設施和協調</p>
+<p><strong>延遲</strong>：取回負載需要額外的網路往返</p>
+<p><strong>一致性挑戰</strong>：確保訊息和負載保持同步</p>
+<p><strong>營運開銷</strong>：管理已儲存負載的生命週期</p>
+</div></div>
+<p>根據您的特定需求評估這些權衡。當訊息大小或效能問題超過增加的複雜性時，此模式效果最佳。</p>
+<h2 id="實際實作模式">實際實作模式</h2>
+<h3 id="模式-1：自動權杖產生">模式 1：自動權杖產生</h3>
+<p>使用事件驅動機制在檔案上傳時自動產生權杖：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 檔案上傳觸發自動 claim-check 產生</span>
+dataStore<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'upload'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">file</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> token <span class="token operator">=</span> <span class="token function">generateClaimCheck</span><span class="token punctuation">(</span>file<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">event</span><span class="token operator">:</span> <span class="token string">'file-uploaded'</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> token<span class="token punctuation">,</span>
+    <span class="token literal-property property">metadata</span><span class="token operator">:</span> file<span class="token punctuation">.</span>metadata
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="模式-2：手動權杖產生">模式 2：手動權杖產生</h3>
+<p>應用程式明確管理權杖建立和負載儲存：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 應用程式控制整個程序</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">processLargeOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> token <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">storeOrderDocuments</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>documents<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> <span class="token function">sendOrderMessage</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+    <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> token
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="結論">結論</h2>
+<p>Claim-Check 模式為訊息系統中處理大型負載的挑戰提供了優雅的解決方案。透過將儲存與訊息傳遞分離，它使系統能夠：</p>
+<ul>
+<li>克服訊息大小限制</li>
+<li>維持高效能</li>
+<li>增強安全性和可靠性</li>
+<li>優化成本</li>
+</ul>
+<p>雖然它引入了額外的複雜性，但在處理大型資料傳輸的系統中，其優勢通常遠超過成本。當您的訊息基礎設施在負載大小上遇到困難，或當您需要在維持高效訊息傳遞的同時保護敏感資料時，請考慮實作此模式。</p>
+<h2 id="相關模式">相關模式</h2>
+<ul>
+<li><strong>非同步請求-回覆</strong>：補充 Claim-Check 用於長時間執行的操作</li>
+<li><strong>競爭消費者</strong>：與 Claim-Check 配合良好用於平行處理</li>
+<li><strong>分割與聚合</strong>：處理大型訊息的替代方法</li>
+</ul>
+<h2 id="參考資料">參考資料</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://www.enterpriseintegrationpatterns.com/patterns/messaging/StoreInLibrary.html">Enterprise Integration Patterns: Claim Check</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/claim-check">Microsoft Azure Architecture Patterns: Claim-Check</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2019/04/Claim-Check-Pattern/" data-id="5818eb3" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Claim-Check 模式：在分散式系統中處理大型訊息",
+        "image": "https://neo01.com",
+        "keywords": "Architecture Design Patterns Messaging Integration Patterns",
+        "genre": "Architecture",
+        "datePublished": "2019-04-15",
+        "dateCreated": "2019-04-15",
+        "dateModified": "2025-10-12",
+        "url": "https://neo01.com//zh-TW/2019/04/Claim-Check-Pattern/",
+        "description": "了解 Claim-Check 模式如何透過將資料儲存在外部並傳遞輕量級權杖，解決訊息系統中傳輸大型負載的挑戰。",
+        "wordCount": 1127
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+            
+                
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+                
+            
+        </ul>
+    </div>
+    <!-- 
+        
+<nav id="article-nav">
+    
+        <a href="/2019/04/Claim-Check-Pattern/" id="article-nav-newer" class="article-nav-link-wrap">
+        <strong class="article-nav-caption">下一篇</strong>
+        <p class="article-nav-title">
+        
+            The Claim-Check Pattern: Handling Large Messages in Distributed Systems
+        
+        </p>
+        <i class="icon fa fa-chevron-right" id="icon-chevron-right"></i>
+    </a>
+    
+    
+        <a href="/zh-CN/2019/03/Retry-Pattern/" id="article-nav-older" class="article-nav-link-wrap">
+        <strong class="article-nav-caption">上一篇</strong>
+        <p class="article-nav-title">重试模式：构建具韧性的应用程序</p>
+        <i class="icon fa fa-chevron-left" id="icon-chevron-left"></i>
+        </a>
+    
+</nav>
+
+     -->
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+    
+    
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="工具、遊戲與瀏覽器內建 AI 遊樂場" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">工具、遊戲與瀏覽器內建 AI 遊樂場</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="代理式編碼的崛起：AI 驅動的軟體工程" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">代理式編碼的崛起：AI 驅動的軟體工程</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports/thumbnail.png)" alt="理解臨時埠" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Development/">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports/" class="title">理解臨時埠</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="架構即程式碼：第二部分 - 建立基礎" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Architecture/">架構</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">架構即程式碼：第二部分 - 建立基礎</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/07/Architecture_As_Code_Part_1_The_Revolution_Begins/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_1_The_Revolution_Begins/thumbnail.jpg)" alt="架構即程式碼：第一部分 - 革命的開端" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Architecture/">架構</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/07/Architecture_As_Code_Part_1_The_Revolution_Begins/" class="title">架構即程式碼：第一部分 - 革命的開端</a></p>
+                            <p class="item-date"><time datetime="2025-07-14T16:00:00.000Z" itemprop="datePublished">2025-07-15</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#72d2dcef</div>
+                <img src="/qr/qr-a8745fee86815ea8f8846e0bde70326d.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#72d2dcef">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
