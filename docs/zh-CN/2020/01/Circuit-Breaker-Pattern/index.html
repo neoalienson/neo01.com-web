@@ -1,0 +1,1683 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>断路器模式：防止连锁故障 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="了解断路器模式如何通过暂时阻挡对故障服务的调用来保护分布式系统免于连锁故障，让系统有时间恢复。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="断路器模式：防止连锁故障">
+<meta property="og:url" content="https://neo01.com/zh-CN/2020/01/Circuit-Breaker-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="了解断路器模式如何通过暂时阻挡对故障服务的调用来保护分布式系统免于连锁故障，让系统有时间恢复。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2020-01-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-12T13:42:11.752Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+    
+    
+
+    
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/libs/titillium-web/styles.css">
+
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    
+<link rel="stylesheet" href="/css/prism-line-numbers.css">
+
+    
+<link rel="stylesheet" href="/css/prism.min.css">
+
+
+    
+
+
+    
+
+
+    
+    
+        
+<link rel="stylesheet" href="/libs/lightgallery/css/lightgallery.min.css">
+
+    
+    
+        
+<link rel="stylesheet" href="/libs/justified-gallery/justifiedGallery.min.css">
+
+    
+
+
+<!-- hexo injector head_end start --><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><link rel="stylesheet" type="text/css" href="/cache/cookieconsent.css"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                    
+                        <h2 class="subtitle-wrap">
+                          
+                            <p class="title">解码数字异常</p>
+                          
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+                    
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                        
+                            
+                            
+                            <a href="/2020/01/Circuit-Breaker-Pattern/" class="lang-link">English</a>
+                        
+                            
+                            <span class="lang-sep">|</span>
+                            <a href="/zh-TW/2020/01/Circuit-Breaker-Pattern/" class="lang-link">繁體中文</a>
+                        
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                            
+                                        <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Security/">Security</a></li></ul>
+                                    
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2020/01/Circuit-Breaker-Pattern-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        断路器模式：防止连锁故障
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2020-01-14T16:00:00.000Z" itemprop="datePublished">2020-01-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-12T13:42:11.752Z" itemprop="datePublished">2025-10-12</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%94%B5%E8%B7%AF%E6%96%AD%E8%B7%AF%E5%99%A8%E7%B1%BB%E6%AF%94"><span class="toc-text">电路断路器类比</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%EF%BC%9A%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F%E4%B8%AD%E7%9A%84%E8%BF%9E%E9%94%81%E6%95%85%E9%9A%9C"><span class="toc-text">问题：分布式系统中的连锁故障</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%EF%BC%9A%E6%96%AD%E8%B7%AF%E5%99%A8%E6%A8%A1%E5%BC%8F"><span class="toc-text">解决方案：断路器模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%AD%E8%B7%AF%E5%99%A8%E7%8A%B6%E6%80%81"><span class="toc-text">断路器状态</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E5%AE%9E%E7%8E%B0"><span class="toc-text">实际实现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9C%9F%E5%AE%9E%E4%B8%96%E7%95%8C%E7%A4%BA%E4%BE%8B%EF%BC%9A%E7%94%B5%E5%AD%90%E5%95%86%E5%8A%A1%E5%B9%B3%E5%8F%B0"><span class="toc-text">真实世界示例：电子商务平台</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%AD%E8%B7%AF%E5%99%A8%E4%B8%8E%E9%87%8D%E8%AF%95%E6%A8%A1%E5%BC%8F%E7%BB%93%E5%90%88"><span class="toc-text">断路器与重试模式结合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%91%E6%8E%A7%E4%B8%8E%E6%8C%87%E6%A0%87"><span class="toc-text">监控与指标</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E8%80%83%E9%87%8F"><span class="toc-text">关键考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%97%B6%E4%BD%BF%E7%94%A8%E6%96%AD%E8%B7%AF%E5%99%A8"><span class="toc-text">何时使用断路器</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%8E%E9%87%8D%E8%AF%95%E6%A8%A1%E5%BC%8F%E6%AF%94%E8%BE%83"><span class="toc-text">与重试模式比较</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-text">总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-text">参考资料</span></a></li></ol>
+            <p>想象你家中的电路系统。当过多电流流经电线时——可能是短路或插座过载——断路器会跳闸，切断电源以防止损坏或火灾。断路器不会持续尝试将电力强制通过危险的情况。相反地，它会快速失败，保护整个系统。问题修复后，你可以重置断路器并恢复供电。</p>
+<p>同样的原理适用于分布式系统。当远程服务故障时，断路器模式可防止应用程序重复尝试注定失败的操作，保护系统资源并实现优雅降级。</p>
+<h2 id="电路断路器类比">电路断路器类比</h2>
+<p>就像电路断路器：</p>
+<ul>
+<li>监控电流（请求失败）</li>
+<li>超过阈值时跳闸（过多失败）</li>
+<li>开启时阻挡进一步尝试（防止连锁故障）</li>
+<li>冷却后允许测试（半开状态）</li>
+<li>服务恢复时重置（关闭状态）</li>
+</ul>
+<p>软件断路器：</p>
+<ul>
+<li>监控服务调用失败</li>
+<li>达到失败阈值时开启</li>
+<li>开启时立即拒绝请求</li>
+<li>超时后允许有限的测试请求</li>
+<li>服务展现恢复时关闭</li>
+</ul>
+<div class="mermaid">stateDiagram-v2
+    [*] --&gt; Closed
+    Closed --&gt; Open: 达到失败阈值
+    Open --&gt; HalfOpen: 超时到期
+    HalfOpen --&gt; Closed: 达到成功阈值
+    HalfOpen --&gt; Open: 发生任何失败
+    
+    note right of Closed
+        正常运作
+        请求通过
+        计算失败次数
+    end note
+    
+    note right of Open
+        快速失败
+        请求被拒绝
+        计时器运行中
+    end note
+    
+    note right of HalfOpen
+        有限测试
+        允许试探请求
+        评估恢复状况
+    end note</div>
+<h2 id="问题：分布式系统中的连锁故障">问题：分布式系统中的连锁故障</h2>
+<p>在分布式环境中，远程服务调用可能因各种原因失败：</p>
+<h3 id="暂时性故障">暂时性故障</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 会自行解决的临时问题</span>
+<span class="token keyword">class</span> <span class="token class-name">PaymentService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">processPayment</span><span class="token punctuation">(</span><span class="token parameter">orderId<span class="token punctuation">,</span> amount</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 网络短暂中断 - 重试可能成功</span>
+      <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>paymentGateway<span class="token punctuation">.</span><span class="token function">charge</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>error<span class="token punctuation">.</span>code <span class="token operator">===</span> <span class="token string">'NETWORK_TIMEOUT'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 暂时性 - 重试可能有效</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">retry</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> 
+          <span class="token keyword">this</span><span class="token punctuation">.</span>paymentGateway<span class="token punctuation">.</span><span class="token function">charge</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="持续性故障">持续性故障</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 服务完全宕机 - 重试无济于事</span>
+<span class="token keyword">class</span> <span class="token class-name">InventoryService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">checkStock</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryApi<span class="token punctuation">.</span><span class="token function">getStock</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>error<span class="token punctuation">.</span>code <span class="token operator">===</span> <span class="token string">'SERVICE_UNAVAILABLE'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 服务崩溃 - 重试浪费资源</span>
+        <span class="token comment">// 每次重试都会占用线程、内存、连接</span>
+        <span class="token comment">// 超时期间会阻挡其他操作</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Inventory service unavailable'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="资源耗尽">资源耗尽</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 失败的服务消耗关键资源</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderProcessor</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">processOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 每次失败的调用都会占用资源直到超时</span>
+    <span class="token keyword">const</span> promises <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">reserve</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span>    <span class="token comment">// 30秒超时</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>paymentService<span class="token punctuation">.</span><span class="token function">charge</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>total<span class="token punctuation">)</span><span class="token punctuation">,</span>       <span class="token comment">// 30秒超时</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>shippingService<span class="token punctuation">.</span><span class="token function">schedule</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>address<span class="token punctuation">)</span>   <span class="token comment">// 30秒超时</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>promises<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 如果库存服务宕机：</span>
+      <span class="token comment">// - 100个并发订单 = 100个线程被阻挡</span>
+      <span class="token comment">// - 每个等待30秒超时</span>
+      <span class="token comment">// - 数据库连接被占用</span>
+      <span class="token comment">// - 待处理请求消耗内存</span>
+      <span class="token comment">// - 其他服务无法获取资源</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 连锁故障问题</p><div class="admonition-content"><p><strong>初始故障</strong>：一个服务变慢或无法使用</p>
+<p><strong>资源阻塞</strong>：调用者等待超时，占用线程和连接</p>
+<p><strong>资源耗尽</strong>：系统耗尽线程、内存或连接</p>
+<p><strong>连锁影响</strong>：其他不相关的操作因资源匮乏而失败</p>
+<p><strong>全系统中断</strong>：整个应用程序变得无响应</p>
+</div></div>
+<h2 id="解决方案：断路器模式">解决方案：断路器模式</h2>
+<p>断路器作为代理监控失败并防止调用故障服务：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">CircuitBreaker</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">options <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureThreshold <span class="token operator">=</span> options<span class="token punctuation">.</span>failureThreshold <span class="token operator">||</span> <span class="token number">5</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>successThreshold <span class="token operator">=</span> options<span class="token punctuation">.</span>successThreshold <span class="token operator">||</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>timeout <span class="token operator">=</span> options<span class="token punctuation">.</span>timeout <span class="token operator">||</span> <span class="token number">60000</span><span class="token punctuation">;</span> <span class="token comment">// 60秒</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>monitoringPeriod <span class="token operator">=</span> options<span class="token punctuation">.</span>monitoringPeriod <span class="token operator">||</span> <span class="token number">10000</span><span class="token punctuation">;</span> <span class="token comment">// 10秒</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'CLOSED'</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">execute</span><span class="token punctuation">(</span><span class="token parameter">operation</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Circuit breaker is OPEN'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      <span class="token comment">// 超时到期，尝试半开</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">operation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">onSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">onFailure</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">onSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>successCount<span class="token operator">++</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">&gt;=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>successThreshold<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'CLOSED'</span><span class="token punctuation">;</span>
+        console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'断路器关闭 - 服务已恢复'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">onFailure</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'OPEN'</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token keyword">this</span><span class="token punctuation">.</span>timeout<span class="token punctuation">;</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'断路器开启 - 服务仍在故障中'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'CLOSED'</span> <span class="token operator">&amp;&amp;</span> 
+        <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">&gt;=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>failureThreshold<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'OPEN'</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token keyword">this</span><span class="token punctuation">.</span>timeout<span class="token punctuation">;</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'断路器开启 - 达到阈值'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getState</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>state<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="断路器状态">断路器状态</h2>
+<div class="mermaid">graph TB
+    subgraph Closed["🟢 关闭状态"]
+        C1[请求到达]
+        C2[传递给服务]
+        C3{成功？}
+        C4[增加失败计数器]
+        C5{达到<br>阈值？}
+        C6[返回结果]
+        
+        C1 --&gt; C2
+        C2 --&gt; C3
+        C3 --&gt;|是| C6
+        C3 --&gt;|否| C4
+        C4 --&gt; C5
+        C5 --&gt;|否| C6
+    end
+    
+    subgraph Open["🔴 开启状态"]
+        O1[请求到达]
+        O2[立即失败]
+        O3[返回缓存/默认值]
+        O4{超时<br>到期？}
+        
+        O1 --&gt; O2
+        O2 --&gt; O3
+        O3 --&gt; O4
+    end
+    
+    subgraph HalfOpen["🟡 半开状态"]
+        H1[有限请求]
+        H2[传递给服务]
+        H3{成功？}
+        H4[增加成功计数器]
+        H5{成功<br>阈值？}
+        
+        H1 --&gt; H2
+        H2 --&gt; H3
+        H3 --&gt;|是| H4
+        H4 --&gt; H5
+    end
+    
+    C5 --&gt;|是| Open
+    O4 --&gt;|是| HalfOpen
+    H5 --&gt;|是| Closed
+    H3 --&gt;|否| Open
+    
+    style Closed fill:#d3f9d8,stroke:#2f9e44
+    style Open fill:#ffe3e3,stroke:#c92a2a
+    style HalfOpen fill:#fff3bf,stroke:#f59f00</div>
+<h3 id="关闭状态：正常运作">关闭状态：正常运作</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">InventoryServiceClient</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreaker <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">CircuitBreaker</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">failureThreshold</span><span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">timeout</span><span class="token operator">:</span> <span class="token number">60000</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">checkStock</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreaker<span class="token punctuation">.</span><span class="token function">execute</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 正常运作 - 请求通过</span>
+      <span class="token keyword">const</span> response <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>
+        <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://inventory-api.example.com/stock/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+      <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>response<span class="token punctuation">.</span>ok<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">HTTP </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>response<span class="token punctuation">.</span>status<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token keyword">return</span> <span class="token keyword">await</span> response<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 使用方式</span>
+<span class="token keyword">const</span> client <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">InventoryServiceClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 前4次失败 - 断路器保持关闭</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> <span class="token number">4</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">try</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> client<span class="token punctuation">.</span><span class="token function">checkStock</span><span class="token punctuation">(</span><span class="token string">'product-123'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">尝试 </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>i <span class="token operator">+</span> <span class="token number">1</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> 失败</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 第5次失败 - 断路器开启</span>
+<span class="token keyword">try</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> client<span class="token punctuation">.</span><span class="token function">checkStock</span><span class="token punctuation">(</span><span class="token string">'product-123'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'断路器开启'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="开启状态：快速失败">开启状态：快速失败</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryClient <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">InventoryServiceClient</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>defaultStock <span class="token operator">=</span> <span class="token punctuation">{</span> <span class="token literal-property property">available</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">processOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 断路器开启 - 立即失败</span>
+      <span class="token keyword">const</span> stock <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryClient<span class="token punctuation">.</span><span class="token function">checkStock</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">completeOrder</span><span class="token punctuation">(</span>order<span class="token punctuation">,</span> stock<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>error<span class="token punctuation">.</span>message <span class="token operator">===</span> <span class="token string">'Circuit breaker is OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 优雅降级</span>
+        console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'库存服务无法使用，使用默认值'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">completeOrder</span><span class="token punctuation">(</span>order<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>defaultStock<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">completeOrder</span><span class="token punctuation">(</span><span class="token parameter">order<span class="token punctuation">,</span> stock</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>stock<span class="token punctuation">.</span>available<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'PENDING'</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">message</span><span class="token operator">:</span> <span class="token string">'库存检查无法使用。订单将很快被验证。'</span>
+      <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'CONFIRMED'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">message</span><span class="token operator">:</span> <span class="token string">'订单已确认'</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="半开状态：测试恢复">半开状态：测试恢复</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">CircuitBreakerWithHalfOpen</span> <span class="token keyword">extends</span> <span class="token class-name">CircuitBreaker</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">execute</span><span class="token punctuation">(</span><span class="token parameter">operation</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Circuit breaker is OPEN'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token comment">// 进入半开状态</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'断路器半开 - 测试服务'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 在半开状态限制并发请求</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>pendingRequests <span class="token operator">&gt;=</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Circuit breaker is HALF_OPEN - limiting requests'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>pendingRequests<span class="token operator">++</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">operation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">onSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">onFailure</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">finally</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>pendingRequests<span class="token operator">--</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="实际实现">实际实现</h2>
+<p>这是一个生产就绪的断路器，具有监控功能：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ProductionCircuitBreaker</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">serviceName<span class="token punctuation">,</span> options <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>serviceName <span class="token operator">=</span> serviceName<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureThreshold <span class="token operator">=</span> options<span class="token punctuation">.</span>failureThreshold <span class="token operator">||</span> <span class="token number">5</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>successThreshold <span class="token operator">=</span> options<span class="token punctuation">.</span>successThreshold <span class="token operator">||</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>timeout <span class="token operator">=</span> options<span class="token punctuation">.</span>timeout <span class="token operator">||</span> <span class="token number">60000</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>monitoringPeriod <span class="token operator">=</span> options<span class="token punctuation">.</span>monitoringPeriod <span class="token operator">||</span> <span class="token number">10000</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token string">'CLOSED'</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>lastStateChange <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 指标</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>metrics <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">totalRequests</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">successfulRequests</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">failedRequests</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">rejectedRequests</span><span class="token operator">:</span> <span class="token number">0</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 定期重置失败计数</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>resetInterval <span class="token operator">=</span> <span class="token function">setInterval</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'CLOSED'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span>monitoringPeriod<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">execute</span><span class="token punctuation">(</span><span class="token parameter">operation<span class="token punctuation">,</span> fallback <span class="token operator">=</span> <span class="token keyword">null</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span>totalRequests<span class="token operator">++</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span>rejectedRequests<span class="token operator">++</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>fallback<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token function">fallback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">CircuitBreakerOpenError</span><span class="token punctuation">(</span>
+          <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Circuit breaker is OPEN for </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token keyword">this</span><span class="token punctuation">.</span>serviceName<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">transitionTo</span><span class="token punctuation">(</span><span class="token string">'HALF_OPEN'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">operation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">onSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span>successfulRequests<span class="token operator">++</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">onFailure</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span>failedRequests<span class="token operator">++</span><span class="token punctuation">;</span>
+      
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>fallback <span class="token operator">&amp;&amp;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token function">fallback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">onSuccess</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>successCount<span class="token operator">++</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">&gt;=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>successThreshold<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">transitionTo</span><span class="token punctuation">(</span><span class="token string">'CLOSED'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">onFailure</span><span class="token punctuation">(</span><span class="token parameter">error</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount<span class="token operator">++</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>successCount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'HALF_OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">transitionTo</span><span class="token punctuation">(</span><span class="token string">'OPEN'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">===</span> <span class="token string">'CLOSED'</span> <span class="token operator">&amp;&amp;</span> 
+               <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount <span class="token operator">&gt;=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>failureThreshold<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">transitionTo</span><span class="token punctuation">(</span><span class="token string">'OPEN'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">logError</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">transitionTo</span><span class="token punctuation">(</span><span class="token parameter">newState</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> oldState <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>state<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>state <span class="token operator">=</span> newState<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>lastStateChange <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>newState <span class="token operator">===</span> <span class="token string">'OPEN'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>nextAttempt <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token keyword">this</span><span class="token punctuation">.</span>timeout<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">emitStateChange</span><span class="token punctuation">(</span>oldState<span class="token punctuation">,</span> newState<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">emitStateChange</span><span class="token punctuation">(</span><span class="token parameter">oldState<span class="token punctuation">,</span> newState</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>
+      <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">[</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token keyword">this</span><span class="token punctuation">.</span>serviceName<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">] 断路器：</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>oldState<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> → </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>newState<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 发送指标供监控</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">publishMetrics</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">service</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>serviceName<span class="token punctuation">,</span>
+      <span class="token literal-property property">state</span><span class="token operator">:</span> newState<span class="token punctuation">,</span>
+      <span class="token literal-property property">timestamp</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">metrics</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>metrics
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">logError</span><span class="token punctuation">(</span><span class="token parameter">error</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span>
+      <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">[</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token keyword">this</span><span class="token punctuation">.</span>serviceName<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">] 请求失败：</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      error<span class="token punctuation">.</span>message
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">publishMetrics</span><span class="token punctuation">(</span><span class="token parameter">data</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 发送到监控系统</span>
+    <span class="token comment">// 示例：CloudWatch、Prometheus、Datadog</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getMetrics</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      <span class="token operator">...</span><span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">,</span>
+      <span class="token literal-property property">state</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>state<span class="token punctuation">,</span>
+      <span class="token literal-property property">failureCount</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>failureCount<span class="token punctuation">,</span>
+      <span class="token literal-property property">successCount</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>successCount
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">destroy</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">clearInterval</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>resetInterval<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">class</span> <span class="token class-name">CircuitBreakerOpenError</span> <span class="token keyword">extends</span> <span class="token class-name">Error</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">super</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>name <span class="token operator">=</span> <span class="token string">'CircuitBreakerOpenError'</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="真实世界示例：电子商务平台">真实世界示例：电子商务平台</h2>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">RecommendationService</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreaker <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ProductionCircuitBreaker</span><span class="token punctuation">(</span>
+      <span class="token string">'recommendation-service'</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span>
+        <span class="token literal-property property">failureThreshold</span><span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">successThreshold</span><span class="token operator">:</span> <span class="token number">3</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">timeout</span><span class="token operator">:</span> <span class="token number">30000</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span>cache <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getRecommendations</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token function-variable function">fallback</span> <span class="token operator">=</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 返回缓存的推荐</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span>
+          <span class="token literal-property property">recommendations</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+          <span class="token literal-property property">source</span><span class="token operator">:</span> <span class="token string">'cache'</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token comment">// 返回热门商品作为备用</span>
+      <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">recommendations</span><span class="token operator">:</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getPopularItems</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">source</span><span class="token operator">:</span> <span class="token string">'fallback'</span>
+      <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreaker<span class="token punctuation">.</span><span class="token function">execute</span><span class="token punctuation">(</span>
+      <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> response <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>
+          <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://recommendations-api.example.com/users/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>userId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>response<span class="token punctuation">.</span>ok<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">HTTP </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>response<span class="token punctuation">.</span>status<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        
+        <span class="token keyword">const</span> data <span class="token operator">=</span> <span class="token keyword">await</span> response<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">// 成功时更新缓存</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>userId<span class="token punctuation">,</span> data<span class="token punctuation">.</span>recommendations<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">return</span> <span class="token punctuation">{</span>
+          <span class="token literal-property property">recommendations</span><span class="token operator">:</span> data<span class="token punctuation">.</span>recommendations<span class="token punctuation">,</span>
+          <span class="token literal-property property">source</span><span class="token operator">:</span> <span class="token string">'live'</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      fallback
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getPopularItems</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 返回静态热门商品</span>
+    <span class="token keyword">return</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token string">'item-1'</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">'热门商品 1'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token string">'item-2'</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">'热门商品 2'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token string">'item-3'</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">'热门商品 3'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 使用方式</span>
+<span class="token keyword">const</span> recommendationService <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">RecommendationService</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">displayRecommendations</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">try</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> recommendationService<span class="token punctuation">.</span><span class="token function">getRecommendations</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span>source <span class="token operator">===</span> <span class="token string">'cache'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'显示缓存的推荐'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span>source <span class="token operator">===</span> <span class="token string">'fallback'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'显示热门商品（服务无法使用）'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'显示个性化推荐'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> result<span class="token punctuation">.</span>recommendations<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">'无法获取推荐：'</span><span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="断路器与重试模式结合">断路器与重试模式结合</h2>
+<p>结合断路器与重试以处理暂时性故障：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ResilientServiceClient</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">serviceName</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreaker <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">ProductionCircuitBreaker</span><span class="token punctuation">(</span>serviceName<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">failureThreshold</span><span class="token operator">:</span> <span class="token number">3</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">timeout</span><span class="token operator">:</span> <span class="token number">60000</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">callWithRetry</span><span class="token punctuation">(</span><span class="token parameter">operation<span class="token punctuation">,</span> maxRetries <span class="token operator">=</span> <span class="token number">3</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreaker<span class="token punctuation">.</span><span class="token function">execute</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">let</span> lastError<span class="token punctuation">;</span>
+      
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> attempt <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> attempt <span class="token operator">&lt;=</span> maxRetries<span class="token punctuation">;</span> attempt<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">try</span> <span class="token punctuation">{</span>
+          <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token function">operation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          lastError <span class="token operator">=</span> error<span class="token punctuation">;</span>
+          
+          <span class="token comment">// 某些错误不重试</span>
+          <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">isNonRetryableError</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+          <span class="token punctuation">}</span>
+          
+          <span class="token keyword">if</span> <span class="token punctuation">(</span>attempt <span class="token operator">&lt;</span> maxRetries<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token comment">// 指数退避</span>
+            <span class="token keyword">const</span> delay <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span><span class="token number">1000</span> <span class="token operator">*</span> Math<span class="token punctuation">.</span><span class="token function">pow</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> attempt <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">10000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span>delay<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token keyword">throw</span> lastError<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">isNonRetryableError</span><span class="token punctuation">(</span><span class="token parameter">error</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 不重试客户端错误（4xx）</span>
+    <span class="token keyword">return</span> error<span class="token punctuation">.</span>status <span class="token operator">&gt;=</span> <span class="token number">400</span> <span class="token operator">&amp;&amp;</span> error<span class="token punctuation">.</span>status <span class="token operator">&lt;</span> <span class="token number">500</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">sleep</span><span class="token punctuation">(</span><span class="token parameter">ms</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token parameter">resolve</span> <span class="token operator">=&gt;</span> <span class="token function">setTimeout</span><span class="token punctuation">(</span>resolve<span class="token punctuation">,</span> ms<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="监控与指标">监控与指标</h2>
+<div id="chart_21la8mkd3" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_21la8mkd3'));
+        var option = {
+  "title": {
+    "text": "断路器状态随时间变化"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["请求", "失败", "断路器状态"]
+  },
+  "xAxis": {
+    "type": "category",
+    "data": ["10:00", "10:05", "10:10", "10:15", "10:20", "10:25", "10:30"]
+  },
+  "yAxis": [
+    {
+      "type": "value",
+      "name": "请求数"
+    },
+    {
+      "type": "value",
+      "name": "状态",
+      "max": 2,
+      "axisLabel": {
+        "formatter": function(value) {
+          return ["关闭", "半开", "开启"][value] || "";
+        }
+      }
+    }
+  ],
+  "series": [
+    {
+      "name": "请求",
+      "type": "line",
+      "data": [100, 95, 90, 20, 25, 80, 100]
+    },
+    {
+      "name": "失败",
+      "type": "line",
+      "data": [2, 5, 15, 18, 10, 3, 1]
+    },
+    {
+      "name": "断路器状态",
+      "type": "line",
+      "yAxisIndex": 1,
+      "data": [0, 0, 2, 2, 1, 0, 0],
+      "itemStyle": {
+        "color": "#f59f00"
+      }
+    }
+  ]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<h2 id="关键考量">关键考量</h2>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>💡 异常处理</p><div class="admonition-content"><p>应用程序必须优雅地处理断路器异常：</p>
+<ul>
+<li>提供备用响应</li>
+<li>显示用户友好的消息</li>
+<li>记录以供监控和警报</li>
+</ul>
+</div></div>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>💡 超时配置</p><div class="admonition-content"><p>平衡超时时间与恢复模式：</p>
+<ul>
+<li>太短：服务恢复前断路器重新开启</li>
+<li>太长：用户不必要地等待</li>
+<li>根据历史数据使用自适应超时</li>
+</ul>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 监控至关重要</p><div class="admonition-content"><p>跟踪断路器指标：</p>
+<ul>
+<li>状态转换（关闭 → 开启 → 半开）</li>
+<li>请求成功/失败率</li>
+<li>在每个状态花费的时间</li>
+<li>断路器频繁开启时发出警报</li>
+</ul>
+</div></div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 备用策略</p><div class="admonition-content"><p>断路器开启时提供有意义的备用：</p>
+<ul>
+<li>缓存数据</li>
+<li>默认值</li>
+<li>降级功能</li>
+<li>用户通知</li>
+</ul>
+</div></div>
+<h2 id="何时使用断路器">何时使用断路器</h2>
+<p>使用此模式当：</p>
+<p>✅ <strong>防止连锁故障</strong>：阻止故障在服务间扩散</p>
+<p>✅ <strong>保护共享资源</strong>：防止故障依赖性造成资源耗尽</p>
+<p>✅ <strong>优雅降级</strong>：服务故障时维持部分功能</p>
+<p>✅ <strong>快速失败</strong>：避免在已知故障上等待超时</p>
+<p>不要使用此模式当：</p>
+<p>❌ <strong>本地资源</strong>：内存内操作不需要断路器</p>
+<p>❌ <strong>业务逻辑异常</strong>：用于基础设施故障，而非业务规则</p>
+<p>❌ <strong>简单重试就足够</strong>：快速恢复的暂时性故障</p>
+<p>❌ <strong>消息队列</strong>：死信队列能更好地处理故障</p>
+<h2 id="与重试模式比较">与重试模式比较</h2>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>断路器</th>
+<th>重试模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>目的</strong></td>
+<td>防止调用故障服务</td>
+<td>从暂时性故障恢复</td>
+</tr>
+<tr>
+<td><strong>何时使用</strong></td>
+<td>持续性故障</td>
+<td>临时故障</td>
+</tr>
+<tr>
+<td><strong>行为</strong></td>
+<td>达到阈值后快速失败</td>
+<td>持续尝试并延迟</td>
+</tr>
+<tr>
+<td><strong>资源使用</strong></td>
+<td>最小（立即拒绝）</td>
+<td>较高（等待重试）</td>
+</tr>
+<tr>
+<td><strong>恢复检测</strong></td>
+<td>主动（半开测试）</td>
+<td>被动（重试成功）</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 最佳实践：结合两种模式</p><div class="admonition-content"><p>在断路器内使用重试模式：</p>
+<ol>
+<li>断路器包装操作</li>
+<li>重试处理暂时性故障</li>
+<li>断路器防止过度重试</li>
+<li>系统获得两种方法的优点</li>
+</ol>
+</div></div>
+<h2 id="总结">总结</h2>
+<p>断路器模式对于构建弹性分布式系统至关重要：</p>
+<ul>
+<li><strong>防止连锁故障</strong>通过停止对故障服务的调用</li>
+<li><strong>保护系统资源</strong>免于在中断期间耗尽</li>
+<li><strong>实现优雅降级</strong>通过备用响应</li>
+<li><strong>提供快速失败</strong>而非等待超时</li>
+<li><strong>监控服务健康</strong>并自动检测恢复</li>
+</ul>
+<p>就像电路断路器保护你的家一样，这个模式保护你的分布式系统免受故障依赖性造成的损害。它不是为了防止故障——而是为了优雅地失败并快速恢复。</p>
+<h2 id="参考资料">参考资料</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker">Microsoft Azure Architecture Patterns - Circuit Breaker</a></li>
+<li><a target="_blank" rel="noopener" href="https://martinfowler.com/bliki/CircuitBreaker.html">Martin Fowler - CircuitBreaker</a></li>
+<li><a target="_blank" rel="noopener" href="https://pragprog.com/titles/mnee2/release-it-second-edition/">Release It! by Michael Nygard</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2020/01/Circuit-Breaker-Pattern/" data-id="4744ec2d" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "断路器模式：防止连锁故障",
+        "image": "https://neo01.com",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2020-01-15",
+        "dateCreated": "2020-01-15",
+        "dateModified": "2025-10-12",
+        "url": "https://neo01.com//zh-CN/2020/01/Circuit-Breaker-Pattern/",
+        "description": "了解断路器模式如何通过暂时阻挡对故障服务的调用来保护分布式系统免于连锁故障，让系统有时间恢复。",
+        "wordCount": 7878
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+            
+                
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                
+            
+                
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+                
+            
+        </ul>
+    </div>
+    <!-- 
+        
+<nav id="article-nav">
+    
+        <a href="/zh-TW/2022/12/Home-Assistant-Sensor-for-Hong-Kong-Observatory/" id="article-nav-newer" class="article-nav-link-wrap">
+        <strong class="article-nav-caption">下一篇</strong>
+        <p class="article-nav-title">
+        
+            香港天文台的 Home Assistant 感測器
+        
+        </p>
+        <i class="icon fa fa-chevron-right" id="icon-chevron-right"></i>
+    </a>
+    
+    
+        <a href="/zh-TW/2020/01/Circuit-Breaker-Pattern/" id="article-nav-older" class="article-nav-link-wrap">
+        <strong class="article-nav-caption">上一篇</strong>
+        <p class="article-nav-title">斷路器模式：防止連鎖故障</p>
+        <i class="icon fa fa-chevron-left" id="icon-chevron-left"></i>
+        </a>
+    
+</nav>
+
+     -->
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+    
+    
+    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control/" class="title">CISP学习指南：访问控制</a></p>
+                            <p class="item-date"><time datetime="2025-10-10T16:00:00.000Z" itemprop="datePublished">2025-10-11</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Asset-Management/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：资产管理" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Asset-Management/" class="title">CISP学习指南：资产管理</a></p>
+                            <p class="item-date"><time datetime="2025-10-09T16:00:00.000Z" itemprop="datePublished">2025-10-10</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Security-Incident-Management/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：信息安全事件管理与业务连续性" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Security-Incident-Management/" class="title">CISP学习指南：信息安全事件管理与业务连续性</a></p>
+                            <p class="item-date"><time datetime="2025-10-08T16:00:00.000Z" itemprop="datePublished">2025-10-09</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Communications-Operations-Security-Extended/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：通信与操作安全（扩展）" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Communications-Operations-Security-Extended/" class="title">CISP学习指南：通信与操作安全（扩展）</a></p>
+                            <p class="item-date"><time datetime="2025-10-07T16:00:00.000Z" itemprop="datePublished">2025-10-08</time></p>
+                        </div>
+                    </li>
+                
+                    <li>
+                        
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Physical-Environmental-Security/" class="thumbnail">
+    
+    
+        
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：物理与环境安全" class="thumbnail-image"></span>
+    
+</a>
+
+                        </div>
+                        
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Physical-Environmental-Security/" class="title">CISP学习指南：物理与环境安全</a></p>
+                            <p class="item-date"><time datetime="2025-10-07T16:00:00.000Z" itemprop="datePublished">2025-10-08</time></p>
+                        </div>
+                    </li>
+                
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">22</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#82449664</div>
+                <img src="/qr/qr-4ddb4a738c48e3b073c9a4c7ef89c914.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#82449664">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
