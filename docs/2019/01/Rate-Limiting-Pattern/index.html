@@ -1,0 +1,1000 @@
+<!DOCTYPE html><html lang="en"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Rate Limiting Pattern: Efficiently Managing Throttled Services | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="Learn how the rate limiting pattern helps you avoid throttling errors and improve throughput when working with services that impose usage limits.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Rate Limiting Pattern: Efficiently Managing Throttled Services">
+<meta property="og:url" content="https://neo01.com/2019/01/Rate-Limiting-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Learn how the rate limiting pattern helps you avoid throttling errors and improve throughput when working with services that impose usage limits.">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://neo01.com/2019/01/Rate-Limiting-Pattern/thumbnail.png">
+<meta property="article:published_time" content="2019-01-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-12T11:01:04.904Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/2019/01/Rate-Limiting-Pattern/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/zh-TW/2019/01/Rate-Limiting-Pattern/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2019/01/Rate-Limiting-Pattern/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/">Home</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/Art-Gallery/">Art Gallery</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Architecture/">Architecture</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Cybersecurity/">Cybersecurity</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Development/">Development</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Misc/">Misc</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/about-me">About</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="Search">
+        <button type="submit" title="Search" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="Type something...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'en',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/01/Rate-Limiting-Pattern" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Rate Limiting Pattern: Efficiently Managing Throttled Services
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-01-14T16:00:00.000Z" itemprop="datePublished">2019-01-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-12T11:01:04.904Z" itemprop="datePublished">2025-10-12</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#Context-and-Problem"><span class="toc-text">Context and Problem</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Solution"><span class="toc-text">Solution</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Issues-and-Considerations"><span class="toc-text">Issues and Considerations</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#When-to-Use-This-Pattern"><span class="toc-text">When to Use This Pattern</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Example-Architecture"><span class="toc-text">Example Architecture</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Related-Patterns"><span class="toc-text">Related Patterns</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#References"><span class="toc-text">References</span></a></li></ol>
+            <p><img src="banner.png" alt=""></p>
+<p>Many services use throttling to control resource consumption, imposing limits on the rate at which applications can access them. The rate limiting pattern helps you avoid throttling errors and accurately predict throughput, especially for large-scale repetitive tasks like batch processing.</p>
+<h2 id="Context-and-Problem">Context and Problem</h2>
+<p>Performing large numbers of operations against a throttled service can result in increased traffic and reduced efficiency. You’ll need to track rejected requests and retry operations, potentially requiring multiple passes to complete your work.</p>
+<p>Consider this example of ingesting data into a database:</p>
+<ul>
+<li>Your application needs to ingest 10,000 records. Each record costs 10 Request Units (RUs), requiring 100,000 RUs total.</li>
+<li>Your database instance has 20,000 RUs provisioned capacity.</li>
+<li>You send all 10,000 records. 2,000 succeed, 8,000 are rejected.</li>
+<li>You retry with 8,000 records. 2,000 succeed, 6,000 are rejected.</li>
+<li>You retry with 6,000 records. 2,000 succeed, 4,000 are rejected.</li>
+<li>You retry with 4,000 records. 2,000 succeed, 2,000 are rejected.</li>
+<li>You retry with 2,000 records. All succeed.</li>
+</ul>
+<p>The job completed, but only after sending 30,000 records—three times the actual dataset size.</p>
+<p>Additional problems with this naive approach:</p>
+<ul>
+<li><strong>Error handling overhead</strong>: 20,000 errors need logging and processing, consuming memory and storage.</li>
+<li><strong>Unpredictable completion time</strong>: Without knowing throttling limits, you can’t estimate how long processing will take.</li>
+</ul>
+<h2 id="Solution">Solution</h2>
+<p>Rate limiting reduces traffic and improves throughput by controlling the number of records sent to a service over time.</p>
+<p>Services throttle based on different metrics:</p>
+<ul>
+<li><strong>Number of operations</strong> (e.g., 20 requests per second)</li>
+<li><strong>Amount of data</strong> (e.g., 2 GiB per minute)</li>
+<li><strong>Relative cost of operations</strong> (e.g., 20,000 RUs per second)</li>
+</ul>
+<p>Your rate limiting implementation must control operations sent to the service, optimizing usage without exceeding capacity.</p>
+<h3 id="Using-a-Durable-Messaging-System">Using a Durable Messaging System</h3>
+<p>When your APIs can handle requests faster than throttled services allow, you need to manage ingestion speed. Simply buffering requests is risky—if your application crashes, you lose buffered data.</p>
+<p>Instead, send records to a durable messaging system that can handle your full ingestion rate. Use job processors to read records at a controlled rate within the throttled service’s limits.</p>
+<p>Durable messaging options include:</p>
+<ul>
+<li>Message queues (e.g., RabbitMQ, ActiveMQ)</li>
+<li>Event streaming platforms (e.g., Apache Kafka)</li>
+<li>Cloud-based queue services</li>
+</ul>
+<div class="mermaid">graph LR
+    A["API<br>(High Rate)"] --&gt; B["Durable<br>Message Queue"]
+    B --&gt; C["Job Processor 1"]
+    B --&gt; D["Job Processor 2"]
+    B --&gt; E["Job Processor 3"]
+    C --&gt; F["Throttled Service<br>(Limited Rate)"]
+    D --&gt; F
+    E --&gt; F
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style F fill:#ffe1e1</div>
+<h3 id="Granular-Time-Intervals">Granular Time Intervals</h3>
+<p>Services often throttle based on comprehensible timespans (per second or per minute), but computers process much faster. Rather than batching releases once per second, send smaller amounts more frequently to:</p>
+<ul>
+<li>Keep resource consumption (memory, CPU, network) flowing evenly</li>
+<li>Prevent bottlenecks from sudden request bursts</li>
+</ul>
+<p>For example, if a service allows 100 operations per second, release 20 operations every 200 milliseconds:</p>
+<div id="chart_97d2a41f7" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_97d2a41f7'));
+        var option = {
+  "title": {
+    "text": "Rate Limiting: Smooth vs Burst Traffic"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["Burst (100/sec)", "Smooth (20/200ms)"]
+  },
+  "xAxis": {
+    "type": "category",
+    "data": ["0ms", "200ms", "400ms", "600ms", "800ms", "1000ms"]
+  },
+  "yAxis": {
+    "type": "value",
+    "name": "Operations"
+  },
+  "series": [
+    {
+      "name": "Burst (100/sec)",
+      "type": "bar",
+      "data": [100, 0, 0, 0, 0, 100],
+      "itemStyle": {
+        "color": "#ff6b6b"
+      }
+    },
+    {
+      "name": "Smooth (20/200ms)",
+      "type": "bar",
+      "data": [20, 20, 20, 20, 20, 20],
+      "itemStyle": {
+        "color": "#51cf66"
+      }
+    }
+  ]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<h3 id="Managing-Multiple-Uncoordinated-Processes">Managing Multiple Uncoordinated Processes</h3>
+<p>When multiple processes share a throttled service, logically partition the service’s capacity and use a distributed mutual exclusion system to manage locks on those partitions.</p>
+<p><strong>Example:</strong></p>
+<p>If a throttled system allows 500 requests per second:</p>
+<ol>
+<li>Create 20 partitions worth 25 requests per second each</li>
+<li>A process needing 100 requests asks for four partitions</li>
+<li>The system grants two partitions for 10 seconds</li>
+<li>The process rate limits to 50 requests per second, completes in 2 seconds, and releases the lock</li>
+</ol>
+<p><strong>Implementation approach:</strong></p>
+<p>Use blob storage to create one small file per logical partition. Applications obtain exclusive leases on these files for short periods (e.g., 15 seconds). For each lease granted, the application can use that partition’s capacity.</p>
+<div class="mermaid">block-beta
+columns 3
+  block:processes:3
+    columns 3
+    P1["Process 1"]
+    P2["Process 2"]
+    P3["Process 3"]
+  end
+  space:3
+  block:leases:3
+    columns 3
+    L1["Lease 1<br>25 req/s"]
+    L2["Lease 2<br>25 req/s"]
+    L3["Lease 3<br>25 req/s"]
+  end
+  space:3
+  block:service:3
+    S["Throttled Service<br>500 req/s total"]
+  end
+  
+  P1 --&gt; L1
+  P2 --&gt; L2
+  P3 --&gt; L3
+  L1 --&gt; S
+  L2 --&gt; S
+  L3 --&gt; S
+  
+  style processes fill:#e1f5ff
+  style leases fill:#fff4e1
+  style service fill:#ffe1e1</div>
+<p>To reduce latency, allocate a small amount of exclusive capacity for each process. Processes only seek shared capacity leases when exceeding their reserved capacity.</p>
+<p>Alternative technologies for lease management include Zookeeper, Consul, etcd, and Redis/Redsync.</p>
+<h2 id="Issues-and-Considerations">Issues and Considerations</h2>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>💡 Key Considerations</p><div class="admonition-content"><p><strong>Handle throttling errors</strong>: Rate limiting reduces errors but doesn't eliminate them. Your application must still handle any throttling errors that occur.</p>
+<p><strong>Multiple workstreams</strong>: If your application has multiple workstreams accessing the same throttled service (e.g., bulk loading and querying), integrate all into your rate limiting strategy or reserve separate capacity pools for each.</p>
+<p><strong>Multi-application usage</strong>: When multiple applications use the same throttled service, increased throttling errors might indicate contention. Consider temporarily reducing throughput until usage from other applications decreases.</p>
+</div></div>
+<p>!!!</p>
+<h2 id="When-to-Use-This-Pattern">When to Use This Pattern</h2>
+<p>Use this pattern to:</p>
+<ul>
+<li>Reduce throttling errors from throttle-limited services</li>
+<li>Reduce traffic compared to naive retry-on-error approaches</li>
+<li>Reduce memory consumption by dequeuing records only when there’s capacity to process them</li>
+<li>Improve predictability of batch processing completion times</li>
+</ul>
+<h2 id="Example-Architecture">Example Architecture</h2>
+<p>Consider an application where users submit records of various types to an API. Each record type has a unique job processor that performs validation, enrichment, and database insertion.</p>
+<p>All components (API, job processors) are separate processes that scale independently and don’t directly communicate.</p>
+<div class="mermaid">graph TB
+    U1["User"] --&gt; API["API"]
+    U2["User"] --&gt; API
+    
+    API --&gt; QA["Queue A<br>(Type A Records)"]
+    API --&gt; QB["Queue B<br>(Type B Records)"]
+    
+    QA --&gt; JPA["Job Processor A"]
+    QB --&gt; JPB["Job Processor B"]
+    
+    JPA --&gt; LS["Lease Storage<br>(Blob 0-9)"]
+    JPB --&gt; LS
+    
+    JPA --&gt; DB["Database<br>(1000 req/s limit)"]
+    JPB --&gt; DB
+    
+    style API fill:#e1f5ff
+    style QA fill:#fff4e1
+    style QB fill:#fff4e1
+    style LS fill:#f0e1ff
+    style DB fill:#ffe1e1</div>
+<p><strong>Workflow:</strong></p>
+<ol>
+<li>User submits 10,000 records of type A to the API</li>
+<li>API enqueues records in Queue A</li>
+<li>User submits 5,000 records of type B to the API</li>
+<li>API enqueues records in Queue B</li>
+<li>Job Processor A attempts to lease blob 2</li>
+<li>Job Processor B attempts to lease blob 2</li>
+<li>Job Processor A fails; Job Processor B obtains the lease for 15 seconds (100 req/s capacity)</li>
+<li>Job Processor B dequeues and writes 100 records</li>
+<li>After 1 second, both processors attempt additional leases</li>
+<li>Job Processor A obtains blob 6 (100 req/s); Job Processor B obtains blob 3 (now 200 req/s total)</li>
+<li>Processors continue competing for leases and processing records at their granted rates</li>
+<li>As leases expire (after 15 seconds), processors reduce their request rates accordingly</li>
+</ol>
+<h2 id="Related-Patterns">Related Patterns</h2>
+<p><strong>Throttling</strong>: Rate limiting is typically implemented in response to a throttled service.</p>
+<p><strong>Retry</strong>: When requests result in throttling errors, retry after an appropriate interval.</p>
+<p><strong>Queue-Based Load Leveling</strong>: Similar but broader than rate limiting. Key differences:</p>
+<ul>
+<li>Rate limiting doesn’t necessarily require queues but needs durable messaging</li>
+<li>Rate limiting introduces distributed mutual exclusion on partitions for managing capacity across uncoordinated processes</li>
+<li>Queue-based load leveling applies to any performance mismatch between services; rate limiting specifically addresses throttled services</li>
+</ul>
+<h2 id="References">References</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/rate-limiting-pattern">Rate Limiting Pattern - Microsoft Learn</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/2019/01/Rate-Limiting-Pattern/" data-id="4cb313ac" class="article-share-link"><i class="fa fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Rate Limiting Pattern: Efficiently Managing Throttled Services",
+        "image": "https://neo01.comthumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2019-01-15",
+        "dateCreated": "2019-01-15",
+        "dateModified": "2025-10-12",
+        "url": "https://neo01.com//2019/01/Rate-Limiting-Pattern/",
+        "description": "Learn how the rate limiting pattern helps you avoid throttling errors and improve throughput when working with services that impose usage limits.",
+        "wordCount": 1444
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>follow:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">links</h3>
+    <div class="widget">
+        <ul><li><a href="/ai">AI Playground</a></li><li><a href="/tools">Tools</a></li><li><a href="/games">Games</a></li><li><a href="/pages/useful-information">Useful Information</a></li><li><a href="/pages/Hexo-Blogging-Cheatsheet">Hexo Blogging Cheatsheet</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">recents</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="Tools, Games and Browser Built-in AI Playground" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">Tools, Games and Browser Built-in AI Playground</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="The Rise of Agentic Coding: AI-Powered Software Engineering" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">The Rise of Agentic Coding: AI-Powered Software Engineering</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="Understanding Ephemeral Ports Part 2: Why Server Applications Should Avoid Dynamic Ports" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Development/">Development</a></p>
+                            <p class="item-title"><a href="/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">Understanding Ephemeral Ports Part 2: Why Server Applications Should Avoid Dynamic Ports</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="Understanding Ephemeral Ports: The Invisible Workers of Network Communication" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Development/">Development</a></p>
+                            <p class="item-title"><a href="/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">Understanding Ephemeral Ports: The Invisible Workers of Network Communication</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="Architecture as Code: Part 2 - Building the Foundation" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/categories/Architecture/">Architecture</a></p>
+                            <p class="item-title"><a href="/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">Architecture as Code: Part 2 - Building the Foundation</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2025/">2025</a>
+                    <span class="archive-list-count">11</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2023/">2023</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2022/">2022</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2020/">2020</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#afed5247</div>
+                <img src="/qr/qr-baf417e40b50d00ebf6bfc6c933cd60f.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#afed5247">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
