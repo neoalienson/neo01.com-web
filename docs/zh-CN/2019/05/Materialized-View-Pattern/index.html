@@ -334,7 +334,7 @@
                                 <li class="main-nav-list-item">
                                     <a class="main-nav-list-link" href="/zh-CN/">主页</a>
                                 </li>
-                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Security/">Security</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Security/Kubernetes/">Kubernetes</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/%E5%BC%80%E5%8F%91/">开发</a></li></ul>
                                 <li class="main-nav-list-item">
                                     <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
                                 </li>
@@ -477,19 +477,19 @@
 <p>在深入探讨之前，让我们厘清一个重要的区别：数据库 materialized view 和 Materialized View 模式是相关但不同的概念。</p>
 <h3 id="数据库-Materialized-View">数据库 Materialized View</h3>
 <p>许多关系型数据库（PostgreSQL、Oracle、SQL Server）提供内置的 materialized view 功能：</p>
-<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 数据库 materialized view 示例</span>
-<span class="token keyword">CREATE</span> MATERIALIZED <span class="token keyword">VIEW</span> sales_summary <span class="token keyword">AS</span>
-<span class="token keyword">SELECT</span> 
-    product_category<span class="token punctuation">,</span>
-    <span class="token function">SUM</span><span class="token punctuation">(</span>order_total<span class="token punctuation">)</span> <span class="token keyword">as</span> total_sales<span class="token punctuation">,</span>
-    <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token keyword">DISTINCT</span> customer_id<span class="token punctuation">)</span> <span class="token keyword">as</span> customer_count
-<span class="token keyword">FROM</span> orders
-<span class="token keyword">JOIN</span> order_items <span class="token keyword">ON</span> orders<span class="token punctuation">.</span>id <span class="token operator">=</span> order_items<span class="token punctuation">.</span>order_id
-<span class="token keyword">JOIN</span> products <span class="token keyword">ON</span> order_items<span class="token punctuation">.</span>product_id <span class="token operator">=</span> products<span class="token punctuation">.</span>id
-<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> product_category<span class="token punctuation">;</span>
+<pre class="language-sql" data-language="sql"><code class="language-sql">-- 数据库 materialized view 示例
+CREATE MATERIALIZED VIEW sales_summary AS
+SELECT 
+    product_category,
+    SUM(order_total) as total_sales,
+    COUNT(DISTINCT customer_id) as customer_count
+FROM orders
+JOIN order_items ON orders.id = order_items.order_id
+JOIN products ON order_items.product_id = products.id
+GROUP BY product_category;
 
-<span class="token comment">-- 刷新视图</span>
-REFRESH MATERIALIZED <span class="token keyword">VIEW</span> sales_summary<span class="token punctuation">;</span></code></pre>
+-- 刷新视图
+REFRESH MATERIALIZED VIEW sales_summary;</code></pre>
 <p><strong>特性：</strong></p>
 <ul>
 <li>由数据库引擎管理</li>
@@ -500,25 +500,25 @@ REFRESH MATERIALIZED <span class="token keyword">VIEW</span> sales_summary<span 
 </ul>
 <h3 id="Materialized-View-模式">Materialized View 模式</h3>
 <p>架构模式将这个概念扩展到数据库边界之外：</p>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 模式实现示例</span>
-<span class="token keyword">class</span> <span class="token class-name">MaterializedViewService</span> <span class="token punctuation">{</span>
-  <span class="token keyword">async</span> <span class="token function">updateSalesSummary</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token comment">// 从多个源读取</span>
-    <span class="token keyword">const</span> orders <span class="token operator">=</span> <span class="token keyword">await</span> orderDatabase<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token string">'SELECT * FROM orders'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">const</span> customers <span class="token operator">=</span> <span class="token keyword">await</span> customerDatabase<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token string">'SELECT * FROM customers'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">const</span> products <span class="token operator">=</span> <span class="token keyword">await</span> productCatalog<span class="token punctuation">.</span><span class="token function">getAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 模式实现示例
+class MaterializedViewService {
+  async updateSalesSummary() {
+    // 从多个源读取
+    const orders = await orderDatabase.query('SELECT * FROM orders');
+    const customers = await customerDatabase.query('SELECT * FROM customers');
+    const products = await productCatalog.getAll();
     
-    <span class="token comment">// 转换和聚合</span>
-    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">computeSummary</span><span class="token punctuation">(</span>orders<span class="token punctuation">,</span> customers<span class="token punctuation">,</span> products<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    // 转换和聚合
+    const summary = this.computeSummary(orders, customers, products);
     
-    <span class="token comment">// 以优化格式存储</span>
-    <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">,</span> summary<span class="token punctuation">)</span><span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
+    // 以优化格式存储
+    await viewStore.save('sales_summary', summary);
+  }
   
-  <span class="token keyword">async</span> <span class="token function">getSalesSummary</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token keyword">return</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
-<span class="token punctuation">}</span></code></pre>
+  async getSalesSummary() {
+    return await viewStore.get('sales_summary');
+  }
+}</code></pre>
 <p><strong>特性：</strong></p>
 <ul>
 <li>应用程序管理的逻辑</li>
@@ -571,66 +571,66 @@ REFRESH MATERIALIZED <span class="token keyword">VIEW</span> sales_summary<span 
 <p>让我们探索一个具体示例：一个需要显示产品销售摘要的电子商务平台。</p>
 <h3 id="源数据结构">源数据结构</h3>
 <p>系统将数据存储在针对不同目的优化的独立位置：</p>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 订单存储在事务数据库</span>
-<span class="token punctuation">{</span>
-  <span class="token literal-property property">orderId</span><span class="token operator">:</span> <span class="token string">"ORD-12345"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">customerId</span><span class="token operator">:</span> <span class="token string">"CUST-789"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">orderDate</span><span class="token operator">:</span> <span class="token string">"2019-05-15"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">items</span><span class="token operator">:</span> <span class="token punctuation">[</span>
-    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token literal-property property">price</span><span class="token operator">:</span> <span class="token number">29.99</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
-    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-002"</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token literal-property property">price</span><span class="token operator">:</span> <span class="token number">49.99</span> <span class="token punctuation">}</span>
-  <span class="token punctuation">]</span>
-<span class="token punctuation">}</span>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 订单存储在事务数据库
+{
+  orderId: "ORD-12345",
+  customerId: "CUST-789",
+  orderDate: "2019-05-15",
+  items: [
+    { productId: "PROD-001", quantity: 2, price: 29.99 },
+    { productId: "PROD-002", quantity: 1, price: 49.99 }
+  ]
+}
 
-<span class="token comment">// 产品存储在目录服务</span>
-<span class="token punctuation">{</span>
-  <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"无线鼠标"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"电子产品"</span>
-<span class="token punctuation">}</span>
+// 产品存储在目录服务
+{
+  productId: "PROD-001",
+  name: "无线鼠标",
+  category: "电子产品"
+}
 
-<span class="token comment">// 客户存储在 CRM 系统</span>
-<span class="token punctuation">{</span>
-  <span class="token literal-property property">customerId</span><span class="token operator">:</span> <span class="token string">"CUST-789"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"张三"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">segment</span><span class="token operator">:</span> <span class="token string">"高级会员"</span>
-<span class="token punctuation">}</span></code></pre>
+// 客户存储在 CRM 系统
+{
+  customerId: "CUST-789",
+  name: "张三",
+  segment: "高级会员"
+}</code></pre>
 <h3 id="Materialized-View-结构">Materialized View 结构</h3>
 <p>视图将这些数据组合并转换为查询优化格式：</p>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 销售摘要的 materialized view</span>
-<span class="token punctuation">{</span>
-  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"电子产品"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">109.97</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">orderCount</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">customerCount</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">topProducts</span><span class="token operator">:</span> <span class="token punctuation">[</span>
-    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-002"</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"键盘"</span><span class="token punctuation">,</span> <span class="token literal-property property">sales</span><span class="token operator">:</span> <span class="token number">49.99</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
-    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"无线鼠标"</span><span class="token punctuation">,</span> <span class="token literal-property property">sales</span><span class="token operator">:</span> <span class="token number">59.98</span> <span class="token punctuation">}</span>
-  <span class="token punctuation">]</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">lastUpdated</span><span class="token operator">:</span> <span class="token string">"2019-05-15T14:30:00Z"</span>
-<span class="token punctuation">}</span></code></pre>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 销售摘要的 materialized view
+{
+  category: "电子产品",
+  totalSales: 109.97,
+  orderCount: 1,
+  customerCount: 1,
+  topProducts: [
+    { productId: "PROD-002", name: "键盘", sales: 49.99 },
+    { productId: "PROD-001", name: "无线鼠标", sales: 59.98 }
+  ],
+  lastUpdated: "2019-05-15T14:30:00Z"
+}</code></pre>
 <h3 id="更新策略">更新策略</h3>
 <p>此模式支持多种更新方法：</p>
 <h4 id="1-事件驱动更新">1. 事件驱动更新</h4>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 当源数据变更时更新视图</span>
-orderService<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'orderCreated'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
-  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">updateSalesSummary</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 当源数据变更时更新视图
+orderService.on('orderCreated', async (order) =&gt; {
+  await materializedViewService.updateSalesSummary(order);
+});
 
-productService<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'productUpdated'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">product</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
-  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">refreshProductViews</span><span class="token punctuation">(</span>product<span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+productService.on('productUpdated', async (product) =&gt; {
+  await materializedViewService.refreshProductViews(product);
+});</code></pre>
 <h4 id="2-定时更新">2. 定时更新</h4>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 定期刷新</span>
-cron<span class="token punctuation">.</span><span class="token function">schedule</span><span class="token punctuation">(</span><span class="token string">'0 * * * *'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
-  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">rebuildAllViews</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 定期刷新
+cron.schedule('0 * * * *', async () =&gt; {
+  await materializedViewService.rebuildAllViews();
+});</code></pre>
 <h4 id="3-按需更新">3. 按需更新</h4>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 需要时手动刷新</span>
-app<span class="token punctuation">.</span><span class="token function">post</span><span class="token punctuation">(</span><span class="token string">'/admin/refresh-views'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
-  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">rebuildAllViews</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-  res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'Views refreshed'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 需要时手动刷新
+app.post('/admin/refresh-views', async (req, res) =&gt; {
+  await materializedViewService.rebuildAllViews();
+  res.json({ status: 'Views refreshed' });
+});</code></pre>
 <h2 id="实现考量">实现考量</h2>
 <h3 id="1-更新时机与频率">1. 更新时机与频率</h3>
 <p>根据你的需求选择更新策略：</p>
@@ -640,23 +640,23 @@ app<span class="token punctuation">.</span><span class="token function">post</sp
 </div></div>
 <h3 id="2-数据一致性权衡">2. 数据一致性权衡</h3>
 <p>Materialized view 引入最终一致性：</p>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 示例：处理一致性窗口</span>
-<span class="token keyword">class</span> <span class="token class-name">MaterializedViewReader</span> <span class="token punctuation">{</span>
-  <span class="token keyword">async</span> <span class="token function">getSalesSummary</span><span class="token punctuation">(</span><span class="token parameter">options <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token keyword">const</span> view <span class="token operator">=</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 示例：处理一致性窗口
+class MaterializedViewReader {
+  async getSalesSummary(options = {}) {
+    const view = await viewStore.get('sales_summary');
     
-    <span class="token keyword">if</span> <span class="token punctuation">(</span>options<span class="token punctuation">.</span>requireFresh<span class="token punctuation">)</span> <span class="token punctuation">{</span>
-      <span class="token keyword">const</span> age <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> view<span class="token punctuation">.</span>lastUpdated<span class="token punctuation">;</span>
-      <span class="token keyword">if</span> <span class="token punctuation">(</span>age <span class="token operator">&gt;</span> options<span class="token punctuation">.</span>maxAge<span class="token punctuation">)</span> <span class="token punctuation">{</span>
-        <span class="token comment">// 触发刷新并等待</span>
-        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">refreshView</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-        <span class="token keyword">return</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-      <span class="token punctuation">}</span>
-    <span class="token punctuation">}</span>
+    if (options.requireFresh) {
+      const age = Date.now() - view.lastUpdated;
+      if (age &gt; options.maxAge) {
+        // 触发刷新并等待
+        await this.refreshView();
+        return await viewStore.get('sales_summary');
+      }
+    }
     
-    <span class="token keyword">return</span> view<span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
-<span class="token punctuation">}</span></code></pre>
+    return view;
+  }
+}</code></pre>
 <div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 一致性考量</p><div class="admonition-content"><p>在视图更新期间，数据可能暂时与源系统不一致。设计你的应用程序以优雅地处理这种情况：</p>
 <ul>
 <li>显示最后更新时间戳</li>
@@ -687,19 +687,19 @@ app<span class="token punctuation">.</span><span class="token function">post</sp
 </ul>
 <h3 id="4-视图优化技术">4. 视图优化技术</h3>
 <p>通过策略性设计最大化视图价值：</p>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 包含计算值</span>
-<span class="token punctuation">{</span>
-  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"电子产品"</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">109.97</span><span class="token punctuation">,</span>
-  <span class="token literal-property property">averageOrderValue</span><span class="token operator">:</span> <span class="token number">54.99</span><span class="token punctuation">,</span>  <span class="token comment">// 预先计算</span>
-  <span class="token literal-property property">growthRate</span><span class="token operator">:</span> <span class="token number">0.15</span><span class="token punctuation">,</span>           <span class="token comment">// 预先计算 vs. 前期</span>
-  <span class="token literal-property property">topProducts</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token operator">...</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
-  <span class="token comment">// 包含经常联结的数据</span>
-  <span class="token literal-property property">categoryMetadata</span><span class="token operator">:</span> <span class="token punctuation">{</span>
-    <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"电子产品"</span><span class="token punctuation">,</span>
-    <span class="token literal-property property">description</span><span class="token operator">:</span> <span class="token string">"电子设备和配件"</span>
-  <span class="token punctuation">}</span>
-<span class="token punctuation">}</span></code></pre>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">// 包含计算值
+{
+  category: "电子产品",
+  totalSales: 109.97,
+  averageOrderValue: 54.99,  // 预先计算
+  growthRate: 0.15,           // 预先计算 vs. 前期
+  topProducts: [...],
+  // 包含经常联结的数据
+  categoryMetadata: {
+    name: "电子产品",
+    description: "电子设备和配件"
+  }
+}</code></pre>
 <p><strong>优化策略：</strong></p>
 <ul>
 <li>为 materialized view 添加索引以加快查询</li>
@@ -797,69 +797,69 @@ app<span class="token punctuation">.</span><span class="token function">post</sp
 </ul>
 <h2 id="实际实现示例">实际实现示例</h2>
 <p>这是一个销售分析系统的完整实现：</p>
-<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">SalesAnalyticsView</span> <span class="token punctuation">{</span>
-  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">orderDb<span class="token punctuation">,</span> productDb<span class="token punctuation">,</span> customerDb<span class="token punctuation">,</span> viewStore</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token keyword">this</span><span class="token punctuation">.</span>orderDb <span class="token operator">=</span> orderDb<span class="token punctuation">;</span>
-    <span class="token keyword">this</span><span class="token punctuation">.</span>productDb <span class="token operator">=</span> productDb<span class="token punctuation">;</span>
-    <span class="token keyword">this</span><span class="token punctuation">.</span>customerDb <span class="token operator">=</span> customerDb<span class="token punctuation">;</span>
-    <span class="token keyword">this</span><span class="token punctuation">.</span>viewStore <span class="token operator">=</span> viewStore<span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">class SalesAnalyticsView {
+  constructor(orderDb, productDb, customerDb, viewStore) {
+    this.orderDb = orderDb;
+    this.productDb = productDb;
+    this.customerDb = customerDb;
+    this.viewStore = viewStore;
+  }
   
-  <span class="token keyword">async</span> <span class="token function">rebuildView</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token comment">// 从多个源提取数据</span>
-    <span class="token keyword">const</span> orders <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>orderDb<span class="token punctuation">.</span><span class="token function">getOrders</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">const</span> products <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>productDb<span class="token punctuation">.</span><span class="token function">getProducts</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">const</span> customers <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customerDb<span class="token punctuation">.</span><span class="token function">getCustomers</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  async rebuildView() {
+    // 从多个源提取数据
+    const orders = await this.orderDb.getOrders();
+    const products = await this.productDb.getProducts();
+    const customers = await this.customerDb.getCustomers();
     
-    <span class="token comment">// 转换和聚合</span>
-    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">computeSummary</span><span class="token punctuation">(</span>orders<span class="token punctuation">,</span> products<span class="token punctuation">,</span> customers<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    // 转换和聚合
+    const summary = this.computeSummary(orders, products, customers);
     
-    <span class="token comment">// 以元数据存储</span>
-    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>viewStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token string">'sales_analytics'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
-      <span class="token literal-property property">data</span><span class="token operator">:</span> summary<span class="token punctuation">,</span>
-      <span class="token literal-property property">lastUpdated</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
-      <span class="token literal-property property">version</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">generateVersion</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
-    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
+    // 以元数据存储
+    await this.viewStore.save('sales_analytics', {
+      data: summary,
+      lastUpdated: new Date(),
+      version: this.generateVersion()
+    });
+  }
   
-  <span class="token function">computeSummary</span><span class="token punctuation">(</span><span class="token parameter">orders<span class="token punctuation">,</span> products<span class="token punctuation">,</span> customers</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token keyword">const</span> productMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span>products<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">p</span> <span class="token operator">=&gt;</span> <span class="token punctuation">[</span>p<span class="token punctuation">.</span>id<span class="token punctuation">,</span> p<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-    <span class="token keyword">const</span> customerMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span>customers<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">c</span> <span class="token operator">=&gt;</span> <span class="token punctuation">[</span>c<span class="token punctuation">.</span>id<span class="token punctuation">,</span> c<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  computeSummary(orders, products, customers) {
+    const productMap = new Map(products.map(p =&gt; [p.id, p]));
+    const customerMap = new Map(customers.map(c =&gt; [c.id, c]));
     
-    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+    const summary = {};
     
-    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> order <span class="token keyword">of</span> orders<span class="token punctuation">)</span> <span class="token punctuation">{</span>
-      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> item <span class="token keyword">of</span> order<span class="token punctuation">.</span>items<span class="token punctuation">)</span> <span class="token punctuation">{</span>
-        <span class="token keyword">const</span> product <span class="token operator">=</span> productMap<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>item<span class="token punctuation">.</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
-        <span class="token keyword">const</span> category <span class="token operator">=</span> product<span class="token punctuation">.</span>category<span class="token punctuation">;</span>
+    for (const order of orders) {
+      for (const item of order.items) {
+        const product = productMap.get(item.productId);
+        const category = product.category;
         
-        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-          summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
-            <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
-            <span class="token literal-property property">orderCount</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
-            <span class="token literal-property property">customers</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
-          <span class="token punctuation">}</span><span class="token punctuation">;</span>
-        <span class="token punctuation">}</span>
+        if (!summary[category]) {
+          summary[category] = {
+            totalSales: 0,
+            orderCount: 0,
+            customers: new Set()
+          };
+        }
         
-        summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">.</span>totalSales <span class="token operator">+=</span> item<span class="token punctuation">.</span>quantity <span class="token operator">*</span> item<span class="token punctuation">.</span>price<span class="token punctuation">;</span>
-        summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">.</span>orderCount<span class="token operator">++</span><span class="token punctuation">;</span>
-        summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">.</span>customers<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>customerId<span class="token punctuation">)</span><span class="token punctuation">;</span>
-      <span class="token punctuation">}</span>
-    <span class="token punctuation">}</span>
+        summary[category].totalSales += item.quantity * item.price;
+        summary[category].orderCount++;
+        summary[category].customers.add(order.customerId);
+      }
+    }
     
-    <span class="token comment">// 转换为最终格式</span>
-    <span class="token keyword">return</span> Object<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span>summary<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>category<span class="token punctuation">,</span> data<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">(</span><span class="token punctuation">{</span>
-      category<span class="token punctuation">,</span>
-      <span class="token literal-property property">totalSales</span><span class="token operator">:</span> data<span class="token punctuation">.</span>totalSales<span class="token punctuation">,</span>
-      <span class="token literal-property property">orderCount</span><span class="token operator">:</span> data<span class="token punctuation">.</span>orderCount<span class="token punctuation">,</span>
-      <span class="token literal-property property">customerCount</span><span class="token operator">:</span> data<span class="token punctuation">.</span>customers<span class="token punctuation">.</span>size
-    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
+    // 转换为最终格式
+    return Object.entries(summary).map(([category, data]) =&gt; ({
+      category,
+      totalSales: data.totalSales,
+      orderCount: data.orderCount,
+      customerCount: data.customers.size
+    }));
+  }
   
-  <span class="token keyword">async</span> <span class="token function">getView</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
-    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_analytics'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
-  <span class="token punctuation">}</span>
-<span class="token punctuation">}</span></code></pre>
+  async getView() {
+    return await this.viewStore.get('sales_analytics');
+  }
+}</code></pre>
 <h2 id="权衡与考量">权衡与考量</h2>
 <p>像任何架构模式一样，materialized view 涉及权衡：</p>
 <div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 需要解决的挑战</p><div class="admonition-content"><p><strong>存储开销</strong>：视图消耗额外的存储空间，可能重复数据。</p>
@@ -980,7 +980,7 @@ app<span class="token punctuation">.</span><span class="token function">post</sp
         "dateModified": "2025-10-14",
         "url": "https://neo01.com//zh-CN/2019/05/Materialized-View-Pattern/",
         "description": "了解 Materialized View 模式如何通过预先计算并以特定查询优化的格式存储数据来提升查询性能，以及它与数据库 materialized view 的差异。",
-        "wordCount": 2871
+        "wordCount": 1403
     }
 </script-->
 
@@ -1132,7 +1132,7 @@ app<span class="token punctuation">.</span><span class="token function">post</sp
             
                 <li class="archive-list-item">
                     <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
-                    <span class="archive-list-count">7</span>
+                    <span class="archive-list-count">8</span>
                 </li>
             
                 <li class="archive-list-item">
