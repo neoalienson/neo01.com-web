@@ -1,0 +1,1169 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>マテリアライズドビューパターン：事前計算されたデータによるクエリパフォーマンスの最適化 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Architecture,Data Management,Design Patterns,Performance">
+    
+    
+    <meta name="description" content="マテリアライズドビューパターンを使用して、特定のクエリ用に最適化された形式でデータを事前計算して保存することで、クエリパフォーマンスを向上させる方法と、データベースのマテリアライズドビューとの違いを学びます。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="マテリアライズドビューパターン：事前計算されたデータによるクエリパフォーマンスの最適化">
+<meta property="og:url" content="https://neo01.com/ja/2019/05/Materialized-View-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="マテリアライズドビューパターンを使用して、特定のクエリ用に最適化された形式でデータを事前計算して保存することで、クエリパフォーマンスを向上させる方法と、データベースのマテリアライズドビューとの違いを学びます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-05-19T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-18T04:12:43.352Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="Data Management">
+<meta property="article:tag" content="Design Patterns">
+<meta property="article:tag" content="Performance">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2019/05/Materialized-View-Pattern/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2019/05/Materialized-View-Pattern/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2019/05/Materialized-View-Pattern/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/05/Materialized-View-Pattern-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        マテリアライズドビューパターン：事前計算されたデータによるクエリパフォーマンスの最適化
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-05-19T16:00:00.000Z" itemprop="datePublished">2019-05-20</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-18T04:12:43.352Z" itemprop="datePublished">2025-10-18</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Architecture/">Architecture</a> <a class="tag-link" href="/ja/tags/Design-Patterns/">Design Patterns</a> <a class="tag-link" href="/ja/tags/Data-Management/">Data Management</a> <a class="tag-link" href="/ja/tags/Performance/">Performance</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%95%8F%E9%A1%8C%EF%BC%9A%E3%82%B9%E3%83%88%E3%83%AC%E3%83%BC%E3%82%B8%E5%BD%A2%E5%BC%8F%E3%81%A8%E3%82%AF%E3%82%A8%E3%83%AA%E3%83%8B%E3%83%BC%E3%82%BA"><span class="toc-text">問題：ストレージ形式とクエリニーズ</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%BD%E3%83%AA%E3%83%A5%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%EF%BC%9A%E3%82%AF%E3%82%A8%E3%83%AA%E7%B5%90%E6%9E%9C%E3%82%92%E4%BA%8B%E5%89%8D%E8%A8%88%E7%AE%97%E3%81%97%E3%81%A6%E4%BF%9D%E5%AD%98"><span class="toc-text">ソリューション：クエリ結果を事前計算して保存</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%87%E3%83%BC%E3%82%BF%E3%83%99%E3%83%BC%E3%82%B9%E3%81%AE%E3%83%9E%E3%83%86%E3%83%AA%E3%82%A2%E3%83%A9%E3%82%A4%E3%82%BA%E3%83%89%E3%83%93%E3%83%A5%E3%83%BC-vs-%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">データベースのマテリアライズドビュー vs パターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%95%E7%B5%84%E3%81%BF%EF%BC%9A%E5%AE%9F%E9%9A%9B%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">仕組み：実際のパターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E8%A3%85%E3%81%AE%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">実装の考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%81%93%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%99%E3%82%8B%E5%A0%B4%E5%90%88"><span class="toc-text">このパターンを使用する場合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E5%93%81%E8%B3%AA%E5%B1%9E%E6%80%A7"><span class="toc-text">アーキテクチャ品質属性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%88%E3%83%AC%E3%83%BC%E3%83%89%E3%82%AA%E3%83%95%E3%81%A8%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">トレードオフと考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%96%A2%E9%80%A3%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">関連パターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"><span class="toc-text">参考文献</span></a></li></ol>
+            <p>図書館に入ったとき、特定のジャンルを尋ねるたびに司書がすべての本を再編成することを期待しないでしょう。代わりに、図書館は本を素早く効率的に見つけるための事前計算されたインデックスであるカタログを維持しています。マテリアライズドビューパターンは、この同じ原則をデータシステムに適用します：質問される前に答えを準備します。</p>
+<h2 id="問題：ストレージ形式とクエリニーズ">問題：ストレージ形式とクエリニーズ</h2>
+<p>開発者とデータ管理者がデータストレージを設計する際、通常、データの読み取り方法ではなく、データの書き込みと維持方法に焦点を当てます。これは完全に理にかなっています。ストレージ形式は次のように最適化されています：</p>
+<ul>
+<li><strong>データの整合性</strong>：一貫性を確保し、重複を回避</li>
+<li><strong>書き込み効率</strong>：高速な挿入と更新</li>
+<li><strong>ストレージの最適化</strong>：スペース使用量の最小化</li>
+<li><strong>関係管理</strong>：エンティティ間の接続の維持</li>
+</ul>
+<p>しかし、このストレージ優先のアプローチは、クエリ要件との不一致を生み出すことがよくあります。正規化されたリレーショナルデータベースまたはNoSQLストアのドキュメント集約として注文を保存するeコマースシステムを考えてみましょう。この構造はトランザクションの記録にはうまく機能しますが、次のような質問に答える必要がある場合に問題になります：</p>
+<ul>
+<li>「今月の製品カテゴリ別の総売上高は？」</li>
+<li>「生涯価値が最も高い顧客は？」</li>
+<li>「地域別の平均注文処理時間は？」</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ クエリパフォーマンスの問題</p><div class="admonition-content"><p>これらの質問に答えるために、システムは数千のレコードをスキャンし、複雑な結合または集計を実行し、その場で値を計算する必要があります。このプロセスは、特にデータ量が増えるにつれて、大量のリソースと時間を消費します。</p>
+</div></div>
+<h2 id="ソリューション：クエリ結果を事前計算して保存">ソリューション：クエリ結果を事前計算して保存</h2>
+<p>マテリアライズドビューパターンは、特定のクエリ用に最適化された形式でデータを生成して保存することで、この課題に対処します。クエリが実行されるたびに結果を計算する代わりに、システムは：</p>
+<ol>
+<li><strong>一般的なクエリパターンを特定</strong>：複雑な計算を必要とする</li>
+<li><strong>結果を事前計算</strong>：ソースデータを変換する</li>
+<li><strong>結果を保存</strong>：高速検索用に最適化された形式で</li>
+<li><strong>ビューを更新</strong>：ソースデータが変更されたとき</li>
+</ol>
+<div class="mermaid">graph LR
+    A[ソースデータストア] --&gt;|変換と集計| B[マテリアライズドビュー]
+    C[アプリケーションクエリ] --&gt;|高速読み取り| B
+    A --&gt;|データ変更| D[更新プロセス]
+    D --&gt;|更新| B
+    
+    style B fill:#51cf66,stroke:#2f9e44
+    style A fill:#4dabf7,stroke:#1971c2</div>
+<p>重要な洞察：マテリアライズドビューは完全に使い捨てです。ソースデータから完全に再構築できるため、生データではなく計算結果を保存する特殊な形式のキャッシュです。</p>
+<h2 id="データベースのマテリアライズドビュー-vs-パターン">データベースのマテリアライズドビュー vs パターン</h2>
+<p>深く掘り下げる前に、重要な区別を明確にしましょう：データベースのマテリアライズドビューとマテリアライズドビューパターンは関連していますが、異なる概念です。</p>
+<h3 id="データベースのマテリアライズドビュー">データベースのマテリアライズドビュー</h3>
+<p>多くのリレーショナルデータベース（PostgreSQL、Oracle、SQL Server）は、組み込みのマテリアライズドビュー機能を提供します：</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- データベースのマテリアライズドビューの例</span>
+<span class="token keyword">CREATE</span> MATERIALIZED <span class="token keyword">VIEW</span> sales_summary <span class="token keyword">AS</span>
+<span class="token keyword">SELECT</span> 
+    product_category<span class="token punctuation">,</span>
+    <span class="token function">SUM</span><span class="token punctuation">(</span>order_total<span class="token punctuation">)</span> <span class="token keyword">as</span> total_sales<span class="token punctuation">,</span>
+    <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token keyword">DISTINCT</span> customer_id<span class="token punctuation">)</span> <span class="token keyword">as</span> customer_count
+<span class="token keyword">FROM</span> orders
+<span class="token keyword">JOIN</span> order_items <span class="token keyword">ON</span> orders<span class="token punctuation">.</span>id <span class="token operator">=</span> order_items<span class="token punctuation">.</span>order_id
+<span class="token keyword">JOIN</span> products <span class="token keyword">ON</span> order_items<span class="token punctuation">.</span>product_id <span class="token operator">=</span> products<span class="token punctuation">.</span>id
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> product_category<span class="token punctuation">;</span>
+
+<span class="token comment">-- ビューを更新</span>
+REFRESH MATERIALIZED <span class="token keyword">VIEW</span> sales_summary<span class="token punctuation">;</span></code></pre>
+<p><strong>特徴：</strong></p>
+<ul>
+<li>データベースエンジンによって管理</li>
+<li>同じデータベース内に保存</li>
+<li>データベース固有の更新メカニズムを使用</li>
+<li>通常、増分更新をサポート</li>
+<li>単一データベーススコープに制限</li>
+</ul>
+<h3 id="マテリアライズドビューパターン">マテリアライズドビューパターン</h3>
+<p>アーキテクチャパターンは、この概念をデータベースの境界を超えて拡張します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// パターン実装の例</span>
+<span class="token keyword">class</span> <span class="token class-name">MaterializedViewService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">updateSalesSummary</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 複数のソースから読み取り</span>
+    <span class="token keyword">const</span> orders <span class="token operator">=</span> <span class="token keyword">await</span> orderDatabase<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token string">'SELECT * FROM orders'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> customers <span class="token operator">=</span> <span class="token keyword">await</span> customerDatabase<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token string">'SELECT * FROM customers'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> products <span class="token operator">=</span> <span class="token keyword">await</span> productCatalog<span class="token punctuation">.</span><span class="token function">getAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 変換と集計</span>
+    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">computeSummary</span><span class="token punctuation">(</span>orders<span class="token punctuation">,</span> customers<span class="token punctuation">,</span> products<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 最適化された形式で保存</span>
+    <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">,</span> summary<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getSalesSummary</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>特徴：</strong></p>
+<ul>
+<li>アプリケーション管理ロジック</li>
+<li>複数のソースからデータを集計可能</li>
+<li>任意のデータストアに保存（ソースとは異なる）</li>
+<li>柔軟な更新戦略</li>
+<li>分散システム全体で機能</li>
+</ul>
+<h3 id="主な違い">主な違い</h3>
+<table>
+<thead>
+<tr>
+<th>側面</th>
+<th>データベースのマテリアライズドビュー</th>
+<th>マテリアライズドビューパターン</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>スコープ</strong></td>
+<td>単一データベース</td>
+<td>複数のデータソース</td>
+</tr>
+<tr>
+<td><strong>管理</strong></td>
+<td>データベースエンジン</td>
+<td>アプリケーションコード</td>
+</tr>
+<tr>
+<td><strong>ストレージ</strong></td>
+<td>同じデータベース</td>
+<td>任意のデータストア</td>
+</tr>
+<tr>
+<td><strong>技術</strong></td>
+<td>データベース固有</td>
+<td>技術非依存</td>
+</tr>
+<tr>
+<td><strong>使用例</strong></td>
+<td>DB内のクエリ最適化</td>
+<td>クロスシステムデータ集計</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📊 どちらを使用するか</p><div class="admonition-content"><p><strong>データベースのマテリアライズドビューを使用</strong>：単一データベースシステム内でクエリを最適化する場合。</p>
+<p><strong>マテリアライズドビューパターンを使用</strong>：複数のシステム、マイクロサービス、または異種データストア全体でデータを集計する場合。</p>
+</div></div>
+<h2 id="仕組み：実際のパターン">仕組み：実際のパターン</h2>
+<p>具体的な例を見てみましょう：製品販売サマリーを表示する必要があるeコマースプラットフォーム。</p>
+<h3 id="ソースデータ構造">ソースデータ構造</h3>
+<p>システムは、異なる目的に最適化された別々の場所にデータを保存します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// トランザクションデータベースに保存された注文</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">orderId</span><span class="token operator">:</span> <span class="token string">"ORD-12345"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">customerId</span><span class="token operator">:</span> <span class="token string">"CUST-789"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">orderDate</span><span class="token operator">:</span> <span class="token string">"2019-05-15"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">items</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token literal-property property">price</span><span class="token operator">:</span> <span class="token number">29.99</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-002"</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token literal-property property">price</span><span class="token operator">:</span> <span class="token number">49.99</span> <span class="token punctuation">}</span>
+  <span class="token punctuation">]</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// カタログサービスに保存された製品</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"Wireless Mouse"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"Electronics"</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// CRMシステムに保存された顧客</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">customerId</span><span class="token operator">:</span> <span class="token string">"CUST-789"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"John Doe"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">segment</span><span class="token operator">:</span> <span class="token string">"Premium"</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="マテリアライズドビュー構造">マテリアライズドビュー構造</h3>
+<p>ビューは、このデータをクエリ最適化形式に結合して変換します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 販売サマリーのマテリアライズドビュー</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"Electronics"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">109.97</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">orderCount</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">customerCount</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">topProducts</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-002"</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"Keyboard"</span><span class="token punctuation">,</span> <span class="token literal-property property">sales</span><span class="token operator">:</span> <span class="token number">49.99</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"Wireless Mouse"</span><span class="token punctuation">,</span> <span class="token literal-property property">sales</span><span class="token operator">:</span> <span class="token number">59.98</span> <span class="token punctuation">}</span>
+  <span class="token punctuation">]</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">lastUpdated</span><span class="token operator">:</span> <span class="token string">"2019-05-15T14:30:00Z"</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="更新戦略">更新戦略</h3>
+<p>パターンは複数の更新アプローチをサポートします：</p>
+<h4 id="1-イベント駆動更新">1. イベント駆動更新</h4>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ソースデータが変更されたときにビューを更新</span>
+orderService<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'orderCreated'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">updateSalesSummary</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+productService<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'productUpdated'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">product</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">refreshProductViews</span><span class="token punctuation">(</span>product<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h4 id="2-スケジュールされた更新">2. スケジュールされた更新</h4>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 定期的な更新</span>
+cron<span class="token punctuation">.</span><span class="token function">schedule</span><span class="token punctuation">(</span><span class="token string">'0 * * * *'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">rebuildAllViews</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h4 id="3-オンデマンド更新">3. オンデマンド更新</h4>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 必要に応じて手動更新</span>
+app<span class="token punctuation">.</span><span class="token function">post</span><span class="token punctuation">(</span><span class="token string">'/admin/refresh-views'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">rebuildAllViews</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'Views refreshed'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h2 id="実装の考慮事項">実装の考慮事項</h2>
+<h3 id="1-更新のタイミングと頻度">1. 更新のタイミングと頻度</h3>
+<p>要件に基づいて更新戦略を選択します：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔄 更新戦略の選択</p><div class="admonition-content"><p><strong>リアルタイム（イベント駆動）</strong>：鮮度が最も重要な重要なデータに最適。ソースデータが急速に変化する場合、過度のオーバーヘッドに注意してください。</p>
+<p><strong>スケジュール（バッチ）</strong>：わずかな古さが許容されるレポートと分析に理想的。システム負荷を削減し、実装を簡素化します。</p>
+<p><strong>オンデマンド（手動）</strong>：アクセス頻度の低いビューまたは更新タイミングの明示的な制御が必要な場合に適しています。</p>
+</div></div>
+<h3 id="2-データ一貫性のトレードオフ">2. データ一貫性のトレードオフ</h3>
+<p>マテリアライズドビューは結果整合性を導入します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 例：一貫性ウィンドウの処理</span>
+<span class="token keyword">class</span> <span class="token class-name">MaterializedViewReader</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">getSalesSummary</span><span class="token punctuation">(</span><span class="token parameter">options <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> view <span class="token operator">=</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>options<span class="token punctuation">.</span>requireFresh<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> age <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> view<span class="token punctuation">.</span>lastUpdated<span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>age <span class="token operator">&gt;</span> options<span class="token punctuation">.</span>maxAge<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 更新をトリガーして待機</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">refreshView</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> view<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 一貫性の考慮事項</p><div class="admonition-content"><p>ビューの更新中、データはソースシステムと一時的に一貫性がない可能性があります。アプリケーションがこれを適切に処理するように設計します：</p>
+<ul>
+<li>最終更新タイムスタンプを表示</li>
+<li>重要な操作に手動更新オプションを提供</li>
+<li>バージョニングを使用して古いデータを検出</li>
+</ul>
+</div></div>
+<h3 id="3-ストレージロケーション戦略">3. ストレージロケーション戦略</h3>
+<p>ビューはソースデータと同じストアに存在する必要はありません：</p>
+<div class="mermaid">graph TD
+    A[トランザクションDB] --&gt;|抽出| D[ビュービルダー]
+    B[ドキュメントストア] --&gt;|抽出| D
+    C[外部API] --&gt;|抽出| D
+    D --&gt;|保存| E[キャッシュ層]
+    D --&gt;|保存| F[検索エンジン]
+    D --&gt;|保存| G[分析DB]
+    
+    style D fill:#ffd43b,stroke:#fab005
+    style E fill:#51cf66,stroke:#2f9e44
+    style F fill:#51cf66,stroke:#2f9e44
+    style G fill:#51cf66,stroke:#2f9e44</div>
+<p><strong>ストレージオプション：</strong></p>
+<ul>
+<li><strong>インメモリキャッシュ</strong>（Redis、Memcached）：超高速アクセス、揮発性</li>
+<li><strong>検索エンジン</strong>（Elasticsearch）：全文検索機能</li>
+<li><strong>分析データベース</strong>（ClickHouse、TimescaleDB）：集計用に最適化</li>
+<li><strong>オブジェクトストレージ</strong>：大きく、アクセス頻度の低いビューにコスト効率的</li>
+</ul>
+<h2 id="このパターンを使用する場合">このパターンを使用する場合</h2>
+<h3 id="理想的なシナリオ">理想的なシナリオ</h3>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 完璧な使用例</p><div class="admonition-content"><p><strong>複雑なクエリ要件</strong>：クエリがリアルタイムで計算するのに高価な複数の結合、集計、または変換を必要とする場合。</p>
+<p><strong>クロスシステム集計</strong>：複数のデータベース、マイクロサービス、または外部システムからデータを結合する場合。</p>
+<p><strong>レポートと分析</strong>：リアルタイムの精度を必要としないダッシュボード、レポート、または分析を生成する場合。</p>
+<p><strong>イベントソーシングシステム</strong>：現在の状態をクエリする唯一の方法がすべてのイベントを再生することである場合。</p>
+</div></div>
+<h3 id="二次的なメリット">二次的なメリット</h3>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📋 追加の利点</p><div class="admonition-content"><p><strong>簡素化されたクエリ</strong>：ソースシステムの深い知識を必要としない形式で複雑なデータを公開します。</p>
+<p><strong>セキュリティとプライバシー</strong>：クエリ機能を維持しながら機密データを除外するフィルタリングされたビューを提供します。</p>
+<p><strong>切断されたシナリオ</strong>：オフラインアクセスまたは時々接続されるシステムのためにビューをローカルにキャッシュします。</p>
+<p><strong>パフォーマンスの分離</strong>：重い分析クエリがトランザクションシステムに影響を与えるのを防ぎます。</p>
+</div></div>
+<h3 id="避けるべき場合">避けるべき場合</h3>
+<div class="admonition danger"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>❌ 適していない場合</p><div class="admonition-content"><p><strong>シンプルなデータ構造</strong>：ソースデータがすでに簡単にクエリ可能な形式である。</p>
+<p><strong>高い一貫性要件</strong>：アプリケーションがデータの古さを許容できない。</p>
+<p><strong>急速に変化するデータ</strong>：ソースデータが頻繁に変化するため、ビューが常に古くなっている。</p>
+<p><strong>限定的なクエリパターン</strong>：いくつかの単純なクエリのみが必要で、オーバーヘッドが正当化されない。</p>
+</div></div>
+<h2 id="アーキテクチャ品質属性">アーキテクチャ品質属性</h2>
+<h3 id="パフォーマンス効率">パフォーマンス効率</h3>
+<p>パターンはクエリパフォーマンスを劇的に向上させます：</p>
+<div id="chart_55e42de9b" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_55e42de9b'));
+        var option = {
+  "title": {
+    "text": "クエリ応答時間の比較"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["直接クエリ", "マテリアライズドビュー"]
+  },
+  "xAxis": {
+    "type": "category",
+    "data": ["シンプル", "中程度", "複雑", "非常に複雑"]
+  },
+  "yAxis": {
+    "type": "value",
+    "name": "応答時間 (ms)"
+  },
+  "series": [
+    {
+      "name": "直接クエリ",
+      "type": "bar",
+      "data": [50, 250, 1500, 5000],
+      "itemStyle": {
+        "color": "#fa5252"
+      }
+    },
+    {
+      "name": "マテリアライズドビュー",
+      "type": "bar",
+      "data": [10, 15, 20, 25],
+      "itemStyle": {
+        "color": "#51cf66"
+      }
+    }
+  ]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<p><strong>メリット：</strong></p>
+<ul>
+<li>クエリ時の高価な結合と集計を排除</li>
+<li>事前計算された結果を提供することでデータベース負荷を削減</li>
+<li>データ量に関係なく予測可能なクエリパフォーマンス</li>
+</ul>
+<h3 id="スケーラビリティ">スケーラビリティ</h3>
+<p>マテリアライズドビューは水平スケーリングをサポートします：</p>
+<ul>
+<li><strong>読み取りスケーリング</strong>：複数のノードにビューを複製</li>
+<li><strong>書き込み分離</strong>：読み取り重視の分析を書き込み重視のトランザクションから分離</li>
+<li><strong>リソースの最適化</strong>：異なるアクセスパターンに特化したストレージを使用</li>
+</ul>
+<h3 id="コストの最適化">コストの最適化</h3>
+<p>追加のストレージが必要ですが、パターンは全体的なコストを削減できます：</p>
+<ul>
+<li><strong>計算の削減</strong>：クエリ処理のCPUサイクルが少ない</li>
+<li><strong>データベース負荷の低下</strong>：高価なデータベースインスタンスの必要性が減少</li>
+<li><strong>階層化されたストレージ</strong>：アクセス頻度の低いビューにコスト効率の高いストレージを使用</li>
+</ul>
+<h2 id="トレードオフと考慮事項">トレードオフと考慮事項</h2>
+<p>他のアーキテクチャパターンと同様に、マテリアライズドビューにはトレードオフがあります：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 対処すべき課題</p><div class="admonition-content"><p><strong>ストレージオーバーヘッド</strong>：ビューは追加のストレージスペースを消費し、データを重複させる可能性があります。</p>
+<p><strong>更新の複雑さ</strong>：ビューの更新を管理すると、運用の複雑さと潜在的な障害ポイントが追加されます。</p>
+<p><strong>一貫性ウィンドウ</strong>：アプリケーションは、ビューが最新のソースデータを反映していない期間を処理する必要があります。</p>
+<p><strong>メンテナンスの負担</strong>：ビューには監視、バージョニング、時折の再構築が必要です。</p>
+</div></div>
+<p><strong>軽減戦略：</strong></p>
+<ul>
+<li>スキーマ変更を処理するためにビューのバージョニングを実装</li>
+<li>ビューの鮮度を監視し、古いデータについてアラート</li>
+<li>ビューの再構築と検証を自動化</li>
+<li>各ビューの一貫性保証を文書化</li>
+</ul>
+<h2 id="関連パターン">関連パターン</h2>
+<p>マテリアライズドビューパターンは、他のアーキテクチャパターンとうまく機能します：</p>
+<ul>
+<li><strong>CQRS（コマンドクエリ責任分離）</strong>：マテリアライズドビューをクエリ側として使用し、書き込み用に別のコマンドモデルを使用</li>
+<li><strong>イベントソーシング</strong>：イベントストリームを処理してマテリアライズドビューを構築し、現在の状態を導出</li>
+<li><strong>インデックステーブルパターン</strong>：追加のクエリパターンのためにマテリアライズドビュー上にセカンダリインデックスを作成</li>
+<li><strong>キャッシュアサイド</strong>：明示的な更新ロジックを持つ特殊なキャッシュとしてマテリアライズドビューを扱う</li>
+</ul>
+<h2 id="結論">結論</h2>
+<p>マテリアライズドビューパターンは、データ集約型システムの基本的な課題を解決します：データの保存方法とクエリ方法の不一致。クエリ結果を事前計算して保存することで、次のことを実現します：</p>
+<ul>
+<li>複雑なクエリの<strong>劇的なパフォーマンス向上</strong></li>
+<li>ソースシステムの<strong>負荷削減</strong></li>
+<li>複数のソースにわたってデータを集計する<strong>柔軟性</strong></li>
+<li>アプリケーション開発者のための<strong>簡素化されたクエリ</strong></li>
+</ul>
+<p>一貫性とストレージオーバーヘッドに関するトレードオフを導入しますが、これらのコストは、提供するパフォーマンスの向上とアーキテクチャの柔軟性によって正当化されることがよくあります。システムが複雑なクエリに苦労している場合、複数のソースにわたってデータを集計する必要がある場合、またはトランザクションワークロードに影響を与えずに高性能な分析が必要な場合は、このパターンを検討してください。</p>
+<p>成功の鍵：マテリアライズドビューを、いつでもソースデータから再構築できる使い捨ての自動化されたアーティファクトとして扱います。この考え方により、特定の要件に最適なバランスが見つかるまで、さまざまなビュー構造と更新戦略を自由に実験できます。</p>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://www.enterpriseintegrationpatterns.com/">Enterprise Integration Patterns: Materialized View</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/materialized-view">Microsoft Learn: Materialized View Pattern</a></li>
+<li><a target="_blank" rel="noopener" href="https://martinfowler.com/bliki/CQRS.html">Martin Fowler: CQRS</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2019/05/Materialized-View-Pattern/" data-id="a2c8f45" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "マテリアライズドビューパターン：事前計算されたデータによるクエリパフォーマンスの最適化",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "Architecture Data Management Design Patterns Performance",
+        "genre": "Architecture",
+        "datePublished": "2019-05-20",
+        "dateCreated": "2019-05-20",
+        "dateModified": "2025-10-18",
+        "url": "https://neo01.com//ja/2019/05/Materialized-View-Pattern/",
+        "description": "マテリアライズドビューパターンを使用して、特定のクエリ用に最適化された形式でデータを事前計算して保存することで、クエリパフォーマンスを向上させる方法と、データベースのマテリアライズドビューとの違いを学びます。",
+        "wordCount": 1658
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="Architecture as Code: パート2 - 基盤の構築" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Architecture/">アーキテクチャ</a></p>
+                            <p class="item-title"><a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">Architecture as Code: パート2 - 基盤の構築</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">11</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#8d54e134</div>
+                <img src="/qr/qr-19f8c2238b8cf86751082bc70dd4d01b.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#8d54e134">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

@@ -1,0 +1,1499 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>リバースプロキシを理解する：エンタープライズアーキテクチャの縁の下の力持ち | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Architecture,DevOps,Infrastructure,Security">
+    
+    
+    <meta name="description" content="ユーザーとバックエンドサーバーの間に何があるのか疑問に思ったことはありますか？リバースプロキシがエンタープライズ設計で不可欠な理由と、それが本当に障害点となるのかを解説します。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="リバースプロキシを理解する：エンタープライズアーキテクチャの縁の下の力持ち">
+<meta property="og:url" content="https://neo01.com/ja/2024/09/Understanding-Reverse-Proxy/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="ユーザーとバックエンドサーバーの間に何があるのか疑問に思ったことはありますか？リバースプロキシがエンタープライズ設計で不可欠な理由と、それが本当に障害点となるのかを解説します。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2024-09-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-18T09:36:54.119Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="Infrastructure">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2024/09/Understanding-Reverse-Proxy/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2024/09/Understanding-Reverse-Proxy/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2024/09/Understanding-Reverse-Proxy/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2024/09/Understanding-Reverse-Proxy-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        リバースプロキシを理解する：エンタープライズアーキテクチャの縁の下の力持ち
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2024-09-14T16:00:00.000Z" itemprop="datePublished">2024-09-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-18T09:36:54.119Z" itemprop="datePublished">2025-10-18</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Architecture/">Architecture</a> <a class="tag-link" href="/ja/tags/DevOps/">DevOps</a> <a class="tag-link" href="/ja/tags/Infrastructure/">Infrastructure</a> <a class="tag-link" href="/ja/tags/Security/">Security</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AA%E3%83%90%E3%83%BC%E3%82%B9%E3%83%97%E3%83%AD%E3%82%AD%E3%82%B7%E3%81%A8%E3%81%AF%EF%BC%9F"><span class="toc-text">リバースプロキシとは？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AA%E3%83%90%E3%83%BC%E3%82%B9%E3%83%97%E3%83%AD%E3%82%AD%E3%82%B7%E3%81%AF%E3%81%A9%E3%81%AE%E3%82%88%E3%81%86%E3%81%AB%E6%A9%9F%E8%83%BD%E3%81%99%E3%82%8B%E3%81%8B%EF%BC%9F"><span class="toc-text">リバースプロキシはどのように機能するか？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%A8%E3%83%B3%E3%82%BF%E3%83%BC%E3%83%97%E3%83%A9%E3%82%A4%E3%82%BA%E8%A8%AD%E8%A8%88%E3%81%AB%E3%83%AA%E3%83%90%E3%83%BC%E3%82%B9%E3%83%97%E3%83%AD%E3%82%AD%E3%82%B7%E3%81%8C%E5%BF%85%E8%A6%81%E3%81%AA%E7%90%86%E7%94%B1"><span class="toc-text">エンタープライズ設計にリバースプロキシが必要な理由</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%81%9D%E3%82%8C%E3%81%AF%E5%88%A5%E3%81%AE%E9%9A%9C%E5%AE%B3%E7%82%B9%E3%81%AA%E3%81%AE%E3%81%8B%EF%BC%9F"><span class="toc-text">それは別の障害点なのか？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%BA%E6%B0%97%E3%81%AE%E3%83%AA%E3%83%90%E3%83%BC%E3%82%B9%E3%83%97%E3%83%AD%E3%82%AD%E3%82%B7%E3%82%BD%E3%83%AA%E3%83%A5%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3"><span class="toc-text">人気のリバースプロキシソリューション</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%AF%E3%82%A4%E3%83%83%E3%82%AF%E3%82%B9%E3%82%BF%E3%83%BC%E3%83%88%E4%BE%8B"><span class="toc-text">クイックスタート例</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AA%E3%82%BD%E3%83%BC%E3%82%B9"><span class="toc-text">リソース</span></a></li></ol>
+            <p>ウェブサイトにアクセスし、ボタンをクリックします。その裏側では、リクエストはアプリケーションを実行しているサーバーに直接送られるわけではありません。代わりに、まず別のものに到達します—リバースプロキシです。</p>
+<p>ほとんどのユーザーはその存在を知りません。しかし、エンタープライズアーキテクトにとっては不可欠なものです。</p>
+<h2 id="リバースプロキシとは？">リバースプロキシとは？</h2>
+<p>リバースプロキシは、クライアントとバックエンドサーバーの間に位置するサーバーで、クライアントのリクエストを適切なバックエンドサーバーに転送し、サーバーのレスポンスをクライアントに返します。</p>
+<p><strong>主な違い：</strong></p>
+<ul>
+<li><strong>フォワードプロキシ：</strong> クライアントの前に位置し、クライアントに代わってサーバーにリクエストを転送</li>
+<li><strong>リバースプロキシ：</strong> サーバーの前に位置し、サーバーに代わってクライアントにリクエストを転送</li>
+</ul>
+<h3 id="実世界のアナロジー">実世界のアナロジー</h3>
+<p>リバースプロキシをホテルのコンシェルジュと考えてみましょう：</p>
+<p><strong>リバースプロキシなし：</strong></p>
+<ul>
+<li>ゲストがスタッフのドア（シェフ、ハウスキーパー、マネージャー）を直接ノック</li>
+<li>各スタッフが自分のドアを管理</li>
+<li>複数のゲストが到着すると混乱</li>
+<li>誰が忙しいか利用可能かわからない</li>
+</ul>
+<p><strong>リバースプロキシあり：</strong></p>
+<ul>
+<li>すべてのゲストがまずコンシェルジュデスクへ</li>
+<li>コンシェルジュはどのスタッフに連絡すべきか把握</li>
+<li>リクエストを均等に分配</li>
+<li>混雑時も優雅に対応</li>
+<li>スタッフは中断されずに作業可能</li>
+</ul>
+<p>コンシェルジュは実際の作業を行うわけではありません—効率的にリクエストをルーティングし、スタッフが圧倒されないよう保護します。</p>
+<h2 id="リバースプロキシはどのように機能するか？">リバースプロキシはどのように機能するか？</h2>
+<div class="mermaid">flowchart LR
+    Client["👤 クライアント<br>(ブラウザ)"]
+    RP["🚪 リバースプロキシ<br>(nginx/Traefik)"]
+    
+    subgraph Backend["バックエンドサーバー"]
+        App1["🖥️ アプリサーバー 1"]
+        App2["🖥️ アプリサーバー 2"]
+        App3["🖥️ アプリサーバー 3"]
+    end
+    
+    Client --&gt;|"1. リクエスト"| RP
+    RP --&gt;|"2. 転送"| App1
+    RP -.-&gt;|"負荷分散"| App2
+    RP -.-&gt;|"負荷分散"| App3
+    App1 --&gt;|"3. レスポンス"| RP
+    RP --&gt;|"4. 返却"| Client
+    
+    style RP fill:#fff3e0
+    style Backend fill:#e8f5e9</div>
+<p><strong>リクエストフロー：</strong></p>
+<ol>
+<li><strong>クライアントがリクエスト送信</strong> → <code>https://example.com/api/users</code></li>
+<li><strong>DNS解決</strong> → リバースプロキシのIPを指す</li>
+<li><strong>リバースプロキシが受信</strong> → リクエストを検査（URL、ヘッダー、メソッド）</li>
+<li><strong>ルーティング決定</strong> → どのバックエンドサーバーを使用するか決定</li>
+<li><strong>リクエスト転送</strong> → バックエンドサーバーに送信</li>
+<li><strong>バックエンドが処理</strong> → レスポンスを生成</li>
+<li><strong>プロキシが返却</strong> → クライアントにレスポンスを送り返す</li>
+</ol>
+<p><strong>クライアントが見るもの：</strong></p>
+<pre class="language-none"><code class="language-none">リクエスト: https://example.com/api/users
+レスポンス: 200 OK</code></pre>
+<p><strong>実際に起こっていること：</strong></p>
+<pre class="language-none"><code class="language-none">クライアント → リバースプロキシ (203.0.113.10)
+リバースプロキシ → バックエンドサーバー (10.0.1.5:8080)
+バックエンドサーバー → リバースプロキシ
+リバースプロキシ → クライアント</code></pre>
+<p>クライアントはバックエンドサーバーの実際のIPアドレスやポートを知ることはありません。</p>
+<h2 id="エンタープライズ設計にリバースプロキシが必要な理由">エンタープライズ設計にリバースプロキシが必要な理由</h2>
+<h3 id="1-負荷分散">1. 負荷分散</h3>
+<p><strong>問題：</strong> 単一サーバーではピーク時のすべてのトラフィックを処理できない。</p>
+<p><strong>解決策：</strong> リバースプロキシが複数のサーバーにリクエストを分散。</p>
+<pre class="language-none"><code class="language-none">100 リクエスト/秒 → リバースプロキシ
+                   ├─&gt; サーバー 1 (33 req/sec)
+                   ├─&gt; サーバー 2 (33 req/sec)
+                   └─&gt; サーバー 3 (34 req/sec)</code></pre>
+<p><strong>負荷分散アルゴリズム：</strong></p>
+<ul>
+<li><strong>ラウンドロビン：</strong> リクエストを順次分配</li>
+<li><strong>最小接続数：</strong> アクティブな接続が最も少ないサーバーに送信</li>
+<li><strong>IPハッシュ：</strong> 同じクライアントは常に同じサーバーへ（セッション永続性）</li>
+<li><strong>重み付け：</strong> サーバー容量に基づいて分配</li>
+</ul>
+<p><strong>実世界への影響：</strong></p>
+<p>負荷分散なし：</p>
+<ul>
+<li>サーバー 1: 過負荷（クラッシュ）</li>
+<li>サーバー 2: アイドル</li>
+<li>サーバー 3: アイドル</li>
+<li>結果: サービスダウン</li>
+</ul>
+<p>負荷分散あり：</p>
+<ul>
+<li>すべてのサーバーが負荷を均等に共有</li>
+<li>単一の過負荷ポイントなし</li>
+<li>1つが故障しても優雅に劣化</li>
+</ul>
+<h3 id="2-SSL-TLS終端">2. SSL/TLS終端</h3>
+<p><strong>問題：</strong> すべてのバックエンドサーバーにSSL証明書と暗号化オーバーヘッドが必要。</p>
+<p><strong>解決策：</strong> リバースプロキシがすべてのSSL/TLS暗号化/復号化を処理。</p>
+<div class="mermaid">flowchart LR
+    Client["👤 クライアント"]
+    RP["🚪 リバースプロキシ"]
+    App1["🖥️ アプリサーバー 1"]
+    App2["🖥️ アプリサーバー 2"]
+    
+    Client &lt;--&gt;|"🔒 HTTPS<br>(暗号化)"| RP
+    RP &lt;--&gt;|"HTTP<br>(平文)"| App1
+    RP &lt;--&gt;|"HTTP<br>(平文)"| App2
+    
+    style RP fill:#fff3e0</div>
+<p><strong>メリット：</strong></p>
+<ul>
+<li><strong>単一証明書：</strong> SSL証明書を1か所で管理</li>
+<li><strong>CPU負荷軽減：</strong> バックエンドサーバーはトラフィックを復号化しない</li>
+<li><strong>更新の簡素化：</strong> アプリに触れずにSSL設定を更新</li>
+<li><strong>集中セキュリティ：</strong> TLSバージョンと暗号を統一的に強制</li>
+</ul>
+<p><strong>コスト削減：</strong></p>
+<ul>
+<li>リバースプロキシなし: 10サーバー × $50/証明書 = $500/年</li>
+<li>リバースプロキシあり: 1サーバー × $50/証明書 = $50/年</li>
+</ul>
+<h3 id="3-セキュリティレイヤー">3. セキュリティレイヤー</h3>
+<p><strong>問題：</strong> バックエンドサーバーがインターネット攻撃に直接さらされる。</p>
+<p><strong>解決策：</strong> リバースプロキシがセキュリティバリアとして機能。</p>
+<p><strong>保護メカニズム：</strong></p>
+<p><strong>バックエンドインフラの隠蔽：</strong></p>
+<pre class="language-none"><code class="language-none">クライアントが見るもの: https://api.example.com
+実際のバックエンド: http://10.0.1.5:8080 (隠蔽)</code></pre>
+<p><strong>レート制限：</strong></p>
+<pre class="language-nginx" data-language="nginx"><code class="language-nginx"><span class="token comment"># IP毎に秒間10リクエストに制限</span>
+<span class="token directive"><span class="token keyword">limit_req_zone</span> <span class="token variable">$binary_remote_addr</span> zone=api:10m rate=10r/s</span><span class="token punctuation">;</span></code></pre>
+<p><strong>IPフィルタリング：</strong></p>
+<pre class="language-nginx" data-language="nginx"><code class="language-nginx"><span class="token comment"># 特定のIPをブロック</span>
+<span class="token directive"><span class="token keyword">deny</span> 192.168.1.100</span><span class="token punctuation">;</span>
+<span class="token comment"># 特定の範囲のみ許可</span>
+<span class="token directive"><span class="token keyword">allow</span> 10.0.0.0/8</span><span class="token punctuation">;</span>
+<span class="token directive"><span class="token keyword">deny</span> all</span><span class="token punctuation">;</span></code></pre>
+<p><strong>DDoS緩和：</strong></p>
+<ul>
+<li>IP毎の接続制限</li>
+<li>リクエストレート制限</li>
+<li>悪用IPの自動ブラックリスト化</li>
+</ul>
+<p><strong>Webアプリケーションファイアウォール（WAF）：</strong></p>
+<ul>
+<li>SQLインジェクション検出</li>
+<li>XSS攻撃防止</li>
+<li>悪意のあるペイロードフィルタリング</li>
+</ul>
+<h3 id="4-キャッシング">4. キャッシング</h3>
+<p><strong>問題：</strong> バックエンドサーバーが同じレスポンスを繰り返し生成。</p>
+<p><strong>解決策：</strong> リバースプロキシがレスポンスをキャッシュし、バックエンド負荷を軽減。</p>
+<p><strong>キャッシュフロー：</strong></p>
+<pre class="language-none"><code class="language-none">最初のリクエスト：
+クライアント → プロキシ (キャッシュミス) → バックエンド → レスポンス生成
+                             ← キャッシュに保存 ← 返却
+
+後続のリクエスト：
+クライアント → プロキシ (キャッシュヒット) → キャッシュされたレスポンスを返却
+         (バックエンドに触れない)</code></pre>
+<p><strong>パフォーマンスへの影響：</strong></p>
+<table>
+<thead>
+<tr>
+<th>シナリオ</th>
+<th>レスポンス時間</th>
+<th>バックエンド負荷</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>キャッシュなし</td>
+<td>200ms</td>
+<td>100%</td>
+</tr>
+<tr>
+<td>50%キャッシュヒット</td>
+<td>110ms</td>
+<td>50%</td>
+</tr>
+<tr>
+<td>90%キャッシュヒット</td>
+<td>38ms</td>
+<td>10%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>キャッシュ例：</strong></p>
+<pre class="language-nginx" data-language="nginx"><code class="language-nginx"><span class="token comment"># 静的アセットを1日キャッシュ</span>
+<span class="token directive"><span class="token keyword">location</span> ~* \\.(jpg|jpeg|png|css|js)$</span> <span class="token punctuation">{</span>
+    <span class="token directive"><span class="token keyword">proxy_cache</span> my_cache</span><span class="token punctuation">;</span>
+    <span class="token directive"><span class="token keyword">proxy_cache_valid</span> <span class="token number">200</span> <span class="token number">1d</span></span><span class="token punctuation">;</span>
+    <span class="token directive"><span class="token keyword">proxy_pass</span> http://backend</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="5-簡素化されたルーティング">5. 簡素化されたルーティング</h3>
+<p><strong>問題：</strong> 異なるポート/サーバー上の複数のサービス、クライアントにとって複雑。</p>
+<p><strong>解決策：</strong> パスベースのルーティングを持つ単一エントリポイント。</p>
+<p><strong>リバースプロキシなし：</strong></p>
+<pre class="language-none"><code class="language-none">https://app1.example.com:8080  → サービス 1
+https://app2.example.com:8081  → サービス 2
+https://app3.example.com:8082  → サービス 3</code></pre>
+<p><strong>リバースプロキシあり：</strong></p>
+<pre class="language-none"><code class="language-none">https://example.com/app1  → サービス 1 (10.0.1.5:8080)
+https://example.com/app2  → サービス 2 (10.0.1.6:8081)
+https://example.com/app3  → サービス 3 (10.0.1.7:8082)</code></pre>
+<p><strong>ルーティング設定：</strong></p>
+<pre class="language-nginx" data-language="nginx"><code class="language-nginx"><span class="token directive"><span class="token keyword">location</span> /app1</span> <span class="token punctuation">{</span>
+    <span class="token directive"><span class="token keyword">proxy_pass</span> http://10.0.1.5:8080</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token directive"><span class="token keyword">location</span> /app2</span> <span class="token punctuation">{</span>
+    <span class="token directive"><span class="token keyword">proxy_pass</span> http://10.0.1.6:8081</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token directive"><span class="token keyword">location</span> /api</span> <span class="token punctuation">{</span>
+    <span class="token directive"><span class="token keyword">proxy_pass</span> http://api-cluster</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>メリット：</strong></p>
+<ul>
+<li><strong>単一ドメイン：</strong> 覚えやすく管理しやすい</li>
+<li><strong>CORS問題なし：</strong> すべてのサービスが同じオリジンから提供されているように見える</li>
+<li><strong>柔軟なデプロイ：</strong> クライアントURLを変更せずにサービスを移動</li>
+<li><strong>マイクロサービスフレンドリー：</strong> 異なるサービスに透過的にルーティング</li>
+</ul>
+<h3 id="6-ゼロダウンタイムデプロイメント">6. ゼロダウンタイムデプロイメント</h3>
+<p><strong>問題：</strong> 更新のデプロイにはサーバーをオフラインにする必要がある。</p>
+<p><strong>解決策：</strong> リバースプロキシがローリングデプロイメントを可能に。</p>
+<p><strong>デプロイプロセス：</strong></p>
+<pre class="language-none"><code class="language-none">初期状態：
+プロキシ → サーバー 1 (v1.0) ✅
+        → サーバー 2 (v1.0) ✅
+        → サーバー 3 (v1.0) ✅
+
+ステップ 1: サーバー 1を更新
+プロキシ → サーバー 1 (v1.1) 🔄 (プールから削除)
+        → サーバー 2 (v1.0) ✅
+        → サーバー 3 (v1.0) ✅
+
+ステップ 2: サーバー 1を戻す
+プロキシ → サーバー 1 (v1.1) ✅
+        → サーバー 2 (v1.0) ✅
+        → サーバー 3 (v1.0) ✅
+
+ステップ 3-4: サーバー 2と3で繰り返し
+プロキシ → サーバー 1 (v1.1) ✅
+        → サーバー 2 (v1.1) ✅
+        → サーバー 3 (v1.1) ✅</code></pre>
+<p><strong>ヘルスチェック：</strong></p>
+<pre class="language-nginx" data-language="nginx"><code class="language-nginx"><span class="token directive"><span class="token keyword">upstream</span> backend</span> <span class="token punctuation">{</span>
+    <span class="token directive"><span class="token keyword">server</span> 10.0.1.5:8080 max_fails=3 fail_timeout=30s</span><span class="token punctuation">;</span>
+    <span class="token directive"><span class="token keyword">server</span> 10.0.1.6:8080 max_fails=3 fail_timeout=30s</span><span class="token punctuation">;</span>
+    <span class="token directive"><span class="token keyword">server</span> 10.0.1.7:8080 max_fails=3 fail_timeout=30s</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>サーバーがヘルスチェックに失敗すると、プロキシは自動的にローテーションから削除します。</p>
+<h2 id="それは別の障害点なのか？">それは別の障害点なのか？</h2>
+<p><strong>短い答え：</strong> はい、しかし計算されたトレードオフです。</p>
+<p><strong>長い答え：</strong> 適切に実装された場合、メリットはリスクをはるかに上回ります。</p>
+<h3 id="懸念">懸念</h3>
+<pre class="language-none"><code class="language-none">クライアント → リバースプロキシ → バックエンドサーバー
+              ↓
+         単一障害点？</code></pre>
+<p>リバースプロキシがダウンすると、バックエンドサーバーが健全であっても、すべてのサービスが到達不能になります。</p>
+<h3 id="現実：緩和戦略">現実：緩和戦略</h3>
+<h4 id="1-高可用性セットアップ">1. 高可用性セットアップ</h4>
+<p><strong>アクティブ-パッシブ：</strong></p>
+<div class="mermaid">flowchart TD
+    Client["👤 クライアント"]
+    VIP["🌐 仮想IP<br>(203.0.113.10)"]
+    RP1["🚪 リバースプロキシ 1<br>(アクティブ)"]
+    RP2["🚪 リバースプロキシ 2<br>(スタンバイ)"]
+    
+    subgraph Backend["バックエンドサーバー"]
+        App1["🖥️ サーバー 1"]
+        App2["🖥️ サーバー 2"]
+    end
+    
+    Client --&gt; VIP
+    VIP --&gt; RP1
+    VIP -.-&gt;|"フェイルオーバー"| RP2
+    RP1 --&gt; Backend
+    RP2 -.-&gt; Backend
+    RP1 &lt;-.-&gt;|"ハートビート"| RP2
+    
+    style RP1 fill:#c8e6c9
+    style RP2 fill:#ffecb3
+    style Backend fill:#e8f5e9</div>
+<p><strong>仕組み：</strong></p>
+<ul>
+<li>2つのリバースプロキシが仮想IPを共有</li>
+<li>プライマリがすべてのトラフィックを処理</li>
+<li>セカンダリがハートビートでプライマリを監視</li>
+<li>プライマリが故障すると、セカンダリが仮想IPを引き継ぐ</li>
+<li>フェイルオーバー時間：1-3秒</li>
+</ul>
+<p><strong>アクティブ-アクティブ：</strong></p>
+<pre class="language-none"><code class="language-none">クライアント → DNSラウンドロビン
+         ├─&gt; リバースプロキシ 1 (50%トラフィック)
+         └─&gt; リバースプロキシ 2 (50%トラフィック)
+                    ↓
+              バックエンドサーバー</code></pre>
+<p><strong>メリット：</strong></p>
+<ul>
+<li>両方のプロキシがトラフィックを処理</li>
+<li>リソース利用率の向上</li>
+<li>自動負荷分散</li>
+<li>1つが故障しても、もう1つが100%処理</li>
+</ul>
+<h4 id="2-リバースプロキシはバックエンドよりシンプル">2. リバースプロキシはバックエンドよりシンプル</h4>
+<p><strong>複雑さの比較：</strong></p>
+<table>
+<thead>
+<tr>
+<th>コンポーネント</th>
+<th>複雑さ</th>
+<th>故障確率</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>バックエンドアプリ</td>
+<td>高（ビジネスロジック、データベース、依存関係）</td>
+<td>高い</td>
+</tr>
+<tr>
+<td>リバースプロキシ</td>
+<td>低（ルーティング、転送）</td>
+<td>低い</td>
+</tr>
+</tbody>
+</table>
+<p><strong>リバースプロキシがより信頼性が高い理由：</strong></p>
+<ul>
+<li><strong>ステートレス：</strong> データベースなし、セッションなし（通常）</li>
+<li><strong>シンプルなロジック：</strong> ルーティングと転送のみ</li>
+<li><strong>実戦テスト済み：</strong> nginx/HAProxy/Traefikは成熟</li>
+<li><strong>依存関係が少ない：</strong> 外部サービスが最小限</li>
+<li><strong>監視が容易：</strong> シンプルなヘルスチェック</li>
+</ul>
+<p><strong>故障率の例：</strong></p>
+<pre class="language-none"><code class="language-none">バックエンドアプリケーション: 99.5%稼働率（年間43.8時間のダウンタイム）
+リバースプロキシ: 99.95%稼働率（年間4.38時間のダウンタイム）
+
+HAリバースプロキシ: 99.99%稼働率（年間52分のダウンタイム）</code></pre>
+<h4 id="3-監視とアラート">3. 監視とアラート</h4>
+<p><strong>ヘルスチェック監視：</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># Prometheus監視例</span>
+<span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> ReverseProxyDown
+  <span class="token key atrule">expr</span><span class="token punctuation">:</span> up<span class="token punctuation">{</span>job="reverse<span class="token punctuation">-</span>proxy"<span class="token punctuation">}</span> == 0
+  <span class="token key atrule">for</span><span class="token punctuation">:</span> 1m
+  <span class="token key atrule">annotations</span><span class="token punctuation">:</span>
+    <span class="token key atrule">summary</span><span class="token punctuation">:</span> <span class="token string">"リバースプロキシがダウン"</span>
+    <span class="token key atrule">description</span><span class="token punctuation">:</span> <span class="token string">"リバースプロキシ {{ $labels.instance }} が1分間ダウンしています"</span></code></pre>
+<p><strong>自動復旧：</strong></p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># Systemd自動再起動</span>
+<span class="token punctuation">[</span>Service<span class="token punctuation">]</span>
+<span class="token assign-left variable">Restart</span><span class="token operator">=</span>always
+<span class="token assign-left variable">RestartSec</span><span class="token operator">=</span>5s</code></pre>
+<p><strong>監視メトリクス：</strong></p>
+<ul>
+<li>リクエストレート</li>
+<li>レスポンス時間</li>
+<li>エラーレート（4xx、5xx）</li>
+<li>バックエンドヘルスステータス</li>
+<li>接続数</li>
+<li>CPU/メモリ使用量</li>
+</ul>
+<h4 id="4-地理的分散">4. 地理的分散</h4>
+<p><strong>マルチリージョンセットアップ：</strong></p>
+<pre class="language-none"><code class="language-none">         グローバルDNS（GeoDNS）
+              ↓
+    ┌─────────┴─────────┐
+    ↓                   ↓
+米国リージョン        EUリージョン
+リバースプロキシ      リバースプロキシ
+    ↓                   ↓
+米国バックエンド      EUバックエンド</code></pre>
+<p><strong>メリット：</strong></p>
+<ul>
+<li><strong>リージョナルフェイルオーバー：</strong> 米国リージョンが故障してもトラフィックはEUへ</li>
+<li><strong>レイテンシ削減：</strong> ユーザーは最寄りのリージョンに接続</li>
+<li><strong>災害復旧：</strong> リージョン全体が故障しても完全な停止なし</li>
+</ul>
+<h3 id="リスク比較">リスク比較</h3>
+<p><strong>リバースプロキシなし：</strong></p>
+<pre class="language-none"><code class="language-none">リスク：
+❌ 各バックエンドが攻撃にさらされる
+❌ 負荷分散なし（単一サーバー過負荷）
+❌ 複雑なSSL管理
+❌ キャッシングなし（高いバックエンド負荷）
+❌ 困難なデプロイメント
+❌ 集中監視なし
+
+故障モード：
+- 個々のサーバーが圧倒される
+- DDoSがすべてのサーバーをダウンさせる
+- 1つのサーバーでSSL証明書が期限切れ</code></pre>
+<p><strong>リバースプロキシあり：</strong></p>
+<pre class="language-none"><code class="language-none">リスク：
+⚠️ リバースプロキシが単一点（HAで緩和）
+
+メリット：
+✅ 保護されたバックエンド
+✅ 負荷分散
+✅ 集中SSL
+✅ キャッシングが負荷を軽減
+✅ ゼロダウンタイムデプロイメント
+✅ 集中監視
+
+故障モード：
+- リバースプロキシが故障（しかしHAセットアップがこれを防ぐ）
+- バックエンド故障よりはるかに低い確率</code></pre>
+<h3 id="評決">評決</h3>
+<p><strong>リバースプロキシは単一障害点か？</strong></p>
+<p>技術的にはイエスですが：</p>
+<ol>
+<li><strong>バックエンドアプリケーションより信頼性が高い</strong></li>
+<li><strong>HAセットアップが単一点を排除</strong></li>
+<li><strong>メリットがリスクをはるかに上回る</strong></li>
+<li><strong>業界標準</strong>には理由がある</li>
+</ol>
+<p><strong>リスク評価：</strong></p>
+<table>
+<thead>
+<tr>
+<th>シナリオ</th>
+<th>可用性</th>
+<th>複雑さ</th>
+<th>コスト</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>リバースプロキシなし</td>
+<td>99.5%</td>
+<td>低</td>
+<td>低</td>
+</tr>
+<tr>
+<td>単一リバースプロキシ</td>
+<td>99.95%</td>
+<td>中</td>
+<td>中</td>
+</tr>
+<tr>
+<td>HAリバースプロキシ</td>
+<td>99.99%</td>
+<td>中-高</td>
+<td>中-高</td>
+</tr>
+<tr>
+<td>マルチリージョンHA</td>
+<td>99.999%</td>
+<td>高</td>
+<td>高</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 ベストプラクティス</p><div class="admonition-content"><p>本番システムの場合：</p>
+<ul>
+<li><strong>最小限：</strong> 自動再起動付き単一リバースプロキシ</li>
+<li><strong>推奨：</strong> アクティブ-パッシブHAセットアップ</li>
+<li><strong>エンタープライズ：</strong> アクティブ-アクティブマルチリージョン</li>
+</ul>
+<p>単一のリバースプロキシでも、バックエンドを直接公開するよりも信頼性が高いです。</p>
+</div></div>
+<h2 id="人気のリバースプロキシソリューション">人気のリバースプロキシソリューション</h2>
+<h3 id="nginx">nginx</h3>
+<p><strong>最適用途：</strong> 高性能な静的コンテンツとシンプルなルーティング</p>
+<p><strong>長所：</strong></p>
+<ul>
+<li>非常に高速で軽量</li>
+<li>低メモリフットプリント</li>
+<li>実戦テスト済み（トップウェブサイトの30%以上で使用）</li>
+<li>優れたドキュメント</li>
+</ul>
+<p><strong>短所：</strong></p>
+<ul>
+<li>設定が複雑になる可能性</li>
+<li>設定変更にはリロードが必要</li>
+<li>動的設定が限定的</li>
+</ul>
+<p><strong>ユースケース：</strong> 従来のWebアプリケーション、高トラフィックサイト</p>
+<h3 id="Traefik">Traefik</h3>
+<p><strong>最適用途：</strong> Docker/Kubernetes環境、マイクロサービス</p>
+<p><strong>長所：</strong></p>
+<ul>
+<li>自動サービスディスカバリー</li>
+<li>動的設定（リロード不要）</li>
+<li>Let’s Encrypt組み込みサポート</li>
+<li>美しいダッシュボード</li>
+</ul>
+<p><strong>短所：</strong></p>
+<ul>
+<li>nginxよりリソース使用量が多い</li>
+<li>学習曲線が急</li>
+<li>若いプロジェクト（成熟度が低い）</li>
+</ul>
+<p><strong>ユースケース：</strong> コンテナベースのデプロイメント、クラウドネイティブアプリ</p>
+<h3 id="HAProxy">HAProxy</h3>
+<p><strong>最適用途：</strong> 高度な負荷分散、TCP/UDPプロキシング</p>
+<p><strong>長所：</strong></p>
+<ul>
+<li>非常に信頼性が高い</li>
+<li>高度な負荷分散アルゴリズム</li>
+<li>優れたパフォーマンス監視</li>
+<li>TCP/UDPサポート（HTTPだけでない）</li>
+</ul>
+<p><strong>短所：</strong></p>
+<ul>
+<li>設定構文が独特</li>
+<li>他より直感的でない</li>
+<li>主に負荷分散に焦点</li>
+</ul>
+<p><strong>ユースケース：</strong> 高可用性セットアップ、複雑なルーティングニーズ</p>
+<h3 id="比較">比較</h3>
+<table>
+<thead>
+<tr>
+<th>機能</th>
+<th>nginx</th>
+<th>Traefik</th>
+<th>HAProxy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>パフォーマンス</strong></td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐⭐⭐</td>
+<td>⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>使いやすさ</strong></td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐⭐</td>
+<td>⭐⭐</td>
+</tr>
+<tr>
+<td><strong>Docker統合</strong></td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>動的設定</strong></td>
+<td>⭐⭐</td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>成熟度</strong></td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐⭐⭐</td>
+</tr>
+<tr>
+<td><strong>リソース使用量</strong></td>
+<td>⭐⭐⭐⭐⭐</td>
+<td>⭐⭐⭐</td>
+<td>⭐⭐⭐⭐</td>
+</tr>
+</tbody>
+</table>
+<h2 id="クイックスタート例">クイックスタート例</h2>
+<h3 id="nginxリバースプロキシ">nginxリバースプロキシ</h3>
+<pre class="language-nginx" data-language="nginx"><code class="language-nginx"><span class="token comment"># /etc/nginx/nginx.conf</span>
+
+<span class="token directive"><span class="token keyword">http</span></span> <span class="token punctuation">{</span>
+    <span class="token comment"># バックエンドサーバーを定義</span>
+    <span class="token directive"><span class="token keyword">upstream</span> backend</span> <span class="token punctuation">{</span>
+        <span class="token directive"><span class="token keyword">server</span> 10.0.1.5:8080 weight=3</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">server</span> 10.0.1.6:8080 weight=2</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">server</span> 10.0.1.7:8080 weight=1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment"># レート制限</span>
+    <span class="token directive"><span class="token keyword">limit_req_zone</span> <span class="token variable">$binary_remote_addr</span> zone=api:10m rate=10r/s</span><span class="token punctuation">;</span>
+
+    <span class="token directive"><span class="token keyword">server</span></span> <span class="token punctuation">{</span>
+        <span class="token directive"><span class="token keyword">listen</span> <span class="token number">80</span></span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">server_name</span> example.com</span><span class="token punctuation">;</span>
+
+        <span class="token comment"># HTTPをHTTPSにリダイレクト</span>
+        <span class="token directive"><span class="token keyword">return</span> <span class="token number">301</span> https://<span class="token variable">$server_name</span><span class="token variable">$request_uri</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token directive"><span class="token keyword">server</span></span> <span class="token punctuation">{</span>
+        <span class="token directive"><span class="token keyword">listen</span> <span class="token number">443</span> ssl http2</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">server_name</span> example.com</span><span class="token punctuation">;</span>
+
+        <span class="token comment"># SSL設定</span>
+        <span class="token directive"><span class="token keyword">ssl_certificate</span> /etc/ssl/certs/example.com.crt</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">ssl_certificate_key</span> /etc/ssl/private/example.com.key</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">ssl_protocols</span> TLSv1.2 TLSv1.3</span><span class="token punctuation">;</span>
+
+        <span class="token comment"># ログ</span>
+        <span class="token directive"><span class="token keyword">access_log</span> /var/log/nginx/access.log</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">error_log</span> /var/log/nginx/error.log</span><span class="token punctuation">;</span>
+
+        <span class="token comment"># 静的ファイル（キャッシュ）</span>
+        <span class="token directive"><span class="token keyword">location</span> ~* \\.(jpg|jpeg|png|gif|css|js)$</span> <span class="token punctuation">{</span>
+            <span class="token directive"><span class="token keyword">proxy_pass</span> http://backend</span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_cache</span> my_cache</span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_cache_valid</span> <span class="token number">200</span> <span class="token number">1d</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">expires</span> <span class="token number">1d</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">add_header</span> Cache-Control <span class="token string">"public, immutable"</span></span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment"># APIエンドポイント（レート制限）</span>
+        <span class="token directive"><span class="token keyword">location</span> /api</span> <span class="token punctuation">{</span>
+            <span class="token directive"><span class="token keyword">limit_req</span> zone=api burst=20 nodelay</span><span class="token punctuation">;</span>
+            
+            <span class="token directive"><span class="token keyword">proxy_pass</span> http://backend</span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_set_header</span> Host <span class="token variable">$host</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_set_header</span> X-Real-IP <span class="token variable">$remote_addr</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_set_header</span> X-Forwarded-For <span class="token variable">$proxy_add_x_forwarded_for</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_set_header</span> X-Forwarded-Proto <span class="token variable">$scheme</span></span><span class="token punctuation">;</span>
+            
+            <span class="token comment"># タイムアウト</span>
+            <span class="token directive"><span class="token keyword">proxy_connect_timeout</span> <span class="token number">5s</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_send_timeout</span> <span class="token number">10s</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">proxy_read_timeout</span> <span class="token number">10s</span></span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment"># ヘルスチェックエンドポイント</span>
+        <span class="token directive"><span class="token keyword">location</span> /health</span> <span class="token punctuation">{</span>
+            <span class="token directive"><span class="token keyword">access_log</span> <span class="token boolean">off</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">return</span> <span class="token number">200</span> <span class="token string">"OK<span class="token escape entity">\\</span>n"</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">add_header</span> Content-Type text/plain</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="TraefikとDocker">TraefikとDocker</h3>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># docker-compose.yml</span>
+<span class="token key atrule">version</span><span class="token punctuation">:</span> <span class="token string">'3.8'</span>
+
+<span class="token key atrule">services</span><span class="token punctuation">:</span>
+  <span class="token key atrule">traefik</span><span class="token punctuation">:</span>
+    <span class="token key atrule">image</span><span class="token punctuation">:</span> traefik<span class="token punctuation">:</span>v2.10
+    <span class="token key atrule">command</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"--api.dashboard=true"</span>
+      <span class="token punctuation">-</span> <span class="token string">"--providers.docker=true"</span>
+      <span class="token punctuation">-</span> <span class="token string">"--entrypoints.web.address=:80"</span>
+      <span class="token punctuation">-</span> <span class="token string">"--entrypoints.websecure.address=:443"</span>
+      <span class="token punctuation">-</span> <span class="token string">"--certificatesresolvers.myresolver.acme.email=admin@example.com"</span>
+      <span class="token punctuation">-</span> <span class="token string">"--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"</span>
+      <span class="token punctuation">-</span> <span class="token string">"--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"</span>
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"80:80"</span>
+      <span class="token punctuation">-</span> <span class="token string">"443:443"</span>
+    <span class="token key atrule">volumes</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> /var/run/docker.sock<span class="token punctuation">:</span>/var/run/docker.sock<span class="token punctuation">:</span>ro
+      <span class="token punctuation">-</span> ./letsencrypt<span class="token punctuation">:</span>/letsencrypt
+    <span class="token key atrule">labels</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.dashboard.rule=Host(`traefik.example.com`)"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.dashboard.service=api@internal"</span>
+
+  <span class="token key atrule">app1</span><span class="token punctuation">:</span>
+    <span class="token key atrule">image</span><span class="token punctuation">:</span> myapp<span class="token punctuation">:</span>latest
+    <span class="token key atrule">labels</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.enable=true"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.app1.rule=Host(`app1.example.com`)"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.app1.entrypoints=websecure"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.app1.tls.certresolver=myresolver"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.services.app1.loadbalancer.server.port=8080"</span>
+
+  <span class="token key atrule">app2</span><span class="token punctuation">:</span>
+    <span class="token key atrule">image</span><span class="token punctuation">:</span> myapp<span class="token punctuation">:</span>latest
+    <span class="token key atrule">labels</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.enable=true"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.app2.rule=Host(`app2.example.com`)"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.app2.entrypoints=websecure"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.routers.app2.tls.certresolver=myresolver"</span>
+      <span class="token punctuation">-</span> <span class="token string">"traefik.http.services.app2.loadbalancer.server.port=8080"</span></code></pre>
+<h2 id="結論">結論</h2>
+<p>リバースプロキシは現代のWebアーキテクチャの縁の下の力持ちです。負荷分散、セキュリティ、キャッシング、簡素化されたルーティングを提供しながら、保護するアプリケーションよりも信頼性が高いのです。</p>
+<p><strong>重要なポイント：</strong></p>
+<ul>
+<li><strong>リバースプロキシはクライアントとバックエンドサーバーの間に位置</strong>し、リクエストをインテリジェントにルーティング</li>
+<li><strong>エンタープライズ設計に不可欠</strong>：負荷分散、セキュリティ、SSL終端、キャッシングのため</li>
+<li><strong>はい、潜在的な障害点です</strong>が、HAセットアップと固有のシンプルさにより、代替案よりも信頼性が高い</li>
+<li><strong>適切に実装された場合、メリットがリスクをはるかに上回る</strong></li>
+<li><strong>本番デプロイメントの業界標準</strong></li>
+</ul>
+<p><strong>複雑さに見合う価値はあるか？</strong></p>
+<p>シンプルな単一サーバーセットアップを超えるものには、絶対にあります。運用上のメリット、セキュリティの改善、柔軟性により、リバースプロキシは現代のインフラストラクチャに不可欠です。</p>
+<p><strong>クイック決定ガイド：</strong></p>
+<ul>
+<li><strong>小規模プロジェクト、単一サーバー：</strong> オプション（ただし推奨）</li>
+<li><strong>複数のサーバーまたはサービス：</strong> 絶対に使用</li>
+<li><strong>本番システム：</strong> HAリバースプロキシセットアップを使用</li>
+<li><strong>エンタープライズ/重要システム：</strong> マルチリージョンHAセットアップ</li>
+</ul>
+<p>問題はリバースプロキシを使用するかどうかではなく、どれを選択し、どのように高可用性にするかです。🚀</p>
+<h2 id="リソース">リソース</h2>
+<ul>
+<li><strong><a target="_blank" rel="noopener" href="https://nginx.org/en/docs/">nginxドキュメント</a>：</strong> 公式nginxガイド</li>
+<li><strong><a target="_blank" rel="noopener" href="https://doc.traefik.io/traefik/">Traefikドキュメント</a>：</strong> 完全なTraefikリファレンス</li>
+<li><strong><a target="_blank" rel="noopener" href="https://www.haproxy.org/#docs">HAProxyドキュメント</a>：</strong> HAProxy設定ガイド</li>
+<li><strong><a target="_blank" rel="noopener" href="https://letsencrypt.org/">Let’s Encrypt</a>：</strong> 無料SSL証明書</li>
+<li><strong><a target="_blank" rel="noopener" href="https://www.cloudflare.com/">Cloudflare</a>：</strong> グローバルリバースプロキシ/CDNサービス</li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2024/09/Understanding-Reverse-Proxy/" data-id="44214af5" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "リバースプロキシを理解する：エンタープライズアーキテクチャの縁の下の力持ち",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "Architecture DevOps Infrastructure Security",
+        "genre": "Architecture",
+        "datePublished": "2024-09-15",
+        "dateCreated": "2024-09-15",
+        "dateModified": "2025-10-18",
+        "url": "https://neo01.com//ja/2024/09/Understanding-Reverse-Proxy/",
+        "description": "ユーザーとバックエンドサーバーの間に何があるのか疑問に思ったことはありますか？リバースプロキシがエンタープライズ設計で不可欠な理由と、それが本当に障害点となるのかを解説します。",
+        "wordCount": 2510
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="Architecture as Code: パート2 - 基盤の構築" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Architecture/">アーキテクチャ</a></p>
+                            <p class="item-title"><a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">Architecture as Code: パート2 - 基盤の構築</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">11</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#0065809c</div>
+                <img src="/qr/qr-7e828c37b551b75f1804497b0d8331d1.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#0065809c">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
