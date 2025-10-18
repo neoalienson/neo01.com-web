@@ -1,0 +1,1197 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Gateway Aggregationパターン：ネットワークのおしゃべりを減らす | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="ゲートウェイを通じて複数のバックエンドリクエストを単一の呼び出しに結合します。このパターンが分散システムでネットワークオーバーヘッドを削減し、パフォーマンスを向上させる方法を学びます。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Gateway Aggregationパターン：ネットワークのおしゃべりを減らす">
+<meta property="og:url" content="https://neo01.com/ja/2019/09/Gateway-Aggregation-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="ゲートウェイを通じて複数のバックエンドリクエストを単一の呼び出しに結合します。このパターンが分散システムでネットワークオーバーヘッドを削減し、パフォーマンスを向上させる方法を学びます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-09-12T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-18T04:21:12.914Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2019/09/Gateway-Aggregation-Pattern/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2019/09/Gateway-Aggregation-Pattern/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2019/09/Gateway-Aggregation-Pattern/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/09/Gateway-Aggregation-Pattern-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Gateway Aggregationパターン：ネットワークのおしゃべりを減らす
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-09-12T16:00:00.000Z" itemprop="datePublished">2019-09-13</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-18T04:21:12.914Z" itemprop="datePublished">2025-10-18</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%95%8F%E9%A1%8C%EF%BC%9A%E5%91%BC%E3%81%B3%E5%87%BA%E3%81%97%E3%81%8C%E5%A4%9A%E3%81%99%E3%81%8E%E3%82%8B"><span class="toc-text">問題：呼び出しが多すぎる</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E6%B1%BA%E7%AD%96%EF%BC%9AGateway-Aggregation"><span class="toc-text">解決策：Gateway Aggregation</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BB%E3%81%AA%E5%88%A9%E7%82%B9"><span class="toc-text">主な利点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E8%A3%85%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">実装パターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%AB%98%E5%BA%A6%E3%81%AA%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">高度な考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%81%93%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%99%E3%82%8B%E3%82%BF%E3%82%A4%E3%83%9F%E3%83%B3%E3%82%B0"><span class="toc-text">このパターンを使用するタイミング</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Gateway-Aggregation-vs-%E4%BB%96%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">Gateway Aggregation vs. 他のパターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%A3%E8%A6%96%E3%81%A8%E5%8F%AF%E8%A6%B3%E6%B8%AC%E6%80%A7"><span class="toc-text">監視と可観測性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"><span class="toc-text">参考文献</span></a></li></ol>
+            <p>レストランで食事を注文することを想像してください。前菜、メインコース、サイドディッシュ、デザートのために別々にキッチンに行くのではなく、ウェイターが注文全体を集約し、調整されたコースですべてを一緒に持ってきます。これがGateway Aggregationパターンの本質です——複数のリクエストを収集し、統一されたレスポンスを提供する単一のポイントです。</p>
+<h2 id="問題：呼び出しが多すぎる">問題：呼び出しが多すぎる</h2>
+<p>モダンなアプリケーションは、単一のユーザーアクションを完了するために、複数のバックエンドサービスからデータを必要とすることがよくあります。次のものを表示する商品ページを考えてみましょう：</p>
+<ul>
+<li>カタログサービスからの商品詳細</li>
+<li>倉庫サービスからの在庫状況</li>
+<li>レビューサービスからの顧客レビュー</li>
+<li>レコメンデーションエンジンからのおすすめ商品</li>
+<li>価格サービスからの価格情報</li>
+</ul>
+<h3 id="おしゃべりなアプローチ">おしゃべりなアプローチ</h3>
+<p>集約がない場合、クライアントは複数の個別の呼び出しを行います：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// クライアントは5つの別々のネットワーク呼び出しを行う</span>
+<span class="token keyword">class</span> <span class="token class-name">ProductPageClient</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">loadProductPage</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 各呼び出しにネットワークオーバーヘッドがある</span>
+    <span class="token keyword">const</span> product <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://api.example.com/catalog/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> inventory <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://api.example.com/inventory/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> reviews <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://api.example.com/reviews/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> recommendations <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://api.example.com/recommendations/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> pricing <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://api.example.com/pricing/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">product</span><span class="token operator">:</span> <span class="token keyword">await</span> product<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">inventory</span><span class="token operator">:</span> <span class="token keyword">await</span> inventory<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">reviews</span><span class="token operator">:</span> <span class="token keyword">await</span> reviews<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">recommendations</span><span class="token operator">:</span> <span class="token keyword">await</span> recommendations<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">pricing</span><span class="token operator">:</span> <span class="token keyword">await</span> pricing<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="mermaid">graph TB
+    Client[クライアントアプリケーション]
+    Client --&gt;|1. 商品取得| Catalog[カタログサービス]
+    Client --&gt;|2. 在庫取得| Inventory[在庫サービス]
+    Client --&gt;|3. レビュー取得| Reviews[レビューサービス]
+    Client --&gt;|4. おすすめ取得| Recommend[レコメンデーションサービス]
+    Client --&gt;|5. 価格取得| Pricing[価格サービス]
+    
+    Catalog --&gt;|レスポンス| Client
+    Inventory --&gt;|レスポンス| Client
+    Reviews --&gt;|レスポンス| Client
+    Recommend --&gt;|レスポンス| Client
+    Pricing --&gt;|レスポンス| Client
+    
+    style Client fill:#e03131,stroke:#c92a2a</div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 複数呼び出しの問題</p><div class="admonition-content"><p><strong>高レイテンシ</strong>：各リクエストがネットワークラウンドトリップ時間を追加</p>
+<p><strong>リソース集約的</strong>：複数の接続がクライアントリソースを消費</p>
+<p><strong>障害が発生しやすい</strong>：呼び出しが多いほど障害の機会が増える</p>
+<p><strong>モバイル非対応</strong>：セルラーネットワークがレイテンシの問題を増幅</p>
+<p><strong>複雑なエラー処理</strong>：複数の呼び出しにわたる障害の管理</p>
+</div></div>
+<h3 id="実際のコスト">実際のコスト</h3>
+<p>高レイテンシネットワーク（例：100msラウンドトリップ）では：</p>
+<pre class="language-none"><code class="language-none">順次呼び出し：5リクエスト × 100ms = 最低500ms
+並列呼び出し：100ms + 接続オーバーヘッド + 処理時間</code></pre>
+<p>並列リクエストでも、複数の接続を管理し、複数の障害シナリオを処理し、モバイルデバイスでより多くのバッテリーを消費しています。</p>
+<h2 id="解決策：Gateway-Aggregation">解決策：Gateway Aggregation</h2>
+<p>クライアントとバックエンドサービスの間にゲートウェイを配置します。ゲートウェイは単一のリクエストを受信し、複数のサービスにファンアウトし、レスポンスを集約し、統一された結果を返します。</p>
+<div class="mermaid">graph TB
+    Client[クライアントアプリケーション]
+    Client --&gt;|単一リクエスト| Gateway[集約ゲートウェイ]
+    
+    Gateway --&gt;|ファンアウト| Catalog[カタログサービス]
+    Gateway --&gt;|ファンアウト| Inventory[在庫サービス]
+    Gateway --&gt;|ファンアウト| Reviews[レビューサービス]
+    Gateway --&gt;|ファンアウト| Recommend[レコメンデーションサービス]
+    Gateway --&gt;|ファンアウト| Pricing[価格サービス]
+    
+    Catalog --&gt;|レスポンス| Gateway
+    Inventory --&gt;|レスポンス| Gateway
+    Reviews --&gt;|レスポンス| Gateway
+    Recommend --&gt;|レスポンス| Gateway
+    Pricing --&gt;|レスポンス| Gateway
+    
+    Gateway --&gt;|集約レスポンス| Client
+    
+    style Gateway fill:#51cf66,stroke:#2f9e44
+    style Client fill:#4dabf7,stroke:#1971c2</div>
+<h3 id="シンプルな実装">シンプルな実装</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// クライアントは1回の呼び出しを行う</span>
+<span class="token keyword">class</span> <span class="token class-name">ProductPageClient</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">loadProductPage</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> response <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>
+      <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://gateway.example.com/product-page/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> response<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// ゲートウェイが集約を処理</span>
+<span class="token keyword">class</span> <span class="token class-name">AggregationGateway</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">getProductPage</span><span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token punctuation">{</span> productId <span class="token punctuation">}</span> <span class="token operator">=</span> req<span class="token punctuation">.</span>params<span class="token punctuation">;</span>
+    
+    <span class="token comment">// すべてのサービスに並列でファンアウト</span>
+    <span class="token keyword">const</span> <span class="token punctuation">[</span>product<span class="token punctuation">,</span> inventory<span class="token punctuation">,</span> reviews<span class="token punctuation">,</span> recommendations<span class="token punctuation">,</span> pricing<span class="token punctuation">]</span> <span class="token operator">=</span> 
+      <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>catalogService<span class="token punctuation">.</span><span class="token function">getProduct</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">getStock</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>reviewService<span class="token punctuation">.</span><span class="token function">getReviews</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>recommendationService<span class="token punctuation">.</span><span class="token function">getRecommendations</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>pricingService<span class="token punctuation">.</span><span class="token function">getPrice</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span>
+      <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 集約して返す</span>
+    res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      product<span class="token punctuation">,</span>
+      inventory<span class="token punctuation">,</span>
+      reviews<span class="token punctuation">,</span>
+      recommendations<span class="token punctuation">,</span>
+      pricing
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="主な利点">主な利点</h2>
+<h3 id="1-ネットワークオーバーヘッドの削減">1. ネットワークオーバーヘッドの削減</h3>
+<p><strong>前</strong>：クライアントからクラウドへの5リクエスト</p>
+<pre class="language-none"><code class="language-none">クライアント → [100ms] → サービス1
+クライアント → [100ms] → サービス2
+クライアント → [100ms] → サービス3
+クライアント → [100ms] → サービス4
+クライアント → [100ms] → サービス5
+合計：500ms（順次）または100ms + オーバーヘッド（並列）</code></pre>
+<p><strong>後</strong>：クライアントから1リクエスト、データセンター内で5リクエスト</p>
+<pre class="language-none"><code class="language-none">クライアント → [100ms] → ゲートウェイ
+ゲートウェイ → [1ms] → サービス1
+ゲートウェイ → [1ms] → サービス2
+ゲートウェイ → [1ms] → サービス3
+ゲートウェイ → [1ms] → サービス4
+ゲートウェイ → [1ms] → サービス5
+ゲートウェイ → [100ms] → クライアント
+合計：約200ms</code></pre>
+<h3 id="2-クライアントコードの簡素化">2. クライアントコードの簡素化</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 前：複雑なクライアントロジック</span>
+<span class="token keyword">class</span> <span class="token class-name">ComplexClient</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">loadData</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">allSettled</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchService1</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchService2</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchService3</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+      <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 部分的な障害を処理</span>
+      <span class="token keyword">const</span> data <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+      results<span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">result<span class="token punctuation">,</span> index</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>result<span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'fulfilled'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          data<span class="token punctuation">[</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">service</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>index <span class="token operator">+</span> <span class="token number">1</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">]</span> <span class="token operator">=</span> result<span class="token punctuation">.</span>value<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+          data<span class="token punctuation">[</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">service</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>index <span class="token operator">+</span> <span class="token number">1</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+          <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">logError</span><span class="token punctuation">(</span>result<span class="token punctuation">.</span>reason<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token keyword">return</span> data<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token comment">// エラー処理</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 後：シンプルなクライアントロジック</span>
+<span class="token keyword">class</span> <span class="token class-name">SimpleClient</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">loadData</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'https://gateway.example.com/aggregated-data'</span><span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">then</span><span class="token punctuation">(</span><span class="token parameter">res</span> <span class="token operator">=&gt;</span> res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="3-集中化されたエラー処理">3. 集中化されたエラー処理</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ResilientGateway</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">aggregateData</span><span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">allSettled</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchCriticalData</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchOptionalData1</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchOptionalData2</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 重要なデータは成功する必要がある</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>results<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'rejected'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> res<span class="token punctuation">.</span><span class="token function">status</span><span class="token punctuation">(</span><span class="token number">503</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token literal-property property">error</span><span class="token operator">:</span> <span class="token string">'Critical service unavailable'</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">// オプションのデータは優雅に失敗できる</span>
+    res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">critical</span><span class="token operator">:</span> results<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>value<span class="token punctuation">,</span>
+      <span class="token literal-property property">optional1</span><span class="token operator">:</span> results<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'fulfilled'</span> <span class="token operator">?</span> results<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">.</span>value <span class="token operator">:</span> <span class="token keyword">null</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">optional2</span><span class="token operator">:</span> results<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'fulfilled'</span> <span class="token operator">?</span> results<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span>value <span class="token operator">:</span> <span class="token keyword">null</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="実装パターン">実装パターン</h2>
+<h3 id="パターン1：シンプルな集約">パターン1：シンプルな集約</h3>
+<p>レスポンスをそのまま結合：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">SimpleAggregator</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">aggregate</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token punctuation">[</span>profile<span class="token punctuation">,</span> orders<span class="token punctuation">,</span> preferences<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>userService<span class="token punctuation">.</span><span class="token function">getProfile</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>orderService<span class="token punctuation">.</span><span class="token function">getOrders</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>preferenceService<span class="token punctuation">.</span><span class="token function">getPreferences</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span> profile<span class="token punctuation">,</span> orders<span class="token punctuation">,</span> preferences <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="パターン2：データ変換">パターン2：データ変換</h3>
+<p>データを変換して結合：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">TransformingAggregator</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">aggregate</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token punctuation">[</span>user<span class="token punctuation">,</span> orders<span class="token punctuation">,</span> reviews<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>userService<span class="token punctuation">.</span><span class="token function">getUser</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>orderService<span class="token punctuation">.</span><span class="token function">getOrders</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>reviewService<span class="token punctuation">.</span><span class="token function">getReviews</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 変換して強化</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">user</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">id</span><span class="token operator">:</span> user<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+        <span class="token literal-property property">name</span><span class="token operator">:</span> user<span class="token punctuation">.</span>fullName<span class="token punctuation">,</span>
+        <span class="token literal-property property">memberSince</span><span class="token operator">:</span> user<span class="token punctuation">.</span>createdAt
+      <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">stats</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">totalOrders</span><span class="token operator">:</span> orders<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+        <span class="token literal-property property">totalSpent</span><span class="token operator">:</span> orders<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">sum<span class="token punctuation">,</span> o</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> sum <span class="token operator">+</span> o<span class="token punctuation">.</span>amount<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">reviewCount</span><span class="token operator">:</span> reviews<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+        <span class="token literal-property property">averageRating</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">calculateAverage</span><span class="token punctuation">(</span>reviews<span class="token punctuation">)</span>
+      <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">recentActivity</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">combineActivity</span><span class="token punctuation">(</span>orders<span class="token punctuation">,</span> reviews<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="パターン3：条件付き集約">パターン3：条件付き集約</h3>
+<p>条件に基づいてデータを取得：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ConditionalAggregator</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">aggregate</span><span class="token punctuation">(</span><span class="token parameter">productId<span class="token punctuation">,</span> options</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 常に商品を取得</span>
+    <span class="token keyword">const</span> product <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>catalogService<span class="token punctuation">.</span><span class="token function">getProduct</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 条件付きで追加データを取得</span>
+    <span class="token keyword">const</span> requests <span class="token operator">=</span> <span class="token punctuation">[</span>Promise<span class="token punctuation">.</span><span class="token function">resolve</span><span class="token punctuation">(</span>product<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>options<span class="token punctuation">.</span>includeReviews<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      requests<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>reviewService<span class="token punctuation">.</span><span class="token function">getReviews</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>options<span class="token punctuation">.</span>includeRelated<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      requests<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>recommendationService<span class="token punctuation">.</span><span class="token function">getRelated</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>product<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'physical'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      requests<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">getStock</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>requests<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">buildResponse</span><span class="token punctuation">(</span>results<span class="token punctuation">,</span> options<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="高度な考慮事項">高度な考慮事項</h2>
+<h3 id="タイムアウトと部分的なレスポンス">タイムアウトと部分的なレスポンス</h3>
+<p>遅いサービスを優雅に処理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">TimeoutAwareGateway</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">aggregateWithTimeout</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token function-variable function">timeout</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token parameter">ms<span class="token punctuation">,</span> defaultValue</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> 
+      <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token parameter">resolve</span> <span class="token operator">=&gt;</span> <span class="token function">setTimeout</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token function">resolve</span><span class="token punctuation">(</span>defaultValue<span class="token punctuation">)</span><span class="token punctuation">,</span> ms<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> <span class="token punctuation">[</span>product<span class="token punctuation">,</span> inventory<span class="token punctuation">,</span> reviews<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+      <span class="token comment">// 重要：タイムアウトなし</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>catalogService<span class="token punctuation">.</span><span class="token function">getProduct</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      
+      <span class="token comment">// オプション：500msタイムアウト</span>
+      Promise<span class="token punctuation">.</span><span class="token function">race</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">getStock</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token function">timeout</span><span class="token punctuation">(</span><span class="token number">500</span><span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token literal-property property">available</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span> <span class="token literal-property property">message</span><span class="token operator">:</span> <span class="token string">'Check back later'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span>
+      <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      
+      <span class="token comment">// オプション：1000msタイムアウト</span>
+      Promise<span class="token punctuation">.</span><span class="token function">race</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>reviewService<span class="token punctuation">.</span><span class="token function">getReviews</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token function">timeout</span><span class="token punctuation">(</span><span class="token number">1000</span><span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token literal-property property">reviews</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token literal-property property">message</span><span class="token operator">:</span> <span class="token string">'Reviews temporarily unavailable'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span>
+      <span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span> product<span class="token punctuation">,</span> inventory<span class="token punctuation">,</span> reviews <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="キャッシング戦略">キャッシング戦略</h3>
+<p>キャッシングでバックエンドの負荷を削減：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">CachingGateway</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>cache <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Cache</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">aggregate</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 最初にキャッシュをチェック</span>
+    <span class="token keyword">const</span> cached <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">product:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cached<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> cached<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">// 取得して キャッシュ</span>
+    <span class="token keyword">const</span> data <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">fetchAndAggregate</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 異なるTTLでキャッシュ</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">product:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>productId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> data<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">ttl</span><span class="token operator">:</span> <span class="token number">300</span> <span class="token comment">// 5分</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> data<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="サーキットブレーキング">サーキットブレーキング</h3>
+<p>カスケード障害から保護：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ResilientGateway</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreakers <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">inventory</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">CircuitBreaker</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">threshold</span><span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token literal-property property">timeout</span><span class="token operator">:</span> <span class="token number">60000</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">reviews</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">CircuitBreaker</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">threshold</span><span class="token operator">:</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token literal-property property">timeout</span><span class="token operator">:</span> <span class="token number">60000</span> <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">aggregate</span><span class="token punctuation">(</span><span class="token parameter">productId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> product <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>catalogService<span class="token punctuation">.</span><span class="token function">getProduct</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// オプションのサービスにサーキットブレーカーを使用</span>
+    <span class="token keyword">const</span> inventory <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreakers<span class="token punctuation">.</span>inventory<span class="token punctuation">.</span><span class="token function">execute</span><span class="token punctuation">(</span>
+      <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">getStock</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">fallback</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">available</span><span class="token operator">:</span> <span class="token boolean">false</span> <span class="token punctuation">}</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> reviews <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>circuitBreakers<span class="token punctuation">.</span>reviews<span class="token punctuation">.</span><span class="token function">execute</span><span class="token punctuation">(</span>
+      <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>reviewService<span class="token punctuation">.</span><span class="token function">getReviews</span><span class="token punctuation">(</span>productId<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">fallback</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">reviews</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">}</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span> product<span class="token punctuation">,</span> inventory<span class="token punctuation">,</span> reviews <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="このパターンを使用するタイミング">このパターンを使用するタイミング</h2>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ Gateway Aggregationを使用する場合</p><div class="admonition-content"><p><strong>複数のバックエンド呼び出し</strong>：クライアントが1つの操作のために複数のサービスからデータを必要とする</p>
+<p><strong>高レイテンシネットワーク</strong>：接続が遅いモバイルまたはリモートクライアント</p>
+<p><strong>マイクロサービスアーキテクチャ</strong>：多くの小さなサービスが調整を必要とする</p>
+<p><strong>一貫したAPI</strong>：バックエンドの変更にもかかわらず安定したインターフェースを提供したい</p>
+<p><strong>横断的関心事</strong>：集中化されたロギング、監視、またはセキュリティが必要</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Gateway Aggregationを避ける場合</p><div class="admonition-content"><p><strong>単一サービス</strong>：1つのバックエンドサービスのみを呼び出す（直接接続を使用）</p>
+<p><strong>低レイテンシネットワーク</strong>：クライアントとサービスが同じデータセンターにある</p>
+<p><strong>リアルタイムストリーミング</strong>：リクエスト-レスポンスではなく、継続的なデータストリームが必要</p>
+<p><strong>シンプルなバッチ操作</strong>：バックエンドサービスがすでにバッチエンドポイントを提供している</p>
+</div></div>
+<h2 id="Gateway-Aggregation-vs-他のパターン">Gateway Aggregation vs. 他のパターン</h2>
+<h3 id="vs-Backend-for-Frontend-BFF">vs. Backend for Frontend (BFF)</h3>
+<pre class="language-none"><code class="language-none">Gateway Aggregation：任意のクライアント向けの汎用集約
+BFF：クライアントタイプ（Web、モバイルなど）ごとの専用集約</code></pre>
+<h3 id="vs-API-Composition">vs. API Composition</h3>
+<pre class="language-none"><code class="language-none">Gateway Aggregation：ゲートウェイレベルの集約
+API Composition：アプリケーションレベルの集約</code></pre>
+<h3 id="vs-GraphQL">vs. GraphQL</h3>
+<pre class="language-none"><code class="language-none">Gateway Aggregation：固定集約エンドポイント
+GraphQL：クライアント指定の集約クエリ</code></pre>
+<h2 id="監視と可観測性">監視と可観測性</h2>
+<p>ゲートウェイのパフォーマンスを追跡：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ObservableGateway</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">aggregate</span><span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> startTime <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> requestId <span class="token operator">=</span> req<span class="token punctuation">.</span>headers<span class="token punctuation">[</span><span class="token string">'x-request-id'</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 個々のサービス呼び出しを追跡</span>
+      <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">timedCall</span><span class="token punctuation">(</span><span class="token string">'catalog'</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>catalogService<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>req<span class="token punctuation">.</span>params<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">timedCall</span><span class="token punctuation">(</span><span class="token string">'inventory'</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>req<span class="token punctuation">.</span>params<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">timedCall</span><span class="token punctuation">(</span><span class="token string">'reviews'</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span>reviewService<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>req<span class="token punctuation">.</span>params<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span>
+      <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// メトリクスを記録</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span><span class="token function">recordLatency</span><span class="token punctuation">(</span><span class="token string">'gateway.aggregate'</span><span class="token punctuation">,</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> startTime<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span><span class="token function">increment</span><span class="token punctuation">(</span><span class="token string">'gateway.success'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">combineResults</span><span class="token punctuation">(</span>results<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span><span class="token function">increment</span><span class="token punctuation">(</span><span class="token string">'gateway.error'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>logger<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">'Aggregation failed'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span> requestId<span class="token punctuation">,</span> error <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">timedCall</span><span class="token punctuation">(</span><span class="token parameter">serviceName<span class="token punctuation">,</span> fn</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> start <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fn</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span><span class="token function">recordLatency</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">service.</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>serviceName<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> start<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>metrics<span class="token punctuation">.</span><span class="token function">increment</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">service.</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>serviceName<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">.error</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="結論">結論</h2>
+<p>Gateway Aggregationパターンは、おしゃべりなクライアント-サーバー通信を効率的な単一リクエストのインタラクションに変換します。集約ロジックを集中化することで、ネットワークオーバーヘッドを削減し、クライアントコードを簡素化し、キャッシング、監視、レジリエンスパターンなどの横断的関心事を実装するための強力なポイントを獲得します。</p>
+<p>このパターンは、ネットワークレイテンシが重要な要素であるマイクロサービスアーキテクチャとモバイルアプリケーションで輝きます。ただし、ゲートウェイ自体がボトルネックや単一障害点になる可能性があることを忘れないでください——スケーラビリティとレジリエンスを念頭に置いて設計してください。</p>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/gateway-aggregation">Gateway Aggregation Pattern - Microsoft Architecture Center</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2019/09/Gateway-Aggregation-Pattern/" data-id="c847559" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Gateway Aggregationパターン：ネットワークのおしゃべりを減らす",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2019-09-13",
+        "dateCreated": "2019-09-13",
+        "dateModified": "2025-10-18",
+        "url": "https://neo01.com//ja/2019/09/Gateway-Aggregation-Pattern/",
+        "description": "ゲートウェイを通じて複数のバックエンドリクエストを単一の呼び出しに結合します。このパターンが分散システムでネットワークオーバーヘッドを削減し、パフォーマンスを向上させる方法を学びます。",
+        "wordCount": 4723
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="Architecture as Code: パート2 - 基盤の構築" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Architecture/">アーキテクチャ</a></p>
+                            <p class="item-title"><a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">Architecture as Code: パート2 - 基盤の構築</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">11</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#445a3051</div>
+                <img src="/qr/qr-c70bb14198ec626a110d4abb125f2eb4.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#445a3051">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

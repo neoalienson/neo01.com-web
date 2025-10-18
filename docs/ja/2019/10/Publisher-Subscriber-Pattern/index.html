@@ -1,0 +1,1331 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Publisher-Subscriberパターン：大規模な通信の分離 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="アプリケーションが送信者と受信者を結合せずに、複数のコンシューマーに非同期でイベントを通知できるようにします。pub/subメッセージングがスケーラビリティと信頼性を向上させる方法を学びます。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Publisher-Subscriberパターン：大規模な通信の分離">
+<meta property="og:url" content="https://neo01.com/ja/2019/10/Publisher-Subscriber-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="アプリケーションが送信者と受信者を結合せずに、複数のコンシューマーに非同期でイベントを通知できるようにします。pub/subメッセージングがスケーラビリティと信頼性を向上させる方法を学びます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-10-15T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-18T04:28:24.499Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2019/10/Publisher-Subscriber-Pattern/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2019/10/Publisher-Subscriber-Pattern/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2019/10/Publisher-Subscriber-Pattern/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/10/Publisher-Subscriber-Pattern-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Publisher-Subscriberパターン：大規模な通信の分離
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-10-15T16:00:00.000Z" itemprop="datePublished">2019-10-16</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-18T04:28:24.499Z" itemprop="datePublished">2025-10-18</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%96%B0%E8%81%9E%E3%81%AE%E6%AF%94%E5%96%A9"><span class="toc-text">新聞の比喩</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%95%8F%E9%A1%8C%EF%BC%9A%E3%82%A4%E3%83%99%E3%83%B3%E3%83%88%E9%85%8D%E4%BF%A1%E3%81%AB%E3%81%8A%E3%81%91%E3%82%8B%E5%AF%86%E7%B5%90%E5%90%88"><span class="toc-text">問題：イベント配信における密結合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E6%B1%BA%E7%AD%96%EF%BC%9APublisher-Subscriber%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">解決策：Publisher-Subscriberパターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BB%E8%A6%81%E3%82%B3%E3%83%B3%E3%83%9D%E3%83%BC%E3%83%8D%E3%83%B3%E3%83%88"><span class="toc-text">主要コンポーネント</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BB%E3%81%AA%E5%88%A9%E7%82%B9"><span class="toc-text">主な利点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%AB%98%E5%BA%A6%E3%81%AA%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">高度なパターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%87%8D%E8%A6%81%E3%81%AA%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">重要な考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%81%93%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%99%E3%82%8B%E3%82%BF%E3%82%A4%E3%83%9F%E3%83%B3%E3%82%B0"><span class="toc-text">このパターンを使用するタイミング</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E4%B8%96%E7%95%8C%E3%81%AE%E4%BE%8B%EF%BC%9Ae%E3%82%B3%E3%83%9E%E3%83%BC%E3%82%B9%E6%B3%A8%E6%96%87%E5%87%A6%E7%90%86"><span class="toc-text">実世界の例：eコマース注文処理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%96%A2%E9%80%A3%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3%E3%81%A8%E3%81%AE%E6%AF%94%E8%BC%83"><span class="toc-text">関連パターンとの比較</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"><span class="toc-text">参考文献</span></a></li></ol>
+            <p>新聞発行者を想像してください。彼らはニュースを一度印刷し、何千人もの購読者がそれを受け取りますが、発行者は彼らが誰であるか、どこに住んでいるかを知りません。発行者は各購読者が新聞を読むのを待ってから次の版を印刷することはありません。これがPublisher-Subscriberパターンの本質です——分散システムにおける通信を分離する強力なアプローチです。</p>
+<h2 id="新聞の比喩">新聞の比喩</h2>
+<p>新聞が機能するように：</p>
+<ul>
+<li>発行者はコンテンツを一度作成</li>
+<li>複数の購読者が同じコンテンツを受信</li>
+<li>発行者は個々の購読者を知らない</li>
+<li>配信は非同期で行われる</li>
+<li>購読者は自由に来たり去ったりできる</li>
+</ul>
+<p>ソフトウェアでは、pub/subパターンは：</p>
+<ul>
+<li>送信者はメッセージを一度公開</li>
+<li>複数のコンシューマーがメッセージを受信</li>
+<li>送信者はコンシューマーの身元を知らない</li>
+<li>通信は非同期</li>
+<li>コンシューマーは動的にサブスクライブ/アンサブスクライブできる</li>
+</ul>
+<div class="mermaid">graph TB
+    P[パブリッシャー] --&gt; IC[入力チャネル]
+    IC --&gt; MB{メッセージブローカー}
+    MB --&gt; OC1[出力チャネル1]
+    MB --&gt; OC2[出力チャネル2]
+    MB --&gt; OC3[出力チャネル3]
+    OC1 --&gt; S1[サブスクライバー1]
+    OC2 --&gt; S2[サブスクライバー2]
+    OC3 --&gt; S3[サブスクライバー3]
+    
+    style P fill:#4dabf7,stroke:#1971c2
+    style MB fill:#ffd43b,stroke:#fab005
+    style S1 fill:#51cf66,stroke:#2f9e44
+    style S2 fill:#51cf66,stroke:#2f9e44
+    style S3 fill:#51cf66,stroke:#2f9e44</div>
+<h2 id="問題：イベント配信における密結合">問題：イベント配信における密結合</h2>
+<p>分散アプリケーションでは、イベントが発生したときにコンポーネントが他のコンポーネントに通知する必要があることがよくあります。従来のアプローチは密結合とスケーラビリティの問題を生み出します。</p>
+<h3 id="従来のアプローチ：直接通信">従来のアプローチ：直接通信</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">orderData</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">saveOrder</span><span class="token punctuation">(</span>orderData<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 各依存サービスを直接呼び出し</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryService<span class="token punctuation">.</span><span class="token function">reserveItems</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>paymentService<span class="token punctuation">.</span><span class="token function">processPayment</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>payment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shippingService<span class="token punctuation">.</span><span class="token function">scheduleDelivery</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>address<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>notificationService<span class="token punctuation">.</span><span class="token function">sendConfirmation</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>email<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>analyticsService<span class="token punctuation">.</span><span class="token function">trackOrder</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> order<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 直接通信の問題</p><div class="admonition-content"><p><strong>密結合</strong>：OrderServiceはすべての依存サービスを知っている必要がある</p>
+<p><strong>ブロッキング</strong>：送信者は各サービスの応答を待つ</p>
+<p><strong>脆弱性</strong>：いずれかのサービスがダウンすると、注文作成が失敗</p>
+<p><strong>スケーラビリティ</strong>：新しいコンシューマーを追加するには送信者の変更が必要</p>
+<p><strong>パフォーマンス</strong>：順次呼び出しが応答時間を増加</p>
+</div></div>
+<h3 id="専用キューアプローチ">専用キューアプローチ</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">orderData</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">saveOrder</span><span class="token punctuation">(</span>orderData<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 個別のキューに送信</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>inventoryQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>paymentQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shippingQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>notificationQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>analyticsQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> order<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 専用キューの問題</p><div class="admonition-content"><p><strong>キューの増殖</strong>：コンシューマーごとに1つのキューはスケールしない</p>
+<p><strong>依然として結合</strong>：送信者はすべてのキュー名を知っている必要がある</p>
+<p><strong>メンテナンス負担</strong>：コンシューマーを追加するにはコード変更が必要</p>
+<p><strong>重複メッセージ</strong>：同じメッセージが複数回送信される</p>
+</div></div>
+<h2 id="解決策：Publisher-Subscriberパターン">解決策：Publisher-Subscriberパターン</h2>
+<p>パブリッシャーとサブスクライバーを分離するメッセージングサブシステムを導入：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">messageBroker</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>broker <span class="token operator">=</span> messageBroker<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">orderData</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">saveOrder</span><span class="token punctuation">(</span>orderData<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 一度公開 - ブローカーが配信を処理</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">type</span><span class="token operator">:</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">data</span><span class="token operator">:</span> order<span class="token punctuation">,</span>
+      <span class="token literal-property property">timestamp</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toISOString</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> order<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>サブスクライバーは独立して関心を登録：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 在庫サービス</span>
+<span class="token keyword">class</span> <span class="token class-name">InventoryService</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">messageBroker</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>broker <span class="token operator">=</span> messageBroker<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">reserveItems</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 支払いサービス</span>
+<span class="token keyword">class</span> <span class="token class-name">PaymentService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processPayment</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">.</span>payment<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 分析サービス（OrderServiceを変更せずに後で追加）</span>
+<span class="token keyword">class</span> <span class="token class-name">AnalyticsService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">trackOrder</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="主要コンポーネント">主要コンポーネント</h2>
+<h3 id="1-パブリッシャー">1. パブリッシャー</h3>
+<p>メッセージを送信するコンポーネント：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">Publisher</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">broker</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>broker <span class="token operator">=</span> broker<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">publishEvent</span><span class="token punctuation">(</span><span class="token parameter">topic<span class="token punctuation">,</span> eventType<span class="token punctuation">,</span> data</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> message <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">generateMessageId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">type</span><span class="token operator">:</span> eventType<span class="token punctuation">,</span>
+      <span class="token literal-property property">data</span><span class="token operator">:</span> data<span class="token punctuation">,</span>
+      <span class="token literal-property property">timestamp</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toISOString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">source</span><span class="token operator">:</span> <span class="token string">'order-service'</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span>topic<span class="token punctuation">,</span> message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Published </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>eventType<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> to </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>topic<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="2-メッセージブローカー">2. メッセージブローカー</h3>
+<p>メッセージをルーティングする仲介者：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">MessageBroker</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>topics <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">publish</span><span class="token punctuation">(</span><span class="token parameter">topic<span class="token punctuation">,</span> message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> subscribers <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>topics<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>topic<span class="token punctuation">)</span> <span class="token operator">||</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// すべてのサブスクライバーにメッセージをコピー</span>
+    <span class="token keyword">const</span> deliveryPromises <span class="token operator">=</span> subscribers<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">subscriber</span> <span class="token operator">=&gt;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">deliverMessage</span><span class="token punctuation">(</span>subscriber<span class="token punctuation">,</span> message<span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>deliveryPromises<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token parameter">topic<span class="token punctuation">,</span> handler</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span>topics<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>topic<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>topics<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>topic<span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span>topics<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>topic<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">generateSubscriberId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">handler</span><span class="token operator">:</span> handler
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">deliverMessage</span><span class="token punctuation">(</span><span class="token parameter">subscriber<span class="token punctuation">,</span> message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> subscriber<span class="token punctuation">.</span><span class="token function">handler</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Delivery failed to </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>subscriber<span class="token punctuation">.</span>id<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">:</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token comment">// リトライロジック、デッドレターキューなどを処理</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="3-サブスクライバー">3. サブスクライバー</h3>
+<p>メッセージを受信するコンポーネント：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">Subscriber</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">broker<span class="token punctuation">,</span> subscriptionConfig</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>broker <span class="token operator">=</span> broker<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>config <span class="token operator">=</span> subscriptionConfig<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>config<span class="token punctuation">.</span>topic<span class="token punctuation">,</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">handleMessage</span><span class="token punctuation">.</span><span class="token function">bind</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// タイプでメッセージをフィルタリング</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>config<span class="token punctuation">.</span>messageTypes<span class="token punctuation">.</span><span class="token function">includes</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>type<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">processMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// ビジネスロジックを実装</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="主な利点">主な利点</h2>
+<h3 id="1-分離">1. 分離</h3>
+<p>パブリッシャーとサブスクライバーは独立して動作：</p>
+<div class="mermaid">graph LR
+    P1[注文サービス] --&gt; MB{メッセージブローカー}
+    P2[ユーザーサービス] --&gt; MB
+    P3[支払いサービス] --&gt; MB
+    MB --&gt; S1[メールサービス]
+    MB --&gt; S2[分析]
+    MB --&gt; S3[監査ログ]
+    MB --&gt; S4[レポート]
+    
+    style MB fill:#ffd43b,stroke:#fab005
+    style P1 fill:#4dabf7,stroke:#1971c2
+    style P2 fill:#4dabf7,stroke:#1971c2
+    style P3 fill:#4dabf7,stroke:#1971c2
+    style S1 fill:#51cf66,stroke:#2f9e44
+    style S2 fill:#51cf66,stroke:#2f9e44
+    style S3 fill:#51cf66,stroke:#2f9e44
+    style S4 fill:#51cf66,stroke:#2f9e44</div>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// パブリッシャーはサブスクライバーを知らない</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">saveOrder</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token literal-property property">type</span><span class="token operator">:</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">,</span> <span class="token literal-property property">data</span><span class="token operator">:</span> order <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 完了！誰が聞いているかの知識なし</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// パブリッシャーを変更せずに新しいサブスクライバーを追加</span>
+<span class="token keyword">class</span> <span class="token class-name">FraudDetectionService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 既存のトピックにサブスクライブ</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">checkForFraud</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="2-スケーラビリティ">2. スケーラビリティ</h3>
+<p>サブスクライバーを独立してスケーリングして負荷増加を処理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 負荷に基づいて特定のサブスクライバーをスケールアウト</span>
+<span class="token keyword">class</span> <span class="token class-name">MessageBroker</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token parameter">topic<span class="token punctuation">,</span> handler<span class="token punctuation">,</span> options <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> subscription <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">generateSubscriberId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">handler</span><span class="token operator">:</span> handler<span class="token punctuation">,</span>
+      <span class="token literal-property property">concurrency</span><span class="token operator">:</span> options<span class="token punctuation">.</span>concurrency <span class="token operator">||</span> <span class="token number">1</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 複数のインスタンスが同じトピックにサブスクライブ可能</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>topics<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>topic<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span>subscription<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 遅いサービスの複数インスタンスをデプロイ</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> <span class="token number">5</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> emailService <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">EmailService</span><span class="token punctuation">(</span>broker<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> emailService<span class="token punctuation">.</span><span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// メールを処理する5つのインスタンス</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="3-信頼性">3. 信頼性</h3>
+<p>コンポーネントが失敗してもシステムは動作を継続：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ResilientSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">acknowledgeMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">'Processing failed:'</span><span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// メッセージはリトライのためにキューに残る</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>retryCount <span class="token operator">&lt;</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">requeueMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 調査のためにデッドレターキューに移動</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">moveToDeadLetter</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="4-非同期処理">4. 非同期処理</h3>
+<p>パブリッシャーは待機せずに即座に戻る：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">orderData</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">saveOrder</span><span class="token punctuation">(</span>orderData<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 公開して即座に戻る</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">type</span><span class="token operator">:</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">data</span><span class="token operator">:</span> order
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 処理を待たずにユーザーに戻る</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span> <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'processing'</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// サブスクライバーは自分のペースで処理</span>
+<span class="token keyword">class</span> <span class="token class-name">SlowEmailService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// メール送信に数分かかる可能性</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">sendEmail</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">.</span>email<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// パブリッシャーはすでにユーザーに戻っている</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="高度なパターン">高度なパターン</h2>
+<h3 id="トピックベースのルーティング">トピックベースのルーティング</h3>
+<p>トピックごとにメッセージを整理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">TopicBasedBroker</span> <span class="token punctuation">{</span>
+  <span class="token comment">// パブリッシャーは特定のトピックに送信</span>
+  <span class="token keyword">async</span> <span class="token function">publishToTopic</span><span class="token punctuation">(</span><span class="token parameter">topic<span class="token punctuation">,</span> message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span>topic<span class="token punctuation">,</span> message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// サブスクライバーはトピックを選択</span>
+<span class="token keyword">await</span> broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders.created'</span><span class="token punctuation">,</span> handleOrderCreated<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">await</span> broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders.cancelled'</span><span class="token punctuation">,</span> handleOrderCancelled<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">await</span> broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'payments.processed'</span><span class="token punctuation">,</span> handlePaymentProcessed<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="コンテンツベースのフィルタリング">コンテンツベースのフィルタリング</h3>
+<p>サブスクライバーはメッセージコンテンツでフィルタリング：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">FilteringSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 高額注文のみを処理</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">.</span>total <span class="token operator">&gt;</span> <span class="token number">1000</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processHighValueOrder</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 異なるフィルターを持つ別のサブスクライバー</span>
+<span class="token keyword">class</span> <span class="token class-name">RegionalSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token comment">// 特定地域からの注文のみを処理</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">.</span>region <span class="token operator">===</span> <span class="token string">'US-WEST'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processRegionalOrder</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="ワイルドカードサブスクリプション">ワイルドカードサブスクリプション</h3>
+<p>複数の関連トピックにサブスクライブ：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// すべての注文関連イベントにサブスクライブ</span>
+<span class="token keyword">await</span> broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders.*'</span><span class="token punctuation">,</span> handleOrderEvent<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// サービスからのすべてのイベントにサブスクライブ</span>
+<span class="token keyword">await</span> broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'payment-service.*'</span><span class="token punctuation">,</span> handlePaymentEvent<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// すべてにサブスクライブ（監視/ロギング）</span>
+<span class="token keyword">await</span> broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'*'</span><span class="token punctuation">,</span> logAllEvents<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h2 id="重要な考慮事項">重要な考慮事項</h2>
+<h3 id="メッセージの順序">メッセージの順序</h3>
+<p>メッセージは順不同で到着する可能性：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderAwareSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>processedMessages <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 処理を冪等にする</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>processedMessages<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'Already processed:'</span><span class="token punctuation">,</span> message<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>processedMessages<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="重複メッセージ">重複メッセージ</h3>
+<p>複数回到着するメッセージを処理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">IdempotentSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// すでに処理されているかチェック</span>
+    <span class="token keyword">const</span> exists <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>db<span class="token punctuation">.</span><span class="token function">findOne</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">messageId</span><span class="token operator">:</span> message<span class="token punctuation">.</span>id <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>exists<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span> <span class="token comment">// 重複をスキップ</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">// 処理して記録</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>db<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">messageId</span><span class="token operator">:</span> message<span class="token punctuation">.</span>id<span class="token punctuation">,</span> <span class="token literal-property property">processedAt</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="ポイズンメッセージ">ポイズンメッセージ</h3>
+<p>不正な形式または問題のあるメッセージを処理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">SafeSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">validateMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">isUnrecoverable</span><span class="token punctuation">(</span>error<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// デッドレターキューに移動</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>deadLetterQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token string">'Poison message detected:'</span><span class="token punctuation">,</span> message<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 後でリトライ</span>
+        <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="メッセージの有効期限">メッセージの有効期限</h3>
+<p>時間に敏感なメッセージを処理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ExpirationAwareSubscriber</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> expiresAt <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>expiresAt<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&gt;</span> expiresAt<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'Message expired:'</span><span class="token punctuation">,</span> message<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span><span class="token punctuation">;</span> <span class="token comment">// 期限切れメッセージを破棄</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processMessage</span><span class="token punctuation">(</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="このパターンを使用するタイミング">このパターンを使用するタイミング</h2>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>✅ Publisher-Subscriberを使用する場合</p><div class="admonition-content"><p><strong>ブロードキャスト</strong>：複数のコンシューマーに情報を送信する必要がある</p>
+<p><strong>分離</strong>：サービスを独立して開発したい</p>
+<p><strong>スケーラビリティ</strong>：異なるコンポーネントで変動する負荷を処理する必要がある</p>
+<p><strong>非同期</strong>：コンシューマーからの即座の応答が不要</p>
+<p><strong>拡張性</strong>：パブリッシャーを変更せずに新しいコンシューマーを追加したい</p>
+<p><strong>イベント駆動</strong>：イベント駆動アーキテクチャを構築</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>❌ Publisher-Subscriberを避ける場合</p><div class="admonition-content"><p><strong>少数のコンシューマー</strong>：非常に異なるニーズを持つ1〜2のコンシューマーのみ</p>
+<p><strong>リアルタイムが必要</strong>：即座の同期応答が必要</p>
+<p><strong>シンプルな通信</strong>：直接呼び出しの方がシンプルで十分</p>
+<p><strong>順序保証</strong>：厳密なメッセージ順序が重要</p>
+<p><strong>トランザクション</strong>：パブリッシャーとサブスクライバー間でアトミック操作が必要</p>
+</div></div>
+<h2 id="実世界の例：eコマース注文処理">実世界の例：eコマース注文処理</h2>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 注文サービスがイベントを公開</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">orderData</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>db<span class="token punctuation">.</span>orders<span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span>orderData<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">type</span><span class="token operator">:</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+      <span class="token literal-property property">customerId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>customerId<span class="token punctuation">,</span>
+      <span class="token literal-property property">items</span><span class="token operator">:</span> order<span class="token punctuation">.</span>items<span class="token punctuation">,</span>
+      <span class="token literal-property property">total</span><span class="token operator">:</span> order<span class="token punctuation">.</span>total<span class="token punctuation">,</span>
+      <span class="token literal-property property">timestamp</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toISOString</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> order<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 複数のサブスクライバーが異なる側面を処理</span>
+<span class="token keyword">class</span> <span class="token class-name">InventoryService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">msg</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>msg<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">reserveInventory</span><span class="token punctuation">(</span>msg<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">class</span> <span class="token class-name">PaymentService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">msg</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>msg<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">chargeCustomer</span><span class="token punctuation">(</span>msg<span class="token punctuation">.</span>customerId<span class="token punctuation">,</span> msg<span class="token punctuation">.</span>total<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">class</span> <span class="token class-name">NotificationService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">msg</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>msg<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">sendConfirmationEmail</span><span class="token punctuation">(</span>msg<span class="token punctuation">.</span>customerId<span class="token punctuation">,</span> msg<span class="token punctuation">.</span>orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">class</span> <span class="token class-name">AnalyticsService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">msg</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>msg<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">trackSale</span><span class="token punctuation">(</span>msg<span class="token punctuation">.</span>total<span class="token punctuation">,</span> msg<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// OrderServiceを変更せずに後で追加された新しいサービス</span>
+<span class="token keyword">class</span> <span class="token class-name">LoyaltyService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">start</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>broker<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token string">'orders'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">msg</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>msg<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">'OrderCreated'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">awardPoints</span><span class="token punctuation">(</span>msg<span class="token punctuation">.</span>customerId<span class="token punctuation">,</span> msg<span class="token punctuation">.</span>total<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="関連パターンとの比較">関連パターンとの比較</h2>
+<h3 id="Publisher-Subscriber-vs-Observerパターン">Publisher-Subscriber vs Observerパターン</h3>
+<p>pub/subパターンはObserverパターンをベースにしていますが、非同期メッセージングとブローカー仲介を追加し、より良い分離とスケーラビリティを提供します。</p>
+<h3 id="Publisher-Subscriber-vs-メッセージキュー">Publisher-Subscriber vs メッセージキュー</h3>
+<p>メッセージキューは通常、各メッセージを1つのコンシューマーに配信します（競合コンシューマー）が、pub/subは各メッセージをすべての関心のあるサブスクライバーに配信します。</p>
+<h2 id="結論">結論</h2>
+<p>Publisher-Subscriberパターンは、スケーラブルで疎結合な分散システムを構築するために不可欠です。パブリッシャーとサブスクライバーの間にメッセージブローカーを導入することで、次のことが得られます：</p>
+<ul>
+<li>開発とデプロイの独立性</li>
+<li>コンポーネントを個別にスケールする能力</li>
+<li>コンポーネント障害に対する回復力</li>
+<li>既存のコードを変更せずに新しい機能を追加する柔軟性</li>
+</ul>
+<p>複数のコンシューマーにイベントをブロードキャストする必要があるシステム、特に分散環境を構築する場合、Publisher-Subscriberパターンは非同期でイベント駆動の通信のための堅牢な基盤を提供します。</p>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/async-request-reply">Asynchronous Messaging Primer</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/guide/architecture-styles/event-driven">Event-driven architecture style</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/reference-architectures/enterprise-integration/queues-events">Enterprise integration using message queues and events</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2019/10/Publisher-Subscriber-Pattern/" data-id="72d4e763" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Publisher-Subscriberパターン：大規模な通信の分離",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2019-10-16",
+        "dateCreated": "2019-10-16",
+        "dateModified": "2025-10-18",
+        "url": "https://neo01.com//ja/2019/10/Publisher-Subscriber-Pattern/",
+        "description": "アプリケーションが送信者と受信者を結合せずに、複数のコンシューマーに非同期でイベントを通知できるようにします。pub/subメッセージングがスケーラビリティと信頼性を向上させる方法を学びます。",
+        "wordCount": 5480
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="Architecture as Code: パート2 - 基盤の構築" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Architecture/">アーキテクチャ</a></p>
+                            <p class="item-title"><a href="/ja/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">Architecture as Code: パート2 - 基盤の構築</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">11</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#0d7a0bc2</div>
+                <img src="/qr/qr-fb7416cc84d3f6b379482d5c76a50826.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#0d7a0bc2">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
