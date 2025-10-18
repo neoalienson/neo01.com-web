@@ -13,7 +13,7 @@ class UrlParser {
     }
     
     parseUrl() {
-        const urlString = this.urlInput.value || 'https://example.com:8080/path/to/page?param1=value1&param2=value2#section';
+        const urlString = this.urlInput.value || 'https://neo01.com:8080/path/to/page?param1=value1&param2=value2#section';
         this.output.innerHTML = '';
         
         try {
