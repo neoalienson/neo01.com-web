@@ -1,0 +1,1435 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>DRY 原則：コードの重複が技術的負債になるとき | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Best Practices,Code Quality,Software Design">
+    
+    
+    <meta name="description" content="Don't Repeat Yourself はシンプルに聞こえますが、いつ適用すべきかを知るには判断力が必要です。重複が有害な場合、許容される場合、そして早すぎる抽象化が重複よりも悪い場合を理解しましょう。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DRY 原則：コードの重複が技術的負債になるとき">
+<meta property="og:url" content="https://neo01.com/ja/2021/08/DRY-Principle-Code-Duplication/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Don't Repeat Yourself はシンプルに聞こえますが、いつ適用すべきかを知るには判断力が必要です。重複が有害な場合、許容される場合、そして早すぎる抽象化が重複よりも悪い場合を理解しましょう。">
+<meta property="og:locale" content="ja_JP">
+<meta property="article:published_time" content="2021-08-07T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-23T14:57:12.755Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Best Practices">
+<meta property="article:tag" content="Code Quality">
+<meta property="article:tag" content="Software Design">
+<meta name="twitter:card" content="summary">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2021/08/DRY-Principle-Code-Duplication/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2021/08/DRY-Principle-Code-Duplication/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2021/08/DRY-Principle-Code-Duplication/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2021/08/DRY-Principle-Code-Duplication-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        DRY 原則：コードの重複が技術的負債になるとき
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2021-08-07T16:00:00.000Z" itemprop="datePublished">2021-08-08</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-23T14:57:12.755Z" itemprop="datePublished">2025-10-23</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Best-Practices/">Best Practices</a> <a class="tag-link" href="/ja/tags/Code-Quality/">Code Quality</a> <a class="tag-link" href="/ja/tags/Software-Design/">Software Design</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#DRY-%E5%8E%9F%E5%89%87%E3%81%AE%E7%90%86%E8%A7%A3"><span class="toc-text">DRY 原則の理解</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%98%8E%E7%99%BD%E3%81%AA%E9%87%8D%E8%A4%87%EF%BC%9A%E3%82%B3%E3%83%94%E3%83%BC%EF%BC%86%E3%83%9A%E3%83%BC%E3%82%B9%E3%83%88%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0"><span class="toc-text">明白な重複：コピー＆ペーストプログラミング</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BE%AE%E5%A6%99%E3%81%AA%E9%87%8D%E8%A4%87%EF%BC%9A%E6%95%A3%E5%9C%A8%E3%81%99%E3%82%8B%E3%83%93%E3%82%B8%E3%83%8D%E3%82%B9%E3%83%AD%E3%82%B8%E3%83%83%E3%82%AF"><span class="toc-text">微妙な重複：散在するビジネスロジック</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%87%8D%E8%A4%87%E3%81%8C%E8%A8%B1%E5%AE%B9%E3%81%95%E3%82%8C%E3%82%8B%E5%A0%B4%E5%90%88"><span class="toc-text">重複が許容される場合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%97%A9%E3%81%99%E3%81%8E%E3%82%8B%E6%8A%BD%E8%B1%A1%E5%8C%96%E3%81%AE%E5%8D%B1%E9%99%BA%E6%80%A7"><span class="toc-text">早すぎる抽象化の危険性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E4%B8%96%E7%95%8C%E3%81%AE%E3%83%AA%E3%83%95%E3%82%A1%E3%82%AF%E3%82%BF%E3%83%AA%E3%83%B3%E3%82%B0%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AA%E3%83%BC"><span class="toc-text">実世界のリファクタリングストーリー</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#DRY-%E3%81%AE%E9%81%A9%E7%94%A8%EF%BC%9A%E5%AE%9F%E7%94%A8%E7%9A%84%E3%81%AA%E3%82%AC%E3%82%A4%E3%83%89%E3%83%A9%E3%82%A4%E3%83%B3"><span class="toc-text">DRY の適用：実用的なガイドライン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <p>DRY（Don’t Repeat Yourself、自分自身を繰り返すな）原則は、ソフトウェア開発で最もよく引用される格言の一つです。Andy Hunt と Dave Thomas が『達人プログラマー』で提唱したこの原則は、よりクリーンなコード、容易なメンテナンス、そしてバグの削減を約束します。しかし、この一見シンプルな原則——コードの重複を避ける——は、実践では驚くほど複雑になります。開発者は次のような疑問に悩まされます：いつ重複は許容されるのか？どれだけの抽象化が多すぎるのか？DRY に従うことで実際にコードが悪化することはあるのか？</p>
+<p>本記事では、明白なコピー＆ペーストの違反から微妙な知識の重複まで、実際のシナリオを通じて DRY 原則を検証します。重複をいつ排除すべきか、いつ一時的に許容すべきか、そして早すぎる抽象化がいつより多くの問題を引き起こすかを分析します。本番環境のコードベースとリファクタリングの経験から、DRY がなぜ不可欠であり、同時に危険でもあるのかを明らかにします。</p>
+<h2 id="DRY-原則の理解">DRY 原則の理解</h2>
+<p>DRY をいつ、どのように適用するかに入る前に、この原則が実際に何を意味するのかを理解することが重要です。DRY は単にコピー＆ペーストを避けることではなく、知識の表現に関するものです。</p>
+<h3 id="核となる概念">核となる概念</h3>
+<p>DRY 原則は次のように述べています：「すべての知識は、システム内で単一の、明確な、権威ある表現を持たなければならない。」これは単なるコードの重複を超えています：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📚 DRY の範囲</p><div class="admonition-content"><p><strong>コードの重複</strong></p>
+<ul>
+<li>同一または類似のコードブロックの繰り返し</li>
+<li>同じロジックが複数回実装される</li>
+<li>コピー＆ペーストのプログラミングパターン</li>
+<li>最も目に見える DRY 違反の形態</li>
+</ul>
+<p><strong>知識の重複</strong></p>
+<ul>
+<li>ビジネスルールが複数の場所にエンコードされる</li>
+<li>検証ロジックが層をまたいで散在</li>
+<li>定数と設定が重複</li>
+<li>データベーススキーマがコード構造にミラーリング</li>
+</ul>
+<p><strong>ドキュメントの重複</strong></p>
+<ul>
+<li>コメントがコードの動作を繰り返す</li>
+<li>API ドキュメントが実装を複製</li>
+<li>同じ情報に対する複数の真実の源</li>
+<li>ドキュメントソース間の不整合</li>
+</ul>
+</div></div>
+<p>この原則が「コード」ではなく「知識」を強調するのは、真の問題がテキストの類似性ではなく、複数の場所で同じ概念を維持することだからです。ビジネスルールが変更されたとき、10 の異なる場所でコードを更新する必要があってはなりません。</p>
+<h3 id="なぜ-DRY-が重要なのか">なぜ DRY が重要なのか</h3>
+<p>重複はメンテナンスの負担を生み出し、バグを引き起こします：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 重複のコスト</p><div class="admonition-content"><p><strong>メンテナンスのオーバーヘッド</strong></p>
+<ul>
+<li>変更には複数の場所での更新が必要</li>
+<li>更新時に一つのインスタンスを見逃しやすい</li>
+<li>開発者の認知負荷が増加</li>
+<li>コードベースの理解が困難になる</li>
+</ul>
+<p><strong>バグの増殖</strong></p>
+<ul>
+<li>バグがすべてのコピーに複製される</li>
+<li>修正をすべての場所に適用する必要がある</li>
+<li>不整合な修正が微妙なバグを生む</li>
+<li>テストの負担が倍増</li>
+</ul>
+<p><strong>不整合のリスク</strong></p>
+<ul>
+<li>コピーが時間とともに分岐</li>
+<li>異なるコンテキストでの異なる動作</li>
+<li>正しいバージョンの判断が困難</li>
+<li>混乱とエラーを生む</li>
+</ul>
+</div></div>
+<p>これらのコストは時間とともに複利的に増大します。今日の小さな重複は、コードベースが進化するにつれてメンテナンスの悪夢になります。</p>
+<h2 id="明白な重複：コピー＆ペーストプログラミング">明白な重複：コピー＆ペーストプログラミング</h2>
+<p>最も露骨な DRY 違反は、コピー＆ペーストプログラミングから生じます——コードブロック全体を複製し、わずかな変更を加えることです。</p>
+<h3 id="典型的なコピー＆ペースト違反">典型的なコピー＆ペースト違反</h3>
+<p>ウェブアプリケーションでよく見られるパターンを考えてみましょう：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ユーザー登録エンドポイント</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/register'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">register</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    username <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'username'</span><span class="token punctuation">)</span>
+    email <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'email'</span><span class="token punctuation">)</span>
+    password <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'password'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 検証</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> username <span class="token keyword">or</span> <span class="token builtin">len</span><span class="token punctuation">(</span>username<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">3</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'Username must be at least 3 characters'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> email <span class="token keyword">or</span> <span class="token string">'@'</span> <span class="token keyword">not</span> <span class="token keyword">in</span> email<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'Invalid email address'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> password <span class="token keyword">or</span> <span class="token builtin">len</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">8</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'Password must be at least 8 characters'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    
+    <span class="token comment"># ユーザー作成</span>
+    user <span class="token operator">=</span> User<span class="token punctuation">(</span>username<span class="token operator">=</span>username<span class="token punctuation">,</span> email<span class="token operator">=</span>email<span class="token punctuation">,</span> password<span class="token operator">=</span>hash_password<span class="token punctuation">(</span>password<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    db<span class="token punctuation">.</span>session<span class="token punctuation">.</span>add<span class="token punctuation">(</span>user<span class="token punctuation">)</span>
+    db<span class="token punctuation">.</span>session<span class="token punctuation">.</span>commit<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'message'</span><span class="token punctuation">:</span> <span class="token string">'User created successfully'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">201</span>
+
+<span class="token comment"># プロフィール更新エンドポイント - 重複した検証</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/profile/update'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">update_profile</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    user_id <span class="token operator">=</span> get_current_user_id<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    username <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'username'</span><span class="token punctuation">)</span>
+    email <span class="token operator">=</span> request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'email'</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># 同じ検証ロジックが重複</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> username <span class="token keyword">or</span> <span class="token builtin">len</span><span class="token punctuation">(</span>username<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">3</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'Username must be at least 3 characters'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> email <span class="token keyword">or</span> <span class="token string">'@'</span> <span class="token keyword">not</span> <span class="token keyword">in</span> email<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token string">'Invalid email address'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    
+    <span class="token comment"># ユーザー更新</span>
+    user <span class="token operator">=</span> User<span class="token punctuation">.</span>query<span class="token punctuation">.</span>get<span class="token punctuation">(</span>user_id<span class="token punctuation">)</span>
+    user<span class="token punctuation">.</span>username <span class="token operator">=</span> username
+    user<span class="token punctuation">.</span>email <span class="token operator">=</span> email
+    db<span class="token punctuation">.</span>session<span class="token punctuation">.</span>commit<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'message'</span><span class="token punctuation">:</span> <span class="token string">'Profile updated successfully'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">200</span></code></pre>
+<p>検証ロジックが重複しています。要件が変更されたとき——例えば、ユーザー名の最小長が 5 文字に増加した場合——両方の場所を更新する必要があります。一つを見逃すと、不整合な動作になります。</p>
+<h3 id="DRY-へのリファクタリング">DRY へのリファクタリング</h3>
+<p>重複した検証を再利用可能な関数に抽出します：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 検証関数 - 単一の真実の源</span>
+<span class="token keyword">def</span> <span class="token function">validate_username</span><span class="token punctuation">(</span>username<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> username <span class="token keyword">or</span> <span class="token builtin">len</span><span class="token punctuation">(</span>username<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">3</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Username must be at least 3 characters'</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> username
+
+<span class="token keyword">def</span> <span class="token function">validate_email</span><span class="token punctuation">(</span>email<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> email <span class="token keyword">or</span> <span class="token string">'@'</span> <span class="token keyword">not</span> <span class="token keyword">in</span> email<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Invalid email address'</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> email
+
+<span class="token keyword">def</span> <span class="token function">validate_password</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> password <span class="token keyword">or</span> <span class="token builtin">len</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">8</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Password must be at least 8 characters'</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> password
+
+<span class="token comment"># 登録エンドポイント - 検証関数を使用</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/register'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">register</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        username <span class="token operator">=</span> validate_username<span class="token punctuation">(</span>request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'username'</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        email <span class="token operator">=</span> validate_email<span class="token punctuation">(</span>request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'email'</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        password <span class="token operator">=</span> validate_password<span class="token punctuation">(</span>request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'password'</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">except</span> ValueError <span class="token keyword">as</span> e<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    
+    user <span class="token operator">=</span> User<span class="token punctuation">(</span>username<span class="token operator">=</span>username<span class="token punctuation">,</span> email<span class="token operator">=</span>email<span class="token punctuation">,</span> password<span class="token operator">=</span>hash_password<span class="token punctuation">(</span>password<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    db<span class="token punctuation">.</span>session<span class="token punctuation">.</span>add<span class="token punctuation">(</span>user<span class="token punctuation">)</span>
+    db<span class="token punctuation">.</span>session<span class="token punctuation">.</span>commit<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'message'</span><span class="token punctuation">:</span> <span class="token string">'User created successfully'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">201</span>
+
+<span class="token comment"># プロフィール更新エンドポイント - 同じ検証を再利用</span>
+<span class="token decorator annotation punctuation">@app<span class="token punctuation">.</span>route</span><span class="token punctuation">(</span><span class="token string">'/profile/update'</span><span class="token punctuation">,</span> methods<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">'POST'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">def</span> <span class="token function">update_profile</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    user_id <span class="token operator">=</span> get_current_user_id<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        username <span class="token operator">=</span> validate_username<span class="token punctuation">(</span>request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'username'</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        email <span class="token operator">=</span> validate_email<span class="token punctuation">(</span>request<span class="token punctuation">.</span>form<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'email'</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">except</span> ValueError <span class="token keyword">as</span> e<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'error'</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400</span>
+    
+    user <span class="token operator">=</span> User<span class="token punctuation">.</span>query<span class="token punctuation">.</span>get<span class="token punctuation">(</span>user_id<span class="token punctuation">)</span>
+    user<span class="token punctuation">.</span>username <span class="token operator">=</span> username
+    user<span class="token punctuation">.</span>email <span class="token operator">=</span> email
+    db<span class="token punctuation">.</span>session<span class="token punctuation">.</span>commit<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> jsonify<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">'message'</span><span class="token punctuation">:</span> <span class="token string">'Profile updated successfully'</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">200</span></code></pre>
+<p>これで検証ルールは一箇所にのみ存在します。変更はすべての使用箇所に自動的に伝播します。</p>
+<h3 id="メンテナンスの勝利">メンテナンスの勝利</h3>
+<p>リファクタリング後のバージョンは DRY の価値を示しています：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ DRY の利点</p><div class="admonition-content"><p><strong>単一の真実の源</strong></p>
+<ul>
+<li>検証ルールは一度だけ定義</li>
+<li>変更がすべてのエンドポイントを自動的に更新</li>
+<li>不整合な検証のリスクがない</li>
+</ul>
+<p><strong>テストの容易さ</strong></p>
+<ul>
+<li>検証関数を独立してテスト</li>
+<li>エンドポイントのテストはビジネスロジックに集中</li>
+<li>テストの重複を削減</li>
+</ul>
+<p><strong>可読性の向上</strong></p>
+<ul>
+<li>エンドポイントのコードはワークフローに集中</li>
+<li>検証の詳細が抽象化される</li>
+<li>繰り返しコードなしで意図が明確</li>
+</ul>
+</div></div>
+<p>これは DRY の最良の状態です：目的のない明白な重複を排除することです。</p>
+<h2 id="微妙な重複：散在するビジネスロジック">微妙な重複：散在するビジネスロジック</h2>
+<p>コピー＆ペーストの重複よりも陰湿なのは、コードベース全体に散在するビジネスロジックです——同じ概念が複数の場所で異なる方法で実装されています。</p>
+<h3 id="散在する計算の問題">散在する計算の問題</h3>
+<p>注文合計を計算する e コマースシステムを考えてみましょう：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ショッピングカートコンポーネント内</span>
+<span class="token keyword">function</span> <span class="token function">calculateCartTotal</span><span class="token punctuation">(</span><span class="token parameter">items</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> total <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> item <span class="token keyword">of</span> items<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        total <span class="token operator">+=</span> item<span class="token punctuation">.</span>price <span class="token operator">*</span> item<span class="token punctuation">.</span>quantity<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// $100 を超える注文に 10% 割引を適用</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>total <span class="token operator">&gt;</span> <span class="token number">100</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        total <span class="token operator">=</span> total <span class="token operator">*</span> <span class="token number">0.9</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> total<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 注文確認コンポーネント内 - 重複したロジック</span>
+<span class="token keyword">function</span> <span class="token function">calculateOrderTotal</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> subtotal <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> item <span class="token keyword">of</span> order<span class="token punctuation">.</span>items<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        subtotal <span class="token operator">+=</span> item<span class="token punctuation">.</span>price <span class="token operator">*</span> item<span class="token punctuation">.</span>quantity<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// 同じ割引ロジックが重複</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>subtotal <span class="token operator">&gt;</span> <span class="token number">100</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        subtotal <span class="token operator">=</span> subtotal <span class="token operator">*</span> <span class="token number">0.9</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> subtotal<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 請求書生成器内 - 再び重複</span>
+<span class="token keyword">function</span> <span class="token function">generateInvoice</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> amount <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    order<span class="token punctuation">.</span>items<span class="token punctuation">.</span><span class="token function">forEach</span><span class="token punctuation">(</span><span class="token parameter">item</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        amount <span class="token operator">+=</span> item<span class="token punctuation">.</span>price <span class="token operator">*</span> item<span class="token punctuation">.</span>quantity<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 割引ロジックが3回目の重複</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>amount <span class="token operator">&gt;</span> <span class="token number">100</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        amount <span class="token operator">=</span> amount <span class="token operator">-</span> <span class="token punctuation">(</span>amount <span class="token operator">*</span> <span class="token number">0.1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+        <span class="token literal-property property">total</span><span class="token operator">:</span> amount<span class="token punctuation">,</span>
+        <span class="token comment">// ... その他のフィールド</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>同じビジネスルールの3つの異なる実装です。割引が $150 を超える注文に 15% に変更されたとき、3つすべての場所を見つけて更新する必要があります。一つを見逃すと、顧客はアプリケーションの異なる部分で異なる合計を見ることになります。</p>
+<h3 id="ビジネスロジックの集中化">ビジネスロジックの集中化</h3>
+<p>ビジネスルールを単一の権威ある実装に抽出します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ビジネスロジック層 - 単一の真実の源</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderCalculator</span> <span class="token punctuation">{</span>
+    <span class="token keyword">static</span> <span class="token constant">DISCOUNT_THRESHOLD</span> <span class="token operator">=</span> <span class="token number">100</span><span class="token punctuation">;</span>
+    <span class="token keyword">static</span> <span class="token constant">DISCOUNT_RATE</span> <span class="token operator">=</span> <span class="token number">0.1</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">static</span> <span class="token function">calculateSubtotal</span><span class="token punctuation">(</span><span class="token parameter">items</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> items<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">sum<span class="token punctuation">,</span> item</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> sum <span class="token operator">+</span> <span class="token punctuation">(</span>item<span class="token punctuation">.</span>price <span class="token operator">*</span> item<span class="token punctuation">.</span>quantity<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">static</span> <span class="token function">calculateDiscount</span><span class="token punctuation">(</span><span class="token parameter">subtotal</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>subtotal <span class="token operator">&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token constant">DISCOUNT_THRESHOLD</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> subtotal <span class="token operator">*</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token constant">DISCOUNT_RATE</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        <span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">static</span> <span class="token function">calculateTotal</span><span class="token punctuation">(</span><span class="token parameter">items</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> subtotal <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">calculateSubtotal</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">const</span> discount <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">calculateDiscount</span><span class="token punctuation">(</span>subtotal<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> subtotal <span class="token operator">-</span> discount<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// ショッピングカート - 集中化されたロジックを使用</span>
+<span class="token keyword">function</span> <span class="token function">calculateCartTotal</span><span class="token punctuation">(</span><span class="token parameter">items</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> OrderCalculator<span class="token punctuation">.</span><span class="token function">calculateTotal</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 注文確認 - 同じロジックを使用</span>
+<span class="token keyword">function</span> <span class="token function">calculateOrderTotal</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> OrderCalculator<span class="token punctuation">.</span><span class="token function">calculateTotal</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 請求書生成器 - 同じロジックを使用</span>
+<span class="token keyword">function</span> <span class="token function">generateInvoice</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+        <span class="token literal-property property">subtotal</span><span class="token operator">:</span> OrderCalculator<span class="token punctuation">.</span><span class="token function">calculateSubtotal</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">discount</span><span class="token operator">:</span> OrderCalculator<span class="token punctuation">.</span><span class="token function">calculateDiscount</span><span class="token punctuation">(</span>
+            OrderCalculator<span class="token punctuation">.</span><span class="token function">calculateSubtotal</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span>
+        <span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">total</span><span class="token operator">:</span> OrderCalculator<span class="token punctuation">.</span><span class="token function">calculateTotal</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>ビジネスルールは今や一箇所にのみ存在します。割引の閾値と率は設定可能な定数です。すべてのコンポーネントが同じ計算ロジックを使用し、一貫性を保証します。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 ビジネスロジックの集中化</p><div class="admonition-content"><p><strong>ビジネスルールの識別</strong></p>
+<ul>
+<li>ビジネス要件を実装する計算</li>
+<li>ビジネス制約を強制する検証ルール</li>
+<li>ビジネスプロセスを表すワークフロー</li>
+<li>ビジネス上の決定に基づいて変更される可能性のあるロジック</li>
+</ul>
+<p><strong>ドメイン層の作成</strong></p>
+<ul>
+<li>ビジネスロジックをプレゼンテーションとインフラストラクチャから分離</li>
+<li>ビジネスルールを明示的でテスト可能にする</li>
+<li>コード内でドメイン固有の言語を使用</li>
+<li>ビジネスルールのソース（要件、規制）を文書化</li>
+</ul>
+<p><strong>単一ソースの強制</strong></p>
+<ul>
+<li>すべてのコンポーネントが集中化されたビジネスロジックを使用</li>
+<li>ビジネスルールの再実装なし</li>
+<li>重複よりも設定を優先</li>
+<li>コードレビューで散在するロジックを捕捉</li>
+</ul>
+</div></div>
+<h2 id="重複が許容される場合">重複が許容される場合</h2>
+<p>すべての重複が有害なわけではありません。時には重複が正しい選択であり、少なくとも一時的にはそうです。</p>
+<h3 id="偶然の重複">偶然の重複</h3>
+<p>似ているように見えても異なる概念を表すコードは、重複を排除すべきではありません：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ユーザー認証</span>
+<span class="token keyword">def</span> <span class="token function">validate_user_password</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">8</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Password too short'</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token boolean">True</span>
+
+<span class="token comment"># WiFi パスワード設定</span>
+<span class="token keyword">def</span> <span class="token function">validate_wifi_password</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">8</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Password too short'</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token boolean">True</span></code></pre>
+<p>これらの関数は同一に見えますが、異なるものを検証しています。ユーザーパスワードはすぐに特殊文字が必要になるかもしれませんが、WiFi パスワードは異なるルールが必要かもしれません。それらを結合すると、無関係な概念間に結合が生まれます：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 悪い例：早すぎる抽象化</span>
+<span class="token keyword">def</span> <span class="token function">validate_password</span><span class="token punctuation">(</span>password<span class="token punctuation">,</span> password_type<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> password_type <span class="token operator">==</span> <span class="token string">'user'</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">8</span><span class="token punctuation">:</span>
+            <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Password too short'</span><span class="token punctuation">)</span>
+        <span class="token comment"># 将来：特殊文字をチェック</span>
+    <span class="token keyword">elif</span> password_type <span class="token operator">==</span> <span class="token string">'wifi'</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>password<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">8</span><span class="token punctuation">:</span>
+            <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">'Password too short'</span><span class="token punctuation">)</span>
+        <span class="token comment"># 将来：異なるルール</span>
+    <span class="token keyword">return</span> <span class="token boolean">True</span></code></pre>
+<p>この抽象化は重複よりも悪いです。無関係な概念を結合し、将来の変更を困難にします。</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 偶然の重複 vs. 真の重複</p><div class="admonition-content"><p><strong>偶然の重複（分離を維持）</strong></p>
+<ul>
+<li>コードが今たまたま似ている</li>
+<li>異なるドメイン概念を表す</li>
+<li>将来分岐する可能性が高い</li>
+<li>異なる理由で変更される</li>
+</ul>
+<p><strong>真の重複（排除）</strong></p>
+<ul>
+<li>同じ概念が複数回実装される</li>
+<li>同じ理由で一緒に変更される</li>
+<li>単一の知識の断片を表す</li>
+<li>分岐はバグを示す</li>
+</ul>
+</div></div>
+<p>「三回ルール」が役立ちます：3つのインスタンスができるまで重複を許容し、その後抽象化を検討します。これにより、偶然の類似性に基づく早すぎる抽象化を防ぎます。</p>
+<h3 id="境界を越えた重複">境界を越えた重複</h3>
+<p>アーキテクチャの境界を越えた重複は、しばしば許容されます：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># データベースモデル</span>
+<span class="token keyword">class</span> <span class="token class-name">User</span><span class="token punctuation">(</span>db<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token builtin">id</span> <span class="token operator">=</span> db<span class="token punctuation">.</span>Column<span class="token punctuation">(</span>db<span class="token punctuation">.</span>Integer<span class="token punctuation">,</span> primary_key<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    username <span class="token operator">=</span> db<span class="token punctuation">.</span>Column<span class="token punctuation">(</span>db<span class="token punctuation">.</span>String<span class="token punctuation">(</span><span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">,</span> nullable<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    email <span class="token operator">=</span> db<span class="token punctuation">.</span>Column<span class="token punctuation">(</span>db<span class="token punctuation">.</span>String<span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">,</span> nullable<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+
+<span class="token comment"># API レスポンスモデル</span>
+<span class="token keyword">class</span> <span class="token class-name">UserResponse</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> <span class="token builtin">id</span><span class="token punctuation">,</span> username<span class="token punctuation">,</span> email<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span><span class="token builtin">id</span> <span class="token operator">=</span> <span class="token builtin">id</span>
+        self<span class="token punctuation">.</span>username <span class="token operator">=</span> username
+        self<span class="token punctuation">.</span>email <span class="token operator">=</span> email
+
+<span class="token comment"># フロントエンド TypeScript インターフェース</span>
+interface User <span class="token punctuation">{</span>
+    <span class="token builtin">id</span><span class="token punctuation">:</span> number<span class="token punctuation">;</span>
+    username<span class="token punctuation">:</span> string<span class="token punctuation">;</span>
+    email<span class="token punctuation">:</span> string<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>User 構造はデータベース、バックエンド、フロントエンド間で重複しています。この重複は意図的です——層を分離します。データベースモデルは API 契約に影響を与えずに変更できます。API はフロントエンドの変更を強制せずに進化できます。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🏗️ アーキテクチャの境界</p><div class="admonition-content"><p><strong>重複が分離する場合</strong></p>
+<ul>
+<li>層間（データベース、ビジネスロジック、プレゼンテーション）</li>
+<li>マイクロサービスアーキテクチャのサービス間</li>
+<li>内部 API と外部 API 間</li>
+<li>異なるライフサイクルを持つモジュール間</li>
+</ul>
+<p><strong>境界重複の利点</strong></p>
+<ul>
+<li>層が独立して進化できる</li>
+<li>変更が境界を越えてカスケードしない</li>
+<li>コンポーネント間の明確な契約</li>
+<li>独立したテストが容易</li>
+</ul>
+</div></div>
+<h2 id="早すぎる抽象化の危険性">早すぎる抽象化の危険性</h2>
+<p>DRY の過度な適用は早すぎる抽象化につながります——問題を十分に理解する前に抽象化を作成することです。</p>
+<h3 id="過度に抽象化された混乱">過度に抽象化された混乱</h3>
+<p>開発者が2つの類似した関数を見て、すぐに抽象化します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 元の関数</span>
+<span class="token keyword">function</span> <span class="token function">sendWelcomeEmail</span><span class="token punctuation">(</span><span class="token parameter">user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> subject <span class="token operator">=</span> <span class="token string">'Welcome to Our Service!'</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> body <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, welcome aboard!</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token function">sendEmail</span><span class="token punctuation">(</span>user<span class="token punctuation">.</span>email<span class="token punctuation">,</span> subject<span class="token punctuation">,</span> body<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">function</span> <span class="token function">sendPasswordResetEmail</span><span class="token punctuation">(</span><span class="token parameter">user<span class="token punctuation">,</span> resetLink</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> subject <span class="token operator">=</span> <span class="token string">'Password Reset Request'</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> body <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, click here to reset: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>resetLink<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token function">sendEmail</span><span class="token punctuation">(</span>user<span class="token punctuation">.</span>email<span class="token punctuation">,</span> subject<span class="token punctuation">,</span> body<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 早すぎる抽象化</span>
+<span class="token keyword">function</span> <span class="token function">sendUserEmail</span><span class="token punctuation">(</span><span class="token parameter">user<span class="token punctuation">,</span> emailType<span class="token punctuation">,</span> extraData <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> subject<span class="token punctuation">,</span> body<span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>emailType <span class="token operator">===</span> <span class="token string">'welcome'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        subject <span class="token operator">=</span> <span class="token string">'Welcome to Our Service!'</span><span class="token punctuation">;</span>
+        body <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, welcome aboard!</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>emailType <span class="token operator">===</span> <span class="token string">'password_reset'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        subject <span class="token operator">=</span> <span class="token string">'Password Reset Request'</span><span class="token punctuation">;</span>
+        body <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, click here to reset: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>extraData<span class="token punctuation">.</span>resetLink<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>emailType <span class="token operator">===</span> <span class="token string">'order_confirmation'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        subject <span class="token operator">=</span> <span class="token string">'Order Confirmation'</span><span class="token punctuation">;</span>
+        body <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, your order </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>extraData<span class="token punctuation">.</span>orderId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> is confirmed!</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>emailType <span class="token operator">===</span> <span class="token string">'shipping_notification'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        subject <span class="token operator">=</span> <span class="token string">'Your Order Has Shipped'</span><span class="token punctuation">;</span>
+        body <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, order </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>extraData<span class="token punctuation">.</span>orderId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> shipped via </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>extraData<span class="token punctuation">.</span>carrier<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">!</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// ... さらに多くのメールタイプ</span>
+    
+    <span class="token function">sendEmail</span><span class="token punctuation">(</span>user<span class="token punctuation">.</span>email<span class="token punctuation">,</span> subject<span class="token punctuation">,</span> body<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>この抽象化は元の重複よりも悪いです：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 早すぎる抽象化の問題</p><div class="admonition-content"><p><strong>複雑性の増加</strong></p>
+<ul>
+<li>単一の関数が複数の無関係なケースを処理</li>
+<li>条件ロジックが各メールタイプとともに成長</li>
+<li>各メールタイプが何をするのか理解が困難</li>
+<li>すべてのブランチをテストするのが難しい</li>
+</ul>
+<p><strong>脆弱な設計</strong></p>
+<ul>
+<li>メールタイプの追加には中央関数の変更が必要</li>
+<li>変更が既存のメールタイプを壊すリスク</li>
+<li>extraData パラメータがフィールドの寄せ集めになる</li>
+<li>型安全性の喪失（extraData にはどのフィールドが必要？）</li>
+</ul>
+<p><strong>変更の困難さ</strong></p>
+<ul>
+<li>他のタイプに影響を与えずに一つのメールタイプを変更できない</li>
+<li>リファクタリングにはすべてのメールタイプの理解が必要</li>
+<li>既存機能を壊すことへの恐れ</li>
+<li>皮肉にも重複よりもメンテナンスが困難</li>
+</ul>
+</div></div>
+<h3 id="より良いアプローチ">より良いアプローチ</h3>
+<p>早すぎる抽象化の代わりに、コンポジションと明確なインターフェースを使用します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// メールテンプレートインターフェース</span>
+<span class="token keyword">class</span> <span class="token class-name">EmailTemplate</span> <span class="token punctuation">{</span>
+    <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>user <span class="token operator">=</span> user<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token function">getSubject</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Must implement getSubject'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token function">getBody</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Must implement getBody'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token function">sendEmail</span><span class="token punctuation">(</span><span class="token keyword">this</span><span class="token punctuation">.</span>user<span class="token punctuation">.</span>email<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getSubject</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getBody</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 特定のメールタイプ</span>
+<span class="token keyword">class</span> <span class="token class-name">WelcomeEmail</span> <span class="token keyword">extends</span> <span class="token class-name">EmailTemplate</span> <span class="token punctuation">{</span>
+    <span class="token function">getSubject</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token string">'Welcome to Our Service!'</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token function">getBody</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token keyword">this</span><span class="token punctuation">.</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, welcome aboard!</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">class</span> <span class="token class-name">PasswordResetEmail</span> <span class="token keyword">extends</span> <span class="token class-name">EmailTemplate</span> <span class="token punctuation">{</span>
+    <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">user<span class="token punctuation">,</span> resetLink</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">super</span><span class="token punctuation">(</span>user<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">this</span><span class="token punctuation">.</span>resetLink <span class="token operator">=</span> resetLink<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token function">getSubject</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token string">'Password Reset Request'</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token function">getBody</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Hello </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token keyword">this</span><span class="token punctuation">.</span>user<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">, click here to reset: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token keyword">this</span><span class="token punctuation">.</span>resetLink<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 使用方法</span>
+<span class="token keyword">new</span> <span class="token class-name">WelcomeEmail</span><span class="token punctuation">(</span>user<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">new</span> <span class="token class-name">PasswordResetEmail</span><span class="token punctuation">(</span>user<span class="token punctuation">,</span> resetLink<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<p>この設計は重複（メール送信ロジック）を排除しながら、メールタイプを独立させ、変更を容易にします。</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 良い抽象化の原則</p><div class="admonition-content"><p><strong>パターンが現れるのを待つ</strong></p>
+<ul>
+<li>最初の重複で抽象化しない</li>
+<li>3つ以上のインスタンスができるまで待つ</li>
+<li>抽象化する前にコードがどのように変化するかを理解</li>
+</ul>
+<p><strong>条件よりもコンポジションを優先</strong></p>
+<ul>
+<li>継承またはコンポジションを使用</li>
+<li>大きな条件ブロックを避ける</li>
+<li>各バリアントは独立</li>
+</ul>
+<p><strong>抽象化をシンプルに保つ</strong></p>
+<ul>
+<li>単一責任の原則</li>
+<li>明確で焦点を絞ったインターフェース</li>
+<li>理解とテストが容易</li>
+</ul>
+</div></div>
+<h2 id="実世界のリファクタリングストーリー">実世界のリファクタリングストーリー</h2>
+<p>私はかつて、深刻な重複問題を抱えたコードベースを引き継ぎました。アプリケーションは有機的に成長し、開発者は締め切りに間に合わせるためにコードをコピー＆ペーストしていました。結果：同じビジネスロジックが数十のファイルで異なる方法で実装されていました。</p>
+<h3 id="発見">発見</h3>
+<p>日常的なバグ修正中に、割引計算がアプリケーション内のどこで呼び出されるかによって異なる結果を生成することを発見しました。ショッピングカートは一つの合計を表示し、チェックアウトページは別の合計を、請求書はさらに別の合計を表示していました。すべてわずかに異なっていました。</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🔍 重複の災害</p><div class="admonition-content"><p><strong>発見したこと</strong></p>
+<ul>
+<li>割引ロジックが 12 の異なるファイルで重複</li>
+<li>各実装がわずかに異なる</li>
+<li>一部は税を含み、他は含まない</li>
+<li>異なる丸め戦略</li>
+<li>エッジケースの処理が不整合</li>
+</ul>
+<p><strong>影響</strong></p>
+<ul>
+<li>顧客が変化する合計について苦情</li>
+<li>サポートチームが不一致を説明できない</li>
+<li>会計の照合が悪夢</li>
+<li>計算エラーによる収益損失</li>
+<li>顧客の信頼を損なう</li>
+</ul>
+</div></div>
+<h3 id="リファクタリング">リファクタリング</h3>
+<p>私は2週間かけてビジネスロジックを抽出し、集中化しました：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 以前：12 のファイルに散在し、様々なバリエーション</span>
+<span class="token comment"># ファイル 1:</span>
+total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>item<span class="token punctuation">.</span>price <span class="token operator">*</span> item<span class="token punctuation">.</span>qty <span class="token keyword">for</span> item <span class="token keyword">in</span> items<span class="token punctuation">)</span>
+<span class="token keyword">if</span> total <span class="token operator">&gt;</span> <span class="token number">100</span><span class="token punctuation">:</span>
+    total <span class="token operator">=</span> total <span class="token operator">*</span> <span class="token number">0.9</span>
+
+<span class="token comment"># ファイル 2:</span>
+subtotal <span class="token operator">=</span> <span class="token number">0</span>
+<span class="token keyword">for</span> item <span class="token keyword">in</span> items<span class="token punctuation">:</span>
+    subtotal <span class="token operator">+=</span> item<span class="token punctuation">.</span>price <span class="token operator">*</span> item<span class="token punctuation">.</span>qty
+discount <span class="token operator">=</span> subtotal <span class="token operator">*</span> <span class="token number">0.1</span> <span class="token keyword">if</span> subtotal <span class="token operator">&gt;</span> <span class="token number">100</span> <span class="token keyword">else</span> <span class="token number">0</span>
+total <span class="token operator">=</span> subtotal <span class="token operator">-</span> discount
+
+<span class="token comment"># ファイル 3:</span>
+amount <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">[</span>i<span class="token punctuation">.</span>price <span class="token operator">*</span> i<span class="token punctuation">.</span>qty <span class="token keyword">for</span> i <span class="token keyword">in</span> items<span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">if</span> amount <span class="token operator">&gt;=</span> <span class="token number">100</span><span class="token punctuation">:</span>
+    amount <span class="token operator">=</span> amount <span class="token operator">-</span> <span class="token punctuation">(</span>amount <span class="token operator">*</span> <span class="token number">0.1</span><span class="token punctuation">)</span>
+<span class="token comment"># ... さらに 9 つのバリエーション</span>
+
+<span class="token comment"># 以後：単一の真実の源</span>
+<span class="token keyword">class</span> <span class="token class-name">PricingEngine</span><span class="token punctuation">:</span>
+    DISCOUNT_THRESHOLD <span class="token operator">=</span> Decimal<span class="token punctuation">(</span><span class="token string">'100.00'</span><span class="token punctuation">)</span>
+    DISCOUNT_RATE <span class="token operator">=</span> Decimal<span class="token punctuation">(</span><span class="token string">'0.10'</span><span class="token punctuation">)</span>
+    
+    <span class="token decorator annotation punctuation">@classmethod</span>
+    <span class="token keyword">def</span> <span class="token function">calculate_subtotal</span><span class="token punctuation">(</span>cls<span class="token punctuation">,</span> items<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>
+            Decimal<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>item<span class="token punctuation">.</span>price<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> item<span class="token punctuation">.</span>quantity 
+            <span class="token keyword">for</span> item <span class="token keyword">in</span> items
+        <span class="token punctuation">)</span>
+    
+    <span class="token decorator annotation punctuation">@classmethod</span>
+    <span class="token keyword">def</span> <span class="token function">calculate_discount</span><span class="token punctuation">(</span>cls<span class="token punctuation">,</span> subtotal<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> subtotal <span class="token operator">&gt;=</span> cls<span class="token punctuation">.</span>DISCOUNT_THRESHOLD<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token punctuation">(</span>subtotal <span class="token operator">*</span> cls<span class="token punctuation">.</span>DISCOUNT_RATE<span class="token punctuation">)</span><span class="token punctuation">.</span>quantize<span class="token punctuation">(</span>
+                Decimal<span class="token punctuation">(</span><span class="token string">'0.01'</span><span class="token punctuation">)</span><span class="token punctuation">,</span> rounding<span class="token operator">=</span>ROUND_HALF_UP
+            <span class="token punctuation">)</span>
+        <span class="token keyword">return</span> Decimal<span class="token punctuation">(</span><span class="token string">'0.00'</span><span class="token punctuation">)</span>
+    
+    <span class="token decorator annotation punctuation">@classmethod</span>
+    <span class="token keyword">def</span> <span class="token function">calculate_total</span><span class="token punctuation">(</span>cls<span class="token punctuation">,</span> items<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        subtotal <span class="token operator">=</span> cls<span class="token punctuation">.</span>calculate_subtotal<span class="token punctuation">(</span>items<span class="token punctuation">)</span>
+        discount <span class="token operator">=</span> cls<span class="token punctuation">.</span>calculate_discount<span class="token punctuation">(</span>subtotal<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> subtotal <span class="token operator">-</span> discount</code></pre>
+<p>リファクタリングにより、12 の実装のうち 8 つにバグがあることが明らかになりました。一部は浮動小数点演算を使用し（丸めエラーを引き起こす）、他は閾値チェックでオフバイワンエラーがあり、いくつかは空のカートの処理を忘れていました。</p>
+<h3 id="結果">結果</h3>
+<p>集中化された価格設定エンジンをデプロイした後：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ リファクタリングの成果</p><div class="admonition-content"><p><strong>即座の改善</strong></p>
+<ul>
+<li>アプリケーション全体で一貫した合計</li>
+<li>顧客の苦情がゼロに減少</li>
+<li>会計の照合が簡素化</li>
+<li>収益が増加（バグがお金を失わせていた）</li>
+</ul>
+<p><strong>長期的な利点</strong></p>
+<ul>
+<li>新しい価格設定ルールを一箇所で実装</li>
+<li>価格設定戦略の A/B テストが可能に</li>
+<li>価格設定ロジックの包括的なテストスイート</li>
+<li>価格設定変更を行う自信</li>
+</ul>
+<p><strong>学んだ教訓</strong></p>
+<ul>
+<li>重複はバグを隠す</li>
+<li>不整合はユーザーの信頼を損なう</li>
+<li>リファクタリングはすぐに元が取れる</li>
+<li>DRY は保守性だけでなく正確性に関するもの</li>
+</ul>
+</div></div>
+<p>この経験は、DRY が単にコードを減らすことではなく、単一の真実の源を通じて正確性を確保することであることを強化しました。</p>
+<h2 id="DRY-の適用：実用的なガイドライン">DRY の適用：実用的なガイドライン</h2>
+<p>DRY をいつ、どのように適用するかを知るには判断力が必要です。これらのガイドラインが意思決定をナビゲートするのに役立ちます：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 DRY 意思決定フレームワーク</p><div class="admonition-content"><p><strong>重複を排除する場合：</strong></p>
+<ul>
+<li>複数の場所に同じビジネスロジック</li>
+<li>変更に複数の場所での更新が必要</li>
+<li>不整合がバグや混乱を引き起こす</li>
+<li>重複がアーキテクチャ上の目的を果たさない</li>
+</ul>
+<p><strong>重複を許容する場合：</strong></p>
+<ul>
+<li>コードが偶然似ている</li>
+<li>重複がアーキテクチャ層を分離</li>
+<li>抽象化が早すぎる</li>
+<li>3つ未満のインスタンス</li>
+</ul>
+<p><strong>慎重にリファクタリング：</strong></p>
+<ul>
+<li>抽象化する前に問題を理解</li>
+<li>複雑なものよりもシンプルな抽象化を優先</li>
+<li>条件ロジックよりもコンポジションを使用</li>
+<li>リファクタリング後に徹底的にテスト</li>
+<li>抽象化の目的を文書化</li>
+</ul>
+</div></div>
+<h2 id="結論">結論</h2>
+<p>DRY 原則——Don’t Repeat Yourself（自分自身を繰り返すな）——はソフトウェア品質の礎石ですが、その適用には繊細さと判断力が必要です。その核心において、DRY は似たように見えるコードのすべてのインスタンスを排除することではなく、各知識の断片がシステム内で単一の権威ある表現を持つことを保証することです。</p>
+<p>コピー＆ペーストプログラミングによる明白な重複は、即座のメンテナンス負担を生み出します。検証ロジック、計算、またはビジネスルールが複数のファイルに散在している場合、変更はエラーが発生しやすくなり、不整合は避けられません。この重複を再利用可能な関数やクラスに抽出することで、明確な利点が得られます：単一の真実の源、テストの容易さ、そしてバグの増殖の削減。</p>
+<p>微妙な重複——コンポーネント全体に散在するビジネスロジック——は、検出が困難であるため、より大きな危険をもたらします。同じ概念が複数の場所で異なる方法で実装されている場合、コードベースは不整合の地雷原になります。ビジネスロジックをドメイン層に集中化することで、一貫性が保証され、ビジネスルールが明示的でテスト可能になります。</p>
+<p>しかし、すべての重複が有害なわけではありません。偶然の重複——たまたま似ているように見えても異なる概念を表すコード——は分離したままにすべきです。表面的な類似性に基づく早すぎる抽象化は、無関係な概念間に結合を生み出し、将来の変更を困難にします。三回ルールがガイダンスを提供します：3つのインスタンスができるまで重複を許容し、その後抽象化が正当化されるかどうかを検討します。</p>
+<p>アーキテクチャの境界を越えた重複は、しばしば目的を果たします。データベースモデル、API 契約、フロントエンドインターフェース間でデータ構造を重複させることで、層が分離され、独立した進化が可能になります。この意図的な重複は、柔軟性とコンポーネント間の明確な契約を提供します。</p>
+<p>早すぎる抽象化の危険性は過小評価できません。DRY の過度な適用は、元の重複よりも理解とメンテナンスが困難な、複雑で条件に満ちた関数につながります。良い抽象化は、複数のインスタンスにわたるパターンを理解することから生まれるのであって、最初に見た重複を排除することからではありません。条件ロジックやパラメータ駆動の動作よりも、コンポジションと明確なインターフェースを優先してください。</p>
+<p>実世界の経験は、重複がバグを隠し、ユーザーの信頼を損なう不整合を生み出すことを示しています。重複したビジネスロジックを単一の真実の源にリファクタリングすることは、保守性を向上させるだけでなく、散在する実装に存在していたバグを明らかにし、修正することがよくあります。リファクタリングへの投資は、正確性の向上と変更を行う自信を通じて元が取れます。</p>
+<p>DRY を効果的に適用する鍵は、有害な重複と許容される類似性を区別することにあります。自問してください：この重複は同じ知識を表していますか？これらの断片は同じ理由で一緒に変更されますか？この重複を排除することで、無関係な概念間に結合が生まれますか？答えが、リファクタリングすべきか重複を許容すべきかを導きます。</p>
+<p>DRY は最終的に保守性と正確性に関するものです。ビジネスルールが複数の場所に存在する場合、変更はリスクが高く、不整合は避けられません。知識が単一の権威ある表現を持つ場合、変更は自動的に伝播し、正確性の検証が容易になります。しかし、これを達成するには判断力が必要です——いつ抽象化するか、いつ待つか、そしていつ重複が目的を果たすかを知ることです。</p>
+<p>似たようなコードのすべてのインスタンスを反射的に排除する前に、有害な重複を取り除いているのか、早すぎる抽象化を作成しているのかを考えてください。目標はゼロ重複ではなく、知識が一度、明確に、権威を持って表現され、同時に進化する柔軟性を維持するコードベースです。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2021/08/DRY-Principle-Code-Duplication/" data-id="4c0b91f0" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "DRY 原則：コードの重複が技術的負債になるとき",
+        "image": "https://neo01.com",
+        "keywords": "Best Practices Code Quality Software Design",
+        "genre": "Development",
+        "datePublished": "2021-08-08",
+        "dateCreated": "2021-08-08",
+        "dateModified": "2025-10-23",
+        "url": "https://neo01.com//ja/2021/08/DRY-Principle-Code-Duplication/",
+        "description": "Don't Repeat Yourself はシンプルに聞こえますが、いつ適用すべきかを知るには判断力が必要です。重複が有害な場合、許容される場合、そして早すぎる抽象化が重複よりも悪い場合を理解しましょう。",
+        "wordCount": 5078
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#cb5ac0b5</div>
+                <img src="/qr/qr-974f9244e8d599dc616373bc3924e224.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#cb5ac0b5">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
