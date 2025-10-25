@@ -1,0 +1,1220 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>管理提交到 Git 的凭证：恢复与预防 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Credentials,Git,Security">
+    
+    
+    <meta name="description" content="不小心将凭证提交到 Git？了解如何正确删除它们，为什么重写 Git 历史还不够，以及如何防止未来的泄露。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="管理提交到 Git 的凭证：恢复与预防">
+<meta property="og:url" content="https://neo01.com/zh-CN/2022/02/Managing-Credentials-Committed-to-Git/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="不小心将凭证提交到 Git？了解如何正确删除它们，为什么重写 Git 历史还不够，以及如何防止未来的泄露。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/git/thumbnail.png">
+<meta property="article:published_time" content="2022-02-12T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-25T14:14:37.988Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Credentials">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/git/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="/ja/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">日本語</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2022/02/Managing-Credentials-Committed-to-Git-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        管理提交到 Git 的凭证：恢复与预防
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2022-02-12T16:00:00.000Z" itemprop="datePublished">2022-02-13</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-25T14:14:37.988Z" itemprop="datePublished">2025-10-25</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/Security/">Security</a> <a class="tag-link" href="/zh-CN/tags/Git/">Git</a> <a class="tag-link" href="/zh-CN/tags/Credentials/">Credentials</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#Git-%E5%8E%86%E5%8F%B2%E9%97%AE%E9%A2%98"><span class="toc-text">Git 历史问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AB%8B%E5%8D%B3%E5%93%8D%E5%BA%94%EF%BC%9A%E5%85%88%E8%BD%AE%E6%8D%A2%EF%BC%8C%E5%90%8E%E6%B8%85%E7%90%86"><span class="toc-text">立即响应：先轮换，后清理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%8E-Git-%E5%8E%86%E5%8F%B2%E4%B8%AD%E5%88%A0%E9%99%A4%E5%87%AD%E8%AF%81"><span class="toc-text">从 Git 历史中删除凭证</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%BA%E5%88%B6%E6%8E%A8%E9%80%81%E5%92%8C%E5%8D%8F%E8%B0%83"><span class="toc-text">强制推送和协调</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A4%84%E7%90%86%E5%88%86%E6%94%AF%E5%92%8C%E9%95%9C%E5%83%8F"><span class="toc-text">处理分支和镜像</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A2%84%E9%98%B2%EF%BC%9A%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%B3%95"><span class="toc-text">预防：更好的方法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9C%9F%E5%AE%9E%E4%B8%96%E7%95%8C%E4%BA%8B%E4%BB%B6%EF%BC%9AAWS-%E5%AF%86%E9%92%A5%E6%B3%84%E9%9C%B2"><span class="toc-text">真实世界事件：AWS 密钥泄露</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li></ol>
+            <p>每个开发者的噩梦：你提交代码，推送到仓库，突然意识到你的 AWS 访问密钥、数据库密码或 API 令牌现在已经在 Git 历史中了。恐慌随之而来。你快速删除凭证并再次提交，但损害已经造成——这些秘密仍然保留在 Git 历史中，任何克隆仓库的人都可以访问。</p>
+<p>这种情况每天在各个组织中上演数千次。响应通常涉及疯狂地搜索 Google、尝试重写 Git 历史，并希望凭证尚未被泄露。然而，正确的凭证泄露响应不仅仅是删除文件——它需要理解 Git 的内部机制、立即轮换凭证以及实施预防机制。</p>
+<h2 id="Git-历史问题">Git 历史问题</h2>
+<p>Git 的设计使凭证泄露特别危险。理解原因需要检查 Git 如何存储数据。</p>
+<h3 id="为什么删除还不够">为什么删除还不够</h3>
+<p>当你提交包含凭证的文件并稍后删除它时，凭证仍然保留在 Git 历史中：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 删除的假象</p><div class="admonition-content"><p><strong>开发者通常做什么</strong></p>
+<ul>
+<li>意外提交包含凭证的代码</li>
+<li>意识到错误</li>
+<li>删除文件或移除凭证</li>
+<li>提交删除操作</li>
+<li>认为问题已解决</li>
+</ul>
+<p><strong>为什么这会失败</strong></p>
+<ul>
+<li>Git 保留所有提交的完整历史</li>
+<li>之前的提交仍然包含凭证</li>
+<li>任何人都可以检出旧提交</li>
+<li><code>git log -p</code> 会显示凭证</li>
+<li>克隆仓库包含完整历史</li>
+</ul>
+<p><strong>现实情况</strong></p>
+<ul>
+<li>凭证无限期地保持可访问</li>
+<li>所有仓库克隆都包含泄露</li>
+<li>分支和镜像保留凭证</li>
+<li>搜索引擎可能已索引泄露</li>
+<li>自动扫描器持续监控公共仓库</li>
+</ul>
+</div></div>
+<p>简单地在新提交中删除凭证就像在网上发布钥匙后锁门——损害已经造成。</p>
+<h3 id="Git-的不可变历史">Git 的不可变历史</h3>
+<p>Git 的内容可寻址存储使历史修改变得复杂：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔗 Git 存储模型</p><div class="admonition-content"><p><strong>Git 如何存储数据</strong></p>
+<ul>
+<li>每个提交都有唯一的 SHA-1 哈希</li>
+<li>哈希从提交内容、父哈希和元数据计算</li>
+<li>更改任何提交都会更改其哈希</li>
+<li>所有后代提交也会更改哈希</li>
+<li>创建历史的加密链</li>
+</ul>
+<p><strong>对凭证删除的影响</strong></p>
+<ul>
+<li>删除凭证需要重写历史</li>
+<li>泄露后的所有提交都必须重新创建</li>
+<li>新哈希会破坏现有引用</li>
+<li>协作者必须丢弃他们的本地副本</li>
+<li>分支和镜像不受影响</li>
+</ul>
+<p><strong>协调挑战</strong></p>
+<ul>
+<li>每个开发者必须获取重写的历史</li>
+<li>旧提交必须被垃圾回收</li>
+<li>远程仓库必须强制推送新历史</li>
+<li>CI/CD 系统必须更新引用</li>
+<li>备份系统可能保留旧历史</li>
+</ul>
+</div></div>
+<p>这种架构意味着凭证泄露无法真正"撤销"——只能通过轮换和历史重写来缓解。</p>
+<h2 id="立即响应：先轮换，后清理">立即响应：先轮换，后清理</h2>
+<p>当凭证泄露到 Git 时，优先级顺序至关重要。</p>
+<h3 id="步骤-1：立即轮换凭证">步骤 1：立即轮换凭证</h3>
+<p>在尝试任何 Git 历史操作之前，轮换被泄露的凭证：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>⚠️ 清理前先轮换</p><div class="admonition-content"><p><strong>为什么轮换优先</strong></p>
+<ul>
+<li>Git 历史重写需要时间</li>
+<li>凭证可能已经被泄露</li>
+<li>自动扫描器在几分钟内检测到泄露</li>
+<li>清理 Git 不会撤销访问权限</li>
+<li>攻击者可能已经克隆了仓库</li>
+</ul>
+<p><strong>需要轮换什么</strong></p>
+<ul>
+<li>API 密钥和令牌</li>
+<li>数据库密码</li>
+<li>SSH 私钥</li>
+<li>OAuth 客户端密钥</li>
+<li>加密密钥</li>
+<li>服务账户凭证</li>
+</ul>
+<p><strong>轮换清单</strong></p>
+<ul>
+<li>立即生成新凭证</li>
+<li>更新所有使用凭证的服务</li>
+<li>完全撤销旧凭证</li>
+<li>监控未经授权的访问尝试</li>
+<li>记录事件以供安全审查</li>
+<li>考虑未来使用短期凭证</li>
+</ul>
+</div></div>
+<p>立即轮换凭证限制了漏洞窗口。清理 Git 历史很重要但次要。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>⏱️ 短期凭证建议</p><div class="admonition-content"><p><strong>为什么短期凭证很重要</strong></p>
+<ul>
+<li>在定义的期限后自动过期</li>
+<li>如果泄露，减少暴露窗口</li>
+<li>无需手动轮换</li>
+<li>限制泄露的影响范围</li>
+</ul>
+<p><strong>实施选项</strong></p>
+<ul>
+<li>AWS STS 临时凭证（15 分钟 - 12 小时）</li>
+<li>Vault 动态密钥（几分钟到几小时）</li>
+<li>具有短过期时间的 OAuth 令牌</li>
+<li>具有 TTL 的服务账户令牌</li>
+</ul>
+<p><strong>事后行动</strong></p>
+<ul>
+<li>尽可能迁移到短期凭证</li>
+<li>减少未来泄露的影响</li>
+<li>查看<a href="/zh-CN/2022/03/Preventing-Credentials-in-Git/">预防策略</a>了解实施细节</li>
+</ul>
+</div></div>
+<h3 id="步骤-2：评估暴露范围">步骤 2：评估暴露范围</h3>
+<p>确定凭证传播的范围：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 暴露评估</p><div class="admonition-content"><p><strong>需要回答的问题</strong></p>
+<ul>
+<li>仓库是公共的还是私有的？</li>
+<li>凭证暴露了多长时间？</li>
+<li>有多少人有仓库访问权限？</li>
+<li>是否有分支或镜像？</li>
+<li>CI/CD 系统是否访问了凭证？</li>
+<li>提交是否推送到多个远程？</li>
+</ul>
+<p><strong>公共仓库暴露</strong></p>
+<ul>
+<li>假设凭证已完全泄露</li>
+<li>GitHub、GitLab、Bitbucket 通知安全研究人员</li>
+<li>自动扫描器在几分钟内检测到密钥</li>
+<li>搜索引擎可能已索引内容</li>
+<li>凭证轮换是强制性的，而非可选</li>
+</ul>
+<p><strong>私有仓库暴露</strong></p>
+<ul>
+<li>评估谁有仓库访问权限</li>
+<li>检查访问日志是否有异常活动</li>
+<li>审查凭证使用的审计日志</li>
+<li>考虑内部威胁场景</li>
+<li>作为预防措施轮换凭证</li>
+</ul>
+</div></div>
+<p>暴露评估决定了响应行动的紧迫性和范围。</p>
+<h2 id="从-Git-历史中删除凭证">从 Git 历史中删除凭证</h2>
+<p>轮换凭证后，清理 Git 历史以防止未来暴露。</p>
+<h3 id="使用-git-filter-branch（传统方法）">使用 git filter-branch（传统方法）</h3>
+<p>传统方法使用 <code>git filter-branch</code> 重写历史：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 从所有提交中删除特定文件</span>
+<span class="token function">git</span> filter-branch <span class="token parameter variable">--force</span> --index-filter <span class="token punctuation">\</span>
+  <span class="token string">"git rm --cached --ignore-unmatch path/to/credentials.txt"</span> <span class="token punctuation">\</span>
+  --prune-empty --tag-name-filter <span class="token function">cat</span> -- <span class="token parameter variable">--all</span>
+
+<span class="token comment"># 强制垃圾回收</span>
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ filter-branch 的局限性</p><div class="admonition-content"><p><strong>为什么 filter-branch 有问题</strong></p>
+<ul>
+<li>在大型仓库上极其缓慢</li>
+<li>复杂的语法容易出错</li>
+<li>不处理所有边缘情况</li>
+<li>如果中断可能损坏仓库</li>
+<li>Git 文档推荐替代方案</li>
+</ul>
+<p><strong>何时仍可能使用</strong></p>
+<ul>
+<li>没有 BFG 或 filter-repo 的传统系统</li>
+<li>简单的单文件删除场景</li>
+<li>历史有限的小型仓库</li>
+<li>当其他工具不可用时</li>
+</ul>
+</div></div>
+<p>现代工具为大多数场景提供了更好的替代方案。</p>
+<h3 id="使用-BFG-Repo-Cleaner（推荐）">使用 BFG Repo-Cleaner（推荐）</h3>
+<p>BFG Repo-Cleaner 提供更快、更简单的方法：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 下载 BFG（需要 Java）</span>
+<span class="token comment"># https://rtyley.github.io/bfg-repo-cleaner/</span>
+
+<span class="token comment"># 删除特定文件</span>
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --delete-files credentials.txt repo.git
+
+<span class="token comment"># 删除匹配模式的文件</span>
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --delete-files <span class="token string">"*.key"</span> repo.git
+
+<span class="token comment"># 替换所有文件中的凭证</span>
+<span class="token builtin class-name">echo</span> <span class="token string">"password123"</span> <span class="token operator">&gt;</span> passwords.txt
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --replace-text passwords.txt repo.git
+
+<span class="token comment"># 清理</span>
+<span class="token builtin class-name">cd</span> repo.git
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ BFG 的优势</p><div class="admonition-content"><p><strong>为什么 BFG 更好</strong></p>
+<ul>
+<li>比 filter-branch 快 10-720 倍</li>
+<li>简单、直观的语法</li>
+<li>默认保护 HEAD 提交</li>
+<li>高效处理大型仓库</li>
+<li>经过充分测试和广泛使用</li>
+</ul>
+<p><strong>BFG 功能</strong></p>
+<ul>
+<li>按名称或模式删除文件</li>
+<li>跨所有文件替换文本</li>
+<li>删除大文件</li>
+<li>按大小剥离 blob</li>
+<li>保留最近的提交</li>
+</ul>
+</div></div>
+<p>BFG 是大多数凭证删除场景的推荐工具。</p>
+<h3 id="使用-git-filter-repo（现代替代方案）">使用 git filter-repo（现代替代方案）</h3>
+<p><code>git filter-repo</code> 提供最强大和灵活的方法：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 安装 filter-repo</span>
+pip <span class="token function">install</span> git-filter-repo
+
+<span class="token comment"># 删除特定文件</span>
+<span class="token function">git</span> filter-repo <span class="token parameter variable">--path</span> path/to/credentials.txt --invert-paths
+
+<span class="token comment"># 删除匹配模式的文件</span>
+<span class="token function">git</span> filter-repo --path-glob <span class="token string">'*.key'</span> --invert-paths
+
+<span class="token comment"># 使用回调替换凭证</span>
+<span class="token function">git</span> filter-repo --replace-text <span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token builtin class-name">echo</span> <span class="token string">"password123==&gt;REDACTED"</span><span class="token punctuation">)</span>
+
+<span class="token comment"># 从特定目录删除凭证</span>
+<span class="token function">git</span> filter-repo <span class="token parameter variable">--path</span> secrets/ --invert-paths</code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔧 filter-repo 功能</p><div class="admonition-content"><p><strong>高级功能</strong></p>
+<ul>
+<li>在大型仓库上性能快</li>
+<li>强大的过滤选项</li>
+<li>基于 Python 的可扩展性</li>
+<li>全面的安全检查</li>
+<li>详细的操作日志</li>
+</ul>
+<p><strong>复杂场景</strong></p>
+<ul>
+<li>条件文件删除</li>
+<li>内容转换</li>
+<li>路径重写</li>
+<li>提交消息修改</li>
+<li>作者信息更新</li>
+</ul>
+</div></div>
+<p>对于复杂场景或大型仓库，<code>git filter-repo</code> 提供了最佳的功能和安全性平衡。</p>
+<h2 id="强制推送和协调">强制推送和协调</h2>
+<p>重写历史后，将更改传播到所有仓库副本。</p>
+<h3 id="强制推送到远程">强制推送到远程</h3>
+<p>重写的历史需要强制推送：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 强制推送到 origin</span>
+<span class="token function">git</span> push origin <span class="token parameter variable">--force</span> <span class="token parameter variable">--all</span>
+
+<span class="token comment"># 强制推送标签</span>
+<span class="token function">git</span> push origin <span class="token parameter variable">--force</span> <span class="token parameter variable">--tags</span>
+
+<span class="token comment"># 替代方案：force-with-lease（更安全）</span>
+<span class="token function">git</span> push origin --force-with-lease <span class="token parameter variable">--all</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 强制推送风险</p><div class="admonition-content"><p><strong>强制推送的危险</strong></p>
+<ul>
+<li>覆盖远程历史</li>
+<li>破坏其他开发者的本地副本</li>
+<li>如果不协调可能丢失提交</li>
+<li>可能被仓库设置阻止</li>
+<li>需要特殊权限</li>
+</ul>
+<p><strong>使用 --force-with-lease</strong></p>
+<ul>
+<li>比普通 --force 更安全</li>
+<li>检查远程是否有意外更改</li>
+<li>防止意外覆盖</li>
+<li>仍需要协调</li>
+<li>推荐使用而非 --force</li>
+</ul>
+</div></div>
+<p>强制推送应与所有仓库用户协调。</p>
+<h3 id="与团队成员协调">与团队成员协调</h3>
+<p>所有协作者必须更新他们的本地副本：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>👥 团队协调步骤</p><div class="admonition-content"><p><strong>需要的沟通</strong></p>
+<ul>
+<li>在重写前通知所有团队成员</li>
+<li>解释为什么要重写历史</li>
+<li>提供清晰的更新说明</li>
+<li>设定本地更新的截止日期</li>
+<li>验证每个人都已成功更新</li>
+</ul>
+<p><strong>团队成员的说明</strong>
+</p><pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 保存任何本地工作</span><p></p>
+</code></pre></div></div><code class="language-bash">
+
+<span class="token function">git</span> stash
+
+<span class="token comment"># 获取重写的历史</span>
+<span class="token function">git</span> fetch origin
+
+<span class="token comment"># 重置以匹配远程</span>
+<span class="token function">git</span> reset <span class="token parameter variable">--hard</span> origin/main
+
+<span class="token comment"># 清理旧引用</span>
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span>
+
+<span class="token comment"># 恢复本地工作</span>
+<span class="token function">git</span> stash pop</code>
+<pre><code>**处理冲突**
+- 本地提交必须变基到新历史
+- 可能需要手动解决冲突
+- 考虑在更新前创建补丁
+- 更新后彻底测试
+</code></pre>
+<p>协调不当可能导致旧历史被重新引入。</p>
+<h2 id="处理分支和镜像">处理分支和镜像</h2>
+<p>仓库分支和镜像保留原始历史。</p>
+<h3 id="分支问题">分支问题</h3>
+<p>分支是保留泄露凭证的独立副本：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 分支保留泄露</p><div class="admonition-content"><p><strong>为什么分支有问题</strong></p>
+<ul>
+<li>分支是独立的仓库</li>
+<li>重写父历史不影响分支</li>
+<li>分支所有者可能不知道泄露</li>
+<li>公共分支是可发现的</li>
+<li>没有机制强制分支更新</li>
+</ul>
+<p><strong>缓解策略</strong></p>
+<ul>
+<li>直接联系分支所有者</li>
+<li>请求他们删除或更新分支</li>
+<li>为公共分支提交 DMCA 删除请求（极端情况）</li>
+<li>监控分支的凭证使用</li>
+<li>接受某些分支可能保留</li>
+</ul>
+</div></div>
+<p>对于公共仓库，假设分支凭证已永久暴露。</p>
+<h3 id="处理镜像和备份">处理镜像和备份</h3>
+<p>镜像和备份系统可能保留旧历史：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 镜像注意事项</p><div class="admonition-content"><p><strong>常见镜像位置</strong></p>
+<ul>
+<li>CI/CD 系统缓存</li>
+<li>备份系统</li>
+<li>代码审查工具</li>
+<li>IDE 仓库缓存</li>
+<li>容器镜像层</li>
+<li>部署工件</li>
+</ul>
+<p><strong>清理操作</strong></p>
+<ul>
+<li>清除 CI/CD 缓存</li>
+<li>更新备份系统</li>
+<li>重建容器镜像</li>
+<li>重新部署应用程序</li>
+<li>清除 IDE 缓存</li>
+<li>更新文档仓库</li>
+</ul>
+</div></div>
+<p>全面清理需要识别所有仓库副本。</p>
+<h2 id="预防：更好的方法">预防：更好的方法</h2>
+<p>虽然本文重点关注恢复，但预防比修复更有效。全面的预防策略涉及多个层次：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>🛡️ 预防层次</p><div class="admonition-content"><p><strong>配置</strong></p>
+<ul>
+<li>凭证文件的 <code>.gitignore</code> 模式</li>
+<li>个人模式的全局 gitignore</li>
+<li>指导的模板文件（<code>.env.example</code>）</li>
+</ul>
+<p><strong>代码实践</strong></p>
+<ul>
+<li>环境变量而非硬编码凭证</li>
+<li>启动时的配置验证</li>
+<li>凭证检测的代码审查</li>
+</ul>
+<p><strong>自动扫描</strong></p>
+<ul>
+<li>预提交钩子（git-secrets、detect-secrets）</li>
+<li>CI/CD 管道扫描</li>
+<li>平台提供的扫描（GitHub、GitLab）</li>
+</ul>
+<p><strong>密钥管理</strong></p>
+<ul>
+<li>AWS Secrets Manager、HashiCorp Vault</li>
+<li>运行时密钥注入</li>
+<li>自动凭证轮换</li>
+</ul>
+</div></div>
+<p>有关防止凭证泄露的全面指南，包括详细的代码示例和实施策略，请参阅<a href="/zh-CN/2022/03/Preventing-Credentials-in-Git/">在 Git 中防止凭证：分层防御策略</a>。</p>
+<p>在预防上的投资消除了复杂恢复程序、Git 历史重写和紧急凭证轮换的需要。在构建预防系统上花费的每一小时都能节省数天的事件响应时间。</p>
+<h2 id="真实世界事件：AWS-密钥泄露">真实世界事件：AWS 密钥泄露</h2>
+<p>一个常见场景说明了完整的响应过程：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 事件时间线</p><div class="admonition-content"><p><strong>第 1 天：泄露</strong></p>
+<ul>
+<li>开发者在配置文件中提交 AWS 访问密钥</li>
+<li>推送到公共 GitHub 仓库</li>
+<li>GitHub 密钥扫描在 5 分钟内检测到密钥</li>
+<li>AWS 收到通知并警告账户所有者</li>
+<li>自动扫描器开始尝试使用密钥</li>
+</ul>
+<p><strong>第 1 小时：发现和响应</strong></p>
+<ul>
+<li>安全团队收到 GitHub 警报</li>
+<li>立即轮换 AWS 访问密钥</li>
+<li>审查 CloudTrail 日志是否有未经授权的访问</li>
+<li>发现启动了加密货币挖矿实例</li>
+<li>终止未经授权的资源</li>
+</ul>
+<p><strong>第 2-4 小时：清理</strong></p>
+<ul>
+<li>使用 BFG 从 Git 历史中删除密钥</li>
+<li>强制推送清理后的历史</li>
+<li>联系分支所有者更新</li>
+<li>更新 CI/CD 系统</li>
+<li>清除备份系统</li>
+</ul>
+<p><strong>第 2-7 天：事后</strong></p>
+<ul>
+<li>实施预提交钩子</li>
+<li>将 AWS 模式添加到 git-secrets</li>
+<li>进行安全培训</li>
+<li>审查其他仓库是否有泄露</li>
+<li>记录事件和响应</li>
+</ul>
+</div></div>
+<p>这个事件表明为什么立即轮换至关重要——攻击者在几分钟内利用泄露的凭证。</p>
+<h2 id="结论">结论</h2>
+<p>管理提交到 Git 的凭证需要理解仅删除是不够的。Git 的不可变历史无限期地保留泄露的凭证，任何有仓库访问权限的人都可以访问。正确的响应优先考虑立即凭证轮换而非 Git 历史清理——攻击者在几分钟内利用泄露的凭证，而历史重写需要数小时或数天。</p>
+<p>从 Git 历史中删除凭证涉及使用 BFG Repo-Cleaner 或 git filter-repo 等工具重写提交，然后强制推送并与所有协作者协调。然而，分支、镜像和备份系统可能保留原始历史，使公共仓库的完全删除变得不可能。这一现实强化了凭证轮换是强制性的，而非可选的。</p>
+<p>关键见解：将任何提交到 Git 的凭证视为完全泄露，无论仓库可见性如何。立即轮换，彻底清理历史，并实施<a href="/zh-CN/2022/03/Preventing-Credentials-in-Git/">全面的预防机制</a>以避免未来的事件。考虑迁移到自动过期的短期凭证——它们通过限制暴露窗口大大减少了未来泄露的影响。正确的密钥管理的运营负担远小于凭证泄露的成本和事后响应的复杂性。</p>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2022/02/Managing-Credentials-Committed-to-Git/" data-id="30444a0e" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "管理提交到 Git 的凭证：恢复与预防",
+        "image": "https://neo01.com/assets/git/thumbnail.png",
+        "keywords": "Credentials Git Security",
+        "genre": "Development",
+        "datePublished": "2022-02-13",
+        "dateCreated": "2022-02-13",
+        "dateModified": "2025-10-25",
+        "url": "https://neo01.com//zh-CN/2022/02/Managing-Credentials-Committed-to-Git/",
+        "description": "不小心将凭证提交到 Git？了解如何正确删除它们，为什么重写 Git 历史还不够，以及如何防止未来的泄露。",
+        "wordCount": 648
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：中国信息安全法律法规体系" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="title">CISP学习指南：中国信息安全法律法规体系</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Firewall-IDS-Technologies/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：防火墙与入侵检测技术" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Firewall-IDS-Technologies/" class="title">CISP学习指南：防火墙与入侵检测技术</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">72</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#3e809de2</div>
+                <img src="/qr/qr-d82c36c376a06420cedeb85056b0b9a7.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#3e809de2">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
