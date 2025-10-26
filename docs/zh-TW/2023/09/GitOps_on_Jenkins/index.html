@@ -1,0 +1,883 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Jenkins 管道上的 GitOps | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="GitOps,Groovy,Jenkins">
+    
+    
+    <meta name="description" content="凌晨3點部署出錯？只需 git revert 即可回滾！學習如何用種子腳本實現 Jenkins 管道的 GitOps。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jenkins 管道上的 GitOps">
+<meta property="og:url" content="https://neo01.com/zh-TW/2023/09/GitOps_on_Jenkins/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="凌晨3點部署出錯？只需 git revert 即可回滾！學習如何用種子腳本實現 Jenkins 管道的 GitOps。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/zh-TW/2023/09/GitOps_on_Jenkins/hero.png">
+<meta property="article:published_time" content="2023-09-24T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-11T08:59:15.870Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="GitOps">
+<meta property="article:tag" content="Groovy">
+<meta property="article:tag" content="Jenkins">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/zh-TW/2023/09/GitOps_on_Jenkins/hero.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2023/09/GitOps_on_Jenkins/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-CN/2023/09/GitOps_on_Jenkins/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2023/09/GitOps_on_Jenkins-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Jenkins 管道上的 GitOps
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2023-09-24T16:00:00.000Z" itemprop="datePublished">2023-09-25</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-11T08:59:15.870Z" itemprop="datePublished">2025-10-11</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/GitOps/">GitOps</a> <a class="tag-link" href="/zh-TW/tags/Jenkins/">Jenkins</a> <a class="tag-link" href="/zh-TW/tags/Groovy/">Groovy</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%80%E9%BA%BC%E6%98%AF-GitOps%EF%BC%9F"><span class="toc-text">什麼是 GitOps？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Jenkins-%E7%AE%A1%E9%81%93%E7%9A%84-GitOps"><span class="toc-text">Jenkins 管道的 GitOps</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B6%85%E8%B6%8A-Jenkins%EF%BC%9A%E7%84%A1%E8%99%95%E4%B8%8D%E5%9C%A8%E7%9A%84-GitOps"><span class="toc-text">超越 Jenkins：無處不在的 GitOps</span></a></li></ol>
+            <p><img src="/2023/09/GitOps_on_Jenkins/hero.png" alt=""></p>
+<h2 id="什麼是-GitOps？">什麼是 GitOps？</h2>
+<p>想像一下：凌晨 3 點，部署出錯了。你不必瘋狂地點擊 Jenkins UI 試圖記住你改變了什麼，而是簡單地執行 <code>git revert</code> 並重新部署。這就是 GitOps 的力量。</p>
+<p>GitOps 意味著像管理 Git 中的程式碼一樣管理你的整個基礎設施——每個變更都被追蹤，每個部署都可重現，每個回滾只需一次提交。</p>
+<p>GitOps 是一種使用 Git 作為單一事實來源來管理基礎設施和應用程式的方法。它讓你在程式碼中定義所需狀態，然後使用工具將該狀態應用到你的環境中。GitOps 實現持續交付，因為 Git 儲存庫中的任何變更都會觸發部署新版本程式碼的管道。</p>
+<div class="mermaid">graph LR
+    A([開發者]) --&gt;|提交| B[(Git 儲存庫)]
+    B --&gt;|觸發| C[CI/CD 管道]
+    E[(物件儲存)] --&gt;|讀取狀態| C
+    C --&gt;|部署| D[基礎設施]
+    D --&gt;|寫入狀態| E
+    
+    style B fill:#87CEEB
+    style C fill:#90EE90
+    style D fill:#FFD700
+    style E fill:#FFA07A</div>
+<h2 id="Jenkins-管道的-GitOps">Jenkins 管道的 GitOps</h2>
+<p>在 Jenkins 管道的上下文中，GitOps 可用於透過將管道配置視為程式碼並使用 Git 管理對該程式碼的變更來管理管道。這允許開發者對其管道配置進行版本控制，與其他團隊成員協作變更，並在必要時輕鬆回滾變更。</p>
+<p>換句話說：不是手動點擊 Jenkins UI 來建立和配置管道，而是編寫描述你想要的管道的程式碼，將其提交到 Git，並讓自動化為你建立它們。</p>
+<h3 id="使用種子腳本管理-Jenkins-管道">使用種子腳本管理 Jenkins 管道</h3>
+<p>種子腳本是用於在 Jenkins 上建立和維護管道的腳本。它通常用 Groovy 腳本編寫。</p>
+<p>以下是在 Jenkins 中建立管道的種子腳本範例。該腳本使用 Job DSL 外掛以宣告方式定義管道作業。腳本循環遍歷儲存庫清單並為每個儲存庫建立管道作業。每個管道的步驟詳細資訊從其自己儲存庫中的 Jenkinsfile 引用。</p>
+<p>三個管道可能看起來不太令人印象深刻。但考慮為多個環境建立管道——這就是種子腳本真正發揮作用的地方。</p>
+<p>雖然種子腳本可用於定義管道中的詳細步驟，但重要的是保持這些腳本簡單並專注於管理管道。保持種子腳本簡單使其更容易維護並與其他團隊成員協作。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 最佳實踐</p><div class="admonition-content"><p>保持你的種子腳本專注於管道結構和配置。將實際的管道邏輯儲存在每個儲存庫內的 Jenkinsfile 中。這種關注點分離使兩者都更容易維護。</p>
+</div></div>
+<h3 id="使用種子腳本的好處">使用種子腳本的好處</h3>
+<p>使用種子腳本可以帶來幾個好處，包括：</p>
+<ul>
+<li><strong>自動化</strong>：你可以根據 Git 儲存庫中的變更自動建立和更新 Jenkins 管道。這減少了手動錯誤並節省了時間和精力。</li>
+<li><strong>不可變性</strong>：你可以保持 Jenkins 管道不可變，這意味著它們在建立後不會手動修改。這確保了不同環境和階段之間的一致性和可靠性。</li>
+<li><strong>版本控制</strong>：你可以使用 Git 提交和分支追蹤 Jenkins 管道的歷史和變更。這使你能夠回滾到以前的版本、比較不同版本並稽核變更。</li>
+<li><strong>協作</strong>：你可以使用 Git 功能（如拉取請求、程式碼審查和合併衝突）與其他開發者和團隊協作處理 Jenkins 管道。這提高了管道的品質和安全性。</li>
+<li><strong>恢復</strong>：如果 Jenkins 意外損壞或刪除，你可以使用種子作業從 Git 儲存庫重新部署管道。</li>
+<li><strong>可移植性</strong>：你可以使用 GitOps 在另一個 Jenkins 伺服器上建立相同的管道集。這在你想使用 Jenkins/外掛升級測試管道時特別有用。</li>
+</ul>
+<h3 id="挑戰和解決方案">挑戰和解決方案</h3>
+<p>然而，當使用 GitOps 產生 Jenkins 管道時，你需要注意一些挑戰。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 管道刪除和稽核日誌</p><div class="admonition-content"><p>當你使用 GitOps 產生 Jenkins 管道時，你也可以使用 GitOps 在不再需要時銷毀它們。然而，如果你需要保留管道執行的輸出（控制台日誌）以進行稽核或故障排除，這可能會導致問題。</p>
+</div></div>
+<p><strong>要考慮的解決方案：</strong></p>
+<ol>
+<li><strong>外部日誌儲存</strong>：在刪除管道之前，使用單獨的儲存系統（如 Elasticsearch、CloudWatch 或 S3）歸檔日誌</li>
+<li><strong>軟刪除</strong>：將管道標記為已棄用，而不是立即刪除它們</li>
+<li><strong>保留策略</strong>：實施具有可配置保留期的自動歸檔</li>
+</ol>
+<h3 id="安全考慮">安全考慮</h3>
+<div class="admonition danger"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🔒 安全最佳實踐</p><div class="admonition-content"><p>GitOps 引入了新的安全考慮，因為你的管道配置儲存在 Git 中。</p>
+</div></div>
+<p><strong>關鍵安全實踐：</strong></p>
+<ul>
+<li><strong>憑證管理</strong>：永遠不要在種子腳本中儲存憑證。使用 Jenkins 憑證外掛並透過 ID 引用它們</li>
+<li><strong>存取控制</strong>：實施分支保護並要求對種子腳本變更進行程式碼審查</li>
+<li><strong>稽核追蹤</strong>：啟用 Git 提交簽署以驗證變更的真實性</li>
+<li><strong>最小權限</strong>：僅授予種子作業建立/更新管道所需的權限</li>
+</ul>
+<h3 id="狀態管理模式">狀態管理模式</h3>
+<p>隨著你的 GitOps 實施成熟，你需要決定如何處理狀態——實際部署的內容與 Git 中定義的內容的記錄。</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📦 狀態同步：物件儲存 vs Git 版本控制</p><div class="admonition-content"><p>雖然 GitOps 傳統上使用 Git 進行狀態管理，但一些團隊將狀態儲存在物件儲存（S3、Azure Blob）中，而不是在 Git 中進行版本控制。</p>
+<p><strong>為什麼使用物件儲存來儲存狀態？</strong></p>
+<ul>
+<li><strong>大小限制</strong>：Terraform 狀態檔案或大型配置輸出可能會使 Git 儲存庫膨脹，使複製變慢且歷史記錄笨重</li>
+<li><strong>二進位資料</strong>：狀態檔案通常包含二進位或頻繁變更的資料，這些資料不會從 Git 的差異功能中受益</li>
+<li><strong>並行性</strong>：具有鎖定機制的物件儲存（如 S3 + DynamoDB）比 Git 合併衝突更好地防止並行修改</li>
+<li><strong>效能</strong>：使用物件儲存讀取/寫入大型狀態檔案比 Git 操作更快</li>
+<li><strong>關注點分離</strong>：配置（Git）與執行時狀態（物件儲存）本質上是不同的——一個是意圖，另一個是現實</li>
+</ul>
+<p>把它想像成建築計畫與檢查報告：你對藍圖進行版本控制（Git），但將檢查結果儲存在檔案櫃中（物件儲存）。</p>
+</div></div>
+<h2 id="超越-Jenkins：無處不在的-GitOps">超越 Jenkins：無處不在的 GitOps</h2>
+<p>GitOps 是一個概念，你可以透過使用 Git 作為單一事實來源來應用於自動化一切營運。Jenkins 只是其中一個應用程式。相同的原則適用於：</p>
+<ul>
+<li><strong>基礎設施即代碼</strong>：Terraform、CloudFormation、Pulumi</li>
+<li><strong>Kubernetes</strong>：ArgoCD、Flux 用於叢集管理</li>
+<li><strong>配置管理</strong>：Ansible、Chef、Puppet</li>
+<li><strong>監控</strong>：Grafana 儀表板、Prometheus 規則</li>
+</ul>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✨ 關鍵要點</p><div class="admonition-content"><p>GitOps 將營運從手動、容易出錯的流程轉變為自動化、可稽核和可重現的工作流程。透過將一切視為程式碼並使用 Git 作為事實來源，你可以獲得整個基礎設施的版本控制、協作和可靠性。</p>
+</div></div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🚀 入門</p><div class="admonition-content"><p>準備為你的 Jenkins 管道實施 GitOps？</p>
+<ol>
+<li><strong>從小處開始</strong>：將一個手動管道轉換為種子腳本</li>
+<li><strong>在沙盒中測試</strong>：首先使用非生產 Jenkins 實例</li>
+<li><strong>逐步擴展</strong>：一旦你感到舒適，新增更多管道</li>
+<li><strong>新增可觀察性</strong>：一旦穩定，實施監控和警報</li>
+<li><strong>記錄模式</strong>：為你的團隊建立範本以遵循</li>
+</ol>
+</div></div>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2023/09/GitOps_on_Jenkins/" data-id="5c8755d4" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Jenkins 管道上的 GitOps",
+        "image": "https://neo01.comhero.png",
+        "keywords": "GitOps Groovy Jenkins",
+        "genre": "Development",
+        "datePublished": "2023-09-25",
+        "dateCreated": "2023-09-25",
+        "dateModified": "2025-10-11",
+        "url": "https://neo01.com//zh-TW/2023/09/GitOps_on_Jenkins/",
+        "description": "凌晨3點部署出錯？只需 git revert 即可回滾！學習如何用種子腳本實現 Jenkins 管道的 GitOps。",
+        "wordCount": 256
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="工具、遊戲與瀏覽器內建 AI 遊樂場" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">工具、遊戲與瀏覽器內建 AI 遊樂場</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="代理式編碼的崛起：AI 驅動的軟體工程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">代理式編碼的崛起：AI 驅動的軟體工程</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="理解臨時埠 Part 2：為什麼伺服器應用程式應避免使用動態埠" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Development/">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">理解臨時埠 Part 2：為什麼伺服器應用程式應避免使用動態埠</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/2025/08/Understanding_Ephemeral_Ports_Part1/thumbnail.png)" alt="理解臨時埠：網路通訊的隱形工作者" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Development/">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">理解臨時埠：網路通訊的隱形工作者</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="thumbnail">
+        <span style="background-image:url(/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/thumbnail.jpg)" alt="架構即程式碼：第二部分 - 建立基礎" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Architecture/">架構</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/07/Architecture_As_Code_Part_2_Building_the_Foundation/" class="title">架構即程式碼：第二部分 - 建立基礎</a></p>
+                            <p class="item-date"><time datetime="2025-07-19T16:00:00.000Z" itemprop="datePublished">2025-07-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">11</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#0d4987c8</div>
+                <img src="/qr/qr-fbfc0f72fe5193730c5c68b5c730deab.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#0d4987c8">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

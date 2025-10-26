@@ -1,0 +1,1324 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>分片模式：水平扩展数据存储 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="将数据存储分割成水平分区以提升可扩展性和性能。了解分片如何将数据分散到多个服务器以处理大量数据。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="分片模式：水平扩展数据存储">
+<meta property="og:url" content="https://neo01.com/zh-CN/2019/08/Sharding-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="将数据存储分割成水平分区以提升可扩展性和性能。了解分片如何将数据分散到多个服务器以处理大量数据。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-08-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-13T16:00:37.265Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0"><style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="/2019/08/Sharding-Pattern/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                            <a href="/zh-TW/2019/08/Sharding-Pattern/" class="lang-link">繁體中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/08/Sharding-Pattern-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        分片模式：水平扩展数据存储
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-08-14T16:00:00.000Z" itemprop="datePublished">2019-08-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-13T16:00:37.265Z" itemprop="datePublished">2025-10-14</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%BE%E4%B9%A6%E9%A6%86%E7%B1%BB%E6%AF%94"><span class="toc-text">图书馆类比</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%EF%BC%9A%E5%8D%95%E4%B8%80%E6%9C%8D%E5%8A%A1%E5%99%A8%E7%9A%84%E9%99%90%E5%88%B6"><span class="toc-text">问题：单一服务器的限制</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%EF%BC%9A%E6%B0%B4%E5%B9%B3%E5%88%86%E5%8C%BA%EF%BC%88%E5%88%86%E7%89%87%EF%BC%89"><span class="toc-text">解决方案：水平分区（分片）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%88%86%E7%89%87%E7%AD%96%E7%95%A5"><span class="toc-text">分片策略</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AD%96%E7%95%A5%E6%AF%94%E8%BE%83"><span class="toc-text">策略比较</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E5%AE%9E%E7%8E%B0%E7%A4%BA%E4%BE%8B"><span class="toc-text">实际实现示例</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E8%80%83%E9%87%8F"><span class="toc-text">关键考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%97%B6%E4%BD%BF%E7%94%A8%E5%88%86%E7%89%87"><span class="toc-text">何时使用分片</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BC%98%E7%82%B9%E6%80%BB%E7%BB%93"><span class="toc-text">优点总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8C%91%E6%88%98%E6%80%BB%E7%BB%93"><span class="toc-text">挑战总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-text">参考资料</span></a></li></ol>
+            <p>想象一个图书馆已经成长到单一建筑物无法容纳所有书籍的规模。与其建造一个不可能的巨大建筑，你建立了多个图书馆分馆——每个分馆存放按特定类别或范围组织的书籍。读者根据他们要找的内容知道该去哪个分馆。这就是分片的本质：将数据分散到多个存储系统以克服单一服务器的限制。</p>
+<h2 id="图书馆类比">图书馆类比</h2>
+<p>就像一个有多个分馆的图书馆系统：</p>
+<ul>
+<li>将书籍分散到各个地点</li>
+<li>允许多位读者同时访问</li>
+<li>减少任何单一地点的拥挤</li>
+<li>实现地理位置上更接近用户</li>
+</ul>
+<p>分片数据存储：</p>
+<ul>
+<li>将数据分散到多个服务器</li>
+<li>允许并行查询和写入</li>
+<li>减少任何单一数据库的竞争</li>
+<li>实现数据局部性以获得更好的性能</li>
+</ul>
+<div class="mermaid">graph TB
+    A[应用程序] --&gt; B[分片逻辑]
+    B --&gt; C[分片 1<br>用户 A-H]
+    B --&gt; D[分片 2<br>用户 I-P]
+    B --&gt; E[分片 3<br>用户 Q-Z]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style C fill:#51cf66,stroke:#2f9e44
+    style D fill:#51cf66,stroke:#2f9e44
+    style E fill:#51cf66,stroke:#2f9e44</div>
+<h2 id="问题：单一服务器的限制">问题：单一服务器的限制</h2>
+<p>托管在单一服务器上的数据存储面临不可避免的限制：</p>
+<h3 id="存储空间限制">存储空间限制</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 随着数据增长，单一服务器会耗尽空间</span>
+<span class="token keyword">class</span> <span class="token class-name">UserDatabase</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>storage <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DiskStorage</span><span class="token punctuation">(</span><span class="token string">'/data'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// 当我们达到 10TB？100TB？1PB 时会发生什么？</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">addUser</span><span class="token punctuation">(</span><span class="token parameter">user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>storage<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>user<span class="token punctuation">.</span>id<span class="token punctuation">,</span> user<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>error<span class="token punctuation">.</span>code <span class="token operator">===</span> <span class="token string">'ENOSPC'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 磁盘已满 - 现在怎么办？</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Storage capacity exceeded'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="计算资源限制">计算资源限制</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 单一服务器处理数百万并发用户</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderDatabase</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">processQuery</span><span class="token punctuation">(</span><span class="token parameter">query</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// CPU 处理查询达到上限</span>
+    <span class="token comment">// 内存缓存结果耗尽</span>
+    <span class="token comment">// 查询开始超时</span>
+    <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executeQuery</span><span class="token punctuation">(</span>query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="网络带宽瓶颈">网络带宽瓶颈</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 所有流量都通过一个网络接口</span>
+<span class="token keyword">class</span> <span class="token class-name">DataStore</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleRequest</span><span class="token punctuation">(</span><span class="token parameter">request</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 网络接口在 10Gbps 时饱和</span>
+    <span class="token comment">// 请求开始被丢弃</span>
+    <span class="token comment">// 响应时间大幅增加</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processRequest</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="地理分布挑战">地理分布挑战</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 全球用户访问单一数据中心</span>
+<span class="token keyword">class</span> <span class="token class-name">GlobalApplication</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">getUserData</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 东京的用户访问弗吉尼亚州的数据</span>
+    <span class="token comment">// 仅网络往返就需要 200ms 延迟</span>
+    <span class="token comment">// 在美国存储欧盟数据的合规问题</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>database<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token punctuation">{</span> userId <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 垂直扩展的限制</p><div class="admonition-content"><p><strong>暂时解决方案</strong>：向单一服务器添加更多 CPU、内存或磁盘</p>
+<p><strong>物理限制</strong>：最终你无法添加更多资源</p>
+<p><strong>成本效率低</strong>：高端服务器变得指数级昂贵</p>
+<p><strong>单点故障</strong>：一个服务器故障影响所有用户</p>
+</div></div>
+<h2 id="解决方案：水平分区（分片）">解决方案：水平分区（分片）</h2>
+<p>将数据存储分割成称为分片的水平分区。每个分片：</p>
+<ul>
+<li>具有相同的架构</li>
+<li>包含不同的数据子集</li>
+<li>在独立的存储节点上运行</li>
+<li>独立运作</li>
+</ul>
+<div class="mermaid">graph TB
+    A[应用程序层] --&gt; B[分片映射/路由器]
+    B --&gt; C[分片 A<br>订单 0-999]
+    B --&gt; D[分片 B<br>订单 1000-1999]
+    B --&gt; E[分片 C<br>订单 2000-2999]
+    B --&gt; F[分片 D<br>订单 3000+]
+    
+    C --&gt; C1[(数据库<br>服务器 1)]
+    D --&gt; D1[(数据库<br>服务器 2)]
+    E --&gt; E1[(数据库<br>服务器 3)]
+    F --&gt; F1[(数据库<br>服务器 4)]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style C fill:#51cf66,stroke:#2f9e44
+    style D fill:#51cf66,stroke:#2f9e44
+    style E fill:#51cf66,stroke:#2f9e44
+    style F fill:#51cf66,stroke:#2f9e44</div>
+<h2 id="分片策略">分片策略</h2>
+<h3 id="1-查找策略">1. 查找策略</h3>
+<p>使用映射表将请求路由到适当的分片：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">LookupShardRouter</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 分片映射存储在快速缓存或数据库中</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shardMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-1'</span><span class="token punctuation">,</span> <span class="token string">'shard-a'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-2'</span><span class="token punctuation">,</span> <span class="token string">'shard-a'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-3'</span><span class="token punctuation">,</span> <span class="token string">'shard-b'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-4'</span><span class="token punctuation">,</span> <span class="token string">'shard-c'</span><span class="token punctuation">]</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shardConnections <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token string-property property">'shard-a'</span><span class="token operator">:</span> <span class="token string">'db1.example.com'</span><span class="token punctuation">,</span>
+      <span class="token string-property property">'shard-b'</span><span class="token operator">:</span> <span class="token string">'db2.example.com'</span><span class="token punctuation">,</span>
+      <span class="token string-property property">'shard-c'</span><span class="token operator">:</span> <span class="token string">'db3.example.com'</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForTenant</span><span class="token punctuation">(</span><span class="token parameter">tenantId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shardKey <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardMap<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>tenantId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardConnections<span class="token punctuation">[</span>shardKey<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">queryTenantData</span><span class="token punctuation">(</span><span class="token parameter">tenantId<span class="token punctuation">,</span> query</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shardUrl <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForTenant</span><span class="token punctuation">(</span>tenantId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span>shardUrl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="mermaid">graph LR
+    A[请求:<br>Tenant-3] --&gt; B[查找<br>分片映射]
+    B --&gt; C{Tenant-3<br>→ 分片 B}
+    C --&gt; D[(分片 B<br>数据库)]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style D fill:#51cf66,stroke:#2f9e44</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 查找策略的优点</p><div class="admonition-content"><p><strong>灵活性</strong>：通过更新映射轻松重新平衡</p>
+<p><strong>虚拟分片</strong>：将逻辑分片映射到较少的物理服务器</p>
+<p><strong>控制</strong>：将高价值租户分配到专用分片</p>
+</div></div>
+<h3 id="2-范围策略">2. 范围策略</h3>
+<p>根据连续的分片键将相关项目分组在一起：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">RangeShardRouter</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shardRanges <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-01-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-03-31'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q1-2019.example.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-04-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-06-30'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q2-2019.example.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-07-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-09-30'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q3-2019.example.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-10-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-12-31'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q4-2019.example.com'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForDate</span><span class="token punctuation">(</span><span class="token parameter">date</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> range <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardRanges<span class="token punctuation">.</span><span class="token function">find</span><span class="token punctuation">(</span><span class="token parameter">r</span> <span class="token operator">=&gt;</span> 
+      date <span class="token operator">&gt;=</span> r<span class="token punctuation">.</span>min <span class="token operator">&amp;&amp;</span> date <span class="token operator">&lt;=</span> r<span class="token punctuation">.</span>max
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> range <span class="token operator">?</span> range<span class="token punctuation">.</span>shard <span class="token operator">:</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">queryOrdersByDateRange</span><span class="token punctuation">(</span><span class="token parameter">startDate<span class="token punctuation">,</span> endDate</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 高效：仅查询相关分片</span>
+    <span class="token keyword">const</span> relevantShards <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardRanges
+      <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token parameter">r</span> <span class="token operator">=&gt;</span> r<span class="token punctuation">.</span>max <span class="token operator">&gt;=</span> startDate <span class="token operator">&amp;&amp;</span> r<span class="token punctuation">.</span>min <span class="token operator">&lt;=</span> endDate<span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">r</span> <span class="token operator">=&gt;</span> r<span class="token punctuation">.</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 对多个分片进行并行查询</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>
+      relevantShards<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">shard</span> <span class="token operator">=&gt;</span> 
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShardByDateRange</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> startDate<span class="token punctuation">,</span> endDate<span class="token punctuation">)</span>
+      <span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> results<span class="token punctuation">.</span><span class="token function">flat</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="mermaid">graph TB
+    A[查询:<br>2019 年第二季订单] --&gt; B[范围路由器]
+    B --&gt; C[分片 Q2<br>2019 年 4-6 月]
+    
+    D[查询:<br>2019 年 4-7 月订单] --&gt; B
+    B --&gt; C
+    B --&gt; E[分片 Q3<br>2019 年 7-9 月]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style D fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style C fill:#51cf66,stroke:#2f9e44
+    style E fill:#51cf66,stroke:#2f9e44</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 范围策略的优点</p><div class="admonition-content"><p><strong>范围查询</strong>：有效检索连续数据</p>
+<p><strong>自然排序</strong>：数据以逻辑顺序存储</p>
+<p><strong>基于时间的归档</strong>：轻松归档旧分片</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 范围策略的风险</p><div class="admonition-content"><p><strong>热点</strong>：最近的数据通常被更频繁地访问</p>
+<p><strong>不均匀分布</strong>：某些范围可能比其他范围增长得更大</p>
+</div></div>
+<h3 id="3-哈希策略">3. 哈希策略</h3>
+<p>使用哈希函数均匀分布数据：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">HashShardRouter</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shards <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token string">'db-shard-0.example.com'</span><span class="token punctuation">,</span>
+      <span class="token string">'db-shard-1.example.com'</span><span class="token punctuation">,</span>
+      <span class="token string">'db-shard-2.example.com'</span><span class="token punctuation">,</span>
+      <span class="token string">'db-shard-3.example.com'</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">hashUserId</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 简单的哈希函数（生产环境使用更好的哈希）</span>
+    <span class="token keyword">let</span> hash <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> userId<span class="token punctuation">.</span>length<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      hash <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>hash <span class="token operator">&lt;&lt;</span> <span class="token number">5</span><span class="token punctuation">)</span> <span class="token operator">-</span> hash<span class="token punctuation">)</span> <span class="token operator">+</span> userId<span class="token punctuation">.</span><span class="token function">charCodeAt</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      hash <span class="token operator">=</span> hash <span class="token operator">&amp;</span> hash<span class="token punctuation">;</span> <span class="token comment">// 转换为 32 位整数</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>hash<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> hash <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">hashUserId</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> shardIndex <span class="token operator">=</span> hash <span class="token operator">%</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">[</span>shardIndex<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getUserData</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token punctuation">{</span> userId <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 分布示例</span>
+<span class="token keyword">const</span> router <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashShardRouter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>router<span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token string">'user-123'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// db-shard-2</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>router<span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token string">'user-124'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// db-shard-0</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>router<span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token string">'user-125'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// db-shard-3</span>
+<span class="token comment">// 用户分散到各个分片</span></code></pre>
+<div class="mermaid">graph TB
+    A[用户 ID] --&gt; B[哈希函数]
+    B --&gt; C[user-55 → 哈希: 2]
+    B --&gt; D[user-56 → 哈希: 0]
+    B --&gt; E[user-57 → 哈希: 1]
+    
+    C --&gt; F[(分片 2)]
+    D --&gt; G[(分片 0)]
+    E --&gt; H[(分片 1)]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style F fill:#51cf66,stroke:#2f9e44
+    style G fill:#51cf66,stroke:#2f9e44
+    style H fill:#51cf66,stroke:#2f9e44</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 哈希策略的优点</p><div class="admonition-content"><p><strong>均匀分布</strong>：防止热点</p>
+<p><strong>无需查找表</strong>：直接计算分片位置</p>
+<p><strong>可扩展</strong>：适用于许多分片</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 哈希策略的挑战</p><div class="admonition-content"><p><strong>范围查询</strong>：难以有效查询范围</p>
+<p><strong>重新平衡</strong>：添加分片需要重新哈希数据</p>
+</div></div>
+<h2 id="策略比较">策略比较</h2>
+<div id="chart_af1ed1130" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_af1ed1130'));
+        var option = {
+  "title": {
+    "text": "分片策略权衡"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["查找", "范围", "哈希"]
+  },
+  "radar": {
+    "indicator": [
+      { "name": "灵活性", "max": 10 },
+      { "name": "均匀分布", "max": 10 },
+      { "name": "范围查询性能", "max": 10 },
+      { "name": "简单性", "max": 10 },
+      { "name": "重新平衡容易度", "max": 10 }
+    ]
+  },
+  "series": [{
+    "type": "radar",
+    "data": [
+      {
+        "value": [9, 6, 5, 6, 9],
+        "name": "查找"
+      },
+      {
+        "value": [5, 4, 10, 8, 3],
+        "name": "范围"
+      },
+      {
+        "value": [6, 10, 3, 9, 4],
+        "name": "哈希"
+      }
+    ]
+  }]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<h2 id="实际实现示例">实际实现示例</h2>
+<p>这是一个电子商务平台的完整分片实现：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ShardedOrderDatabase</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 使用哈希策略实现均匀分布</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shards <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-0.example.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-1.example.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-2.example.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-3.example.com'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForOrder</span><span class="token punctuation">(</span><span class="token parameter">orderId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 从订单 ID 中提取数字部分</span>
+    <span class="token keyword">const</span> numericId <span class="token operator">=</span> <span class="token function">parseInt</span><span class="token punctuation">(</span>orderId<span class="token punctuation">.</span><span class="token function">replace</span><span class="token punctuation">(</span><span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">\D</span><span class="token regex-delimiter">/</span><span class="token regex-flags">g</span></span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> shardIndex <span class="token operator">=</span> numericId <span class="token operator">%</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">[</span>shardIndex<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForOrder</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+        <span class="token string">'INSERT INTO orders (id, user_id, total, items) VALUES (?, ?, ?, ?)'</span><span class="token punctuation">,</span>
+        <span class="token punctuation">[</span>order<span class="token punctuation">.</span>id<span class="token punctuation">,</span> order<span class="token punctuation">.</span>userId<span class="token punctuation">,</span> order<span class="token punctuation">.</span>total<span class="token punctuation">,</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">]</span>
+      <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">success</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> shard<span class="token punctuation">.</span>id <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Failed to create order on shard </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>shard<span class="token punctuation">.</span>id<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">:</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getOrder</span><span class="token punctuation">(</span><span class="token parameter">orderId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForOrder</span><span class="token punctuation">(</span>orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+      <span class="token string">'SELECT * FROM orders WHERE id = ?'</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span>orderId<span class="token punctuation">]</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> result<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getUserOrders</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 用户订单分散在各个分片 - 需要扇出查询</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">shard</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+          <span class="token string">'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC'</span><span class="token punctuation">,</span>
+          <span class="token punctuation">[</span>userId<span class="token punctuation">]</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 合并并排序来自所有分片的结果</span>
+    <span class="token keyword">return</span> results
+      <span class="token punctuation">.</span><span class="token function">flat</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> b<span class="token punctuation">.</span>created_at <span class="token operator">-</span> a<span class="token punctuation">.</span>created_at<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">connectToShard</span><span class="token punctuation">(</span><span class="token parameter">shard</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 每个分片的连接池</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>connections <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">createDatabaseConnection</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>connection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>id<span class="token punctuation">,</span> connection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="关键考量">关键考量</h2>
+<h3 id="1-选择分片键">1. 选择分片键</h3>
+<p>分片键决定数据分布和查询性能：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 好：静态、均匀分布</span>
+<span class="token keyword">const</span> shardKey <span class="token operator">=</span> user<span class="token punctuation">.</span>id<span class="token punctuation">;</span> <span class="token comment">// UUID，永不改变</span>
+
+<span class="token comment">// 坏：可能随时间改变</span>
+<span class="token keyword">const</span> shardKey <span class="token operator">=</span> user<span class="token punctuation">.</span>email<span class="token punctuation">;</span> <span class="token comment">// 用户可能更改电子邮件</span>
+
+<span class="token comment">// 坏：不均匀分布</span>
+<span class="token keyword">const</span> shardKey <span class="token operator">=</span> user<span class="token punctuation">.</span>country<span class="token punctuation">;</span> <span class="token comment">// 某些国家的用户多得多</span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📝 分片键最佳实践</p><div class="admonition-content"><p><strong>不可变</strong>：选择永不改变的键</p>
+<p><strong>高基数</strong>：许多唯一值以实现均匀分布</p>
+<p><strong>查询对齐</strong>：支持最常见的查询模式</p>
+<p><strong>避免热点</strong>：如果使用哈希策略，避免连续键</p>
+</div></div>
+<h3 id="2-跨分片查询">2. 跨分片查询</h3>
+<p>最小化跨越多个分片的查询：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OptimizedShardedDatabase</span> <span class="token punctuation">{</span>
+  <span class="token comment">// 好：单一分片查询</span>
+  <span class="token keyword">async</span> <span class="token function">getOrderById</span><span class="token punctuation">(</span><span class="token parameter">orderId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForOrder</span><span class="token punctuation">(</span>orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShardById</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token comment">// 可接受：带缓存的扇出</span>
+  <span class="token keyword">async</span> <span class="token function">getUserOrderCount</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 缓存结果以避免重复的扇出查询</span>
+    <span class="token keyword">const</span> cached <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">order_count:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>userId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cached<span class="token punctuation">)</span> <span class="token keyword">return</span> cached<span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> counts <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">shard</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">countUserOrders</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> userId<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> total <span class="token operator">=</span> counts<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">sum<span class="token punctuation">,</span> count</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> sum <span class="token operator">+</span> count<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">order_count:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>userId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> total<span class="token punctuation">,</span> <span class="token number">300</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 5 分钟 TTL</span>
+    <span class="token keyword">return</span> total<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token comment">// 更好：反规范化以避免跨分片查询</span>
+  <span class="token keyword">async</span> <span class="token function">getUserOrderCountOptimized</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 在用户分片中存储计数</span>
+    <span class="token keyword">const</span> userShard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryUserOrderCount</span><span class="token punctuation">(</span>userShard<span class="token punctuation">,</span> userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="3-重新平衡分片">3. 重新平衡分片</h3>
+<p>规划增长和重新平衡：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">RebalancingShardManager</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">addNewShard</span><span class="token punctuation">(</span><span class="token parameter">newShardConnection</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. 将新分片添加到配置</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">connection</span><span class="token operator">:</span> newShardConnection
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 2. 逐步迁移数据</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">migrateDataToNewShard</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 3. 更新分片映射</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateShardMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">migrateDataToNewShard</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 使用虚拟分片以便更容易重新平衡</span>
+    <span class="token keyword">const</span> virtualShards <span class="token operator">=</span> <span class="token number">1000</span><span class="token punctuation">;</span> <span class="token comment">// 许多虚拟分片</span>
+    <span class="token keyword">const</span> physicalShards <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    
+    <span class="token comment">// 将虚拟分片重新映射到物理分片</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> virtualShards<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> newPhysicalShard <span class="token operator">=</span> i <span class="token operator">%</span> physicalShards<span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">remapVirtualShard</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> newPhysicalShard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="4-处理故障">4. 处理故障</h3>
+<p>实现弹性策略：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ResilientShardedDatabase</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">queryWithRetry</span><span class="token punctuation">(</span><span class="token parameter">shard<span class="token punctuation">,</span> query<span class="token punctuation">,</span> maxRetries <span class="token operator">=</span> <span class="token number">3</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> attempt <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> attempt <span class="token operator">&lt;=</span> maxRetries<span class="token punctuation">;</span> attempt<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">try</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>attempt <span class="token operator">===</span> maxRetries<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          <span class="token comment">// 如果可用，尝试副本</span>
+          <span class="token keyword">if</span> <span class="token punctuation">(</span>shard<span class="token punctuation">.</span>replica<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>replica<span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token punctuation">}</span>
+          <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        
+        <span class="token comment">// 指数退避</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">pow</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> attempt<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">queryShard</span><span class="token punctuation">(</span><span class="token parameter">shard<span class="token punctuation">,</span> query</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">sleep</span><span class="token punctuation">(</span><span class="token parameter">ms</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token parameter">resolve</span> <span class="token operator">=&gt;</span> <span class="token function">setTimeout</span><span class="token punctuation">(</span>resolve<span class="token punctuation">,</span> ms<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="何时使用分片">何时使用分片</h2>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 使用分片的时机</p><div class="admonition-content"><p><strong>大规模</strong>：数据量超过单一服务器容量</p>
+<p><strong>高吞吐量</strong>：需要处理数百万并发操作</p>
+<p><strong>地理分布</strong>：用户分散在多个地区</p>
+<p><strong>成本优化</strong>：多个商用服务器比一个高端服务器便宜</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 避免分片的时机</p><div class="admonition-content"><p><strong>小规模</strong>：数据可以舒适地放在一个服务器上</p>
+<p><strong>复杂联结</strong>：应用程序严重依赖跨表联结</p>
+<p><strong>资源有限</strong>：团队缺乏管理分布式系统的专业知识</p>
+<p><strong>过早优化</strong>：垂直扩展仍然可行</p>
+</div></div>
+<h2 id="优点总结">优点总结</h2>
+<ul>
+<li><strong>可扩展性</strong>：随着数据增长添加更多分片</li>
+<li><strong>性能</strong>：跨分片并行处理</li>
+<li><strong>成本效率</strong>：使用商用硬件而非昂贵的服务器</li>
+<li><strong>地理接近性</strong>：将数据放置在靠近用户的位置</li>
+<li><strong>故障隔离</strong>：一个分片的故障不会影响其他分片</li>
+</ul>
+<h2 id="挑战总结">挑战总结</h2>
+<ul>
+<li><strong>复杂性</strong>：需要管理更多的活动部件</li>
+<li><strong>跨分片查询</strong>：昂贵的扇出操作</li>
+<li><strong>重新平衡</strong>：难以重新分配数据</li>
+<li><strong>引用完整性</strong>：难以跨分片维护</li>
+<li><strong>运营开销</strong>：监控、备份和维护成倍增加</li>
+</ul>
+<h2 id="参考资料">参考资料</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/best-practices/data-partitioning">数据分区指南</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">分片模式</a></li>
+</ul>
+
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2019/08/Sharding-Pattern/" data-id="3efc802a" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "分片模式：水平扩展数据存储",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2019-08-15",
+        "dateCreated": "2019-08-15",
+        "dateModified": "2025-10-14",
+        "url": "https://neo01.com//zh-CN/2019/08/Sharding-Pattern/",
+        "description": "将数据存储分割成水平分区以提升可扩展性和性能。了解分片如何将数据分散到多个服务器以处理大量数据。",
+        "wordCount": 5183
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-IDS-Law/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：入侵检测系统与法律基础" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-IDS-Law/" class="title">CISP学习指南：入侵检测系统与法律基础</a></p>
+                            <p class="item-date"><time datetime="2025-10-20T16:00:00.000Z" itemprop="datePublished">2025-10-21</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Project-Management-Basics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：项目管理基础" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Project-Management-Basics/" class="title">CISP学习指南：项目管理基础</a></p>
+                            <p class="item-date"><time datetime="2025-10-20T16:00:00.000Z" itemprop="datePublished">2025-10-21</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Authentication-Methods/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：身份鉴别方法" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Authentication-Methods/" class="title">CISP学习指南：身份鉴别方法</a></p>
+                            <p class="item-date"><time datetime="2025-10-19T16:00:00.000Z" itemprop="datePublished">2025-10-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Security-Mechanisms-Protocols/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：安全机制、密码协议与数字签名" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Security-Mechanisms-Protocols/" class="title">CISP学习指南：安全机制、密码协议与数字签名</a></p>
+                            <p class="item-date"><time datetime="2025-10-19T16:00:00.000Z" itemprop="datePublished">2025-10-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">52</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">24</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#44be6500</div>
+                <img src="/qr/qr-169e8848709591577afe4f1bf5e8886b.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#44be6500">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
