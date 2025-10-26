@@ -1,0 +1,1194 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>OLTP vs OLAP：トランザクションデータベースと分析データベースの理解 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="OLTPとOLAPシステムの基本的な違いを発見します。日常業務にトランザクションデータベースを使用し、ビジネスインテリジェンスに分析データベースを使用するタイミングを学びます。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OLTP vs OLAP：トランザクションデータベースと分析データベースの理解">
+<meta property="og:url" content="https://neo01.com/ja/2020/02/OLTP-vs-OLAP/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="OLTPとOLAPシステムの基本的な違いを発見します。日常業務にトランザクションデータベースを使用し、ビジネスインテリジェンスに分析データベースを使用するタイミングを学びます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2020-02-13T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-22T09:22:58.741Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/ja/2020/02/OLTP-vs-OLAP">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2020/02/OLTP-vs-OLAP/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2020/02/OLTP-vs-OLAP/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2020/02/OLTP-vs-OLAP/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2020/02/OLTP-vs-OLAP-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        OLTP vs OLAP：トランザクションデータベースと分析データベースの理解
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2020-02-13T16:00:00.000Z" itemprop="datePublished">2020-02-14</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-22T09:22:58.741Z" itemprop="datePublished">2025-10-22</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%87%E3%83%BC%E3%82%BF%E5%87%A6%E7%90%86%E3%81%AE2%E3%81%A4%E3%81%AE%E4%B8%96%E7%95%8C"><span class="toc-text">データ処理の2つの世界</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OLTP%EF%BC%9A%E9%81%8B%E7%94%A8%E3%81%AE%E4%B8%BB%E5%8A%9B"><span class="toc-text">OLTP：運用の主力</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OLAP%EF%BC%9A%E5%88%86%E6%9E%90%E3%81%AE%E5%BC%B7%E5%8A%9B%E3%81%AA%E3%83%84%E3%83%BC%E3%83%AB"><span class="toc-text">OLAP：分析の強力なツール</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%A6%E5%88%97%E6%AF%94%E8%BC%83"><span class="toc-text">並列比較</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E4%B8%96%E7%95%8C%E3%81%AE%E4%BE%8B%EF%BC%9Ae%E3%82%B3%E3%83%9E%E3%83%BC%E3%82%B9%E3%83%97%E3%83%A9%E3%83%83%E3%83%88%E3%83%95%E3%82%A9%E3%83%BC%E3%83%A0"><span class="toc-text">実世界の例：eコマースプラットフォーム</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%81%A9%E5%88%87%E3%81%AA%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%E3%81%AE%E9%81%B8%E6%8A%9E"><span class="toc-text">適切なシステムの選択</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%81%BE%E3%81%A8%E3%82%81"><span class="toc-text">まとめ</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"><span class="toc-text">参考文献</span></a></li></ol>
+            <p>2つの異なるタイプの店を想像してください。1つ目は、顧客が素早くアイテムを手に取り、支払いをして去る忙しいコンビニエンスストアです——毎時間何百もの小さく速いトランザクション。2つ目は、アナリストが購買パターン、在庫トレンド、季節的需要を研究する倉庫です——操作は少ないですが、それぞれが膨大な量のデータを調査します。これらは、データベースシステムへの2つの基本的なアプローチを表しています：OLTPとOLAP。</p>
+<h2 id="データ処理の2つの世界">データ処理の2つの世界</h2>
+<p>モダンなビジネスは、2つの異なる目的のためにデータベースを必要とします：</p>
+<p><strong>OLTP（Online Transaction Processing）</strong>：日常業務を処理</p>
+<ul>
+<li>顧客注文を処理</li>
+<li>在庫を更新</li>
+<li>支払いを記録</li>
+<li>ユーザーアカウントを管理</li>
+</ul>
+<p><strong>OLAP（Online Analytical Processing）</strong>：ビジネスインテリジェンスをサポート</p>
+<ul>
+<li>販売トレンドを分析</li>
+<li>レポートを生成</li>
+<li>需要を予測</li>
+<li>パターンを特定</li>
+</ul>
+<div class="mermaid">graph TB
+    subgraph OLTP["🏪 OLTPシステム"]
+        T1[顧客注文]
+        T2[支払い処理]
+        T3[在庫更新]
+        T4[ユーザー登録]
+        
+        T1 --&gt; DB1[(トランザクション<br>データベース)]
+        T2 --&gt; DB1
+        T3 --&gt; DB1
+        T4 --&gt; DB1
+    end
+    
+    subgraph ETL["🔄 ETLプロセス"]
+        E1[抽出]
+        E2[変換]
+        E3[ロード]
+        
+        E1 --&gt; E2
+        E2 --&gt; E3
+    end
+    
+    subgraph OLAP["📊 OLAPシステム"]
+        A1[販売分析]
+        A2[トレンドレポート]
+        A3[予測]
+        A4[ビジネスインテリジェンス]
+        
+        DW[(データ<br>ウェアハウス)] --&gt; A1
+        DW --&gt; A2
+        DW --&gt; A3
+        DW --&gt; A4
+    end
+    
+    DB1 -.-&gt;|定期同期| E1
+    E3 --&gt; DW
+    
+    style OLTP fill:#e3f2fd,stroke:#1976d2
+    style OLAP fill:#f3e5f5,stroke:#7b1fa2
+    style ETL fill:#fff3e0,stroke:#f57c00</div>
+<h2 id="OLTP：運用の主力">OLTP：運用の主力</h2>
+<p>OLTPシステムは、高速で信頼性の高いトランザクションで日常業務を支えます。</p>
+<h3 id="特徴">特徴</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// OLTP：高速で焦点を絞った操作</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">customerId<span class="token punctuation">,</span> items</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 少数の行に影響する単一トランザクション</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> db<span class="token punctuation">.</span><span class="token function">getConnection</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">beginTransaction</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 注文を挿入（1行）</span>
+      <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+        <span class="token string">'INSERT INTO orders (customer_id, total, status) VALUES (?, ?, ?)'</span><span class="token punctuation">,</span>
+        <span class="token punctuation">[</span>customerId<span class="token punctuation">,</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">calculateTotal</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">'PENDING'</span><span class="token punctuation">]</span>
+      <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 注文アイテムを挿入（数行）</span>
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> item <span class="token keyword">of</span> items<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+          <span class="token string">'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'</span><span class="token punctuation">,</span>
+          <span class="token punctuation">[</span>order<span class="token punctuation">.</span>id<span class="token punctuation">,</span> item<span class="token punctuation">.</span>productId<span class="token punctuation">,</span> item<span class="token punctuation">.</span>quantity<span class="token punctuation">,</span> item<span class="token punctuation">.</span>price<span class="token punctuation">]</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">// 在庫を更新（アイテムごとに1行）</span>
+        <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+          <span class="token string">'UPDATE products SET stock = stock - ? WHERE id = ?'</span><span class="token punctuation">,</span>
+          <span class="token punctuation">[</span>item<span class="token punctuation">.</span>quantity<span class="token punctuation">,</span> item<span class="token punctuation">.</span>productId<span class="token punctuation">]</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">commit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> order<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">rollback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="OLTPデータベース設計：正規化スキーマ">OLTPデータベース設計：正規化スキーマ</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 正規化設計は冗長性を最小化</span>
+<span class="token comment">-- INSERT、UPDATE、DELETEに最適化</span>
+
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> customers <span class="token punctuation">(</span>
+  id <span class="token keyword">INT</span> <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span><span class="token punctuation">,</span>
+  name <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  email <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  created_at <span class="token keyword">TIMESTAMP</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> orders <span class="token punctuation">(</span>
+  id <span class="token keyword">INT</span> <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span><span class="token punctuation">,</span>
+  customer_id <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  total <span class="token keyword">DECIMAL</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">status</span> <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">20</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  created_at <span class="token keyword">TIMESTAMP</span><span class="token punctuation">,</span>
+  <span class="token keyword">FOREIGN</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span>customer_id<span class="token punctuation">)</span> <span class="token keyword">REFERENCES</span> customers<span class="token punctuation">(</span>id<span class="token punctuation">)</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> order_items <span class="token punctuation">(</span>
+  id <span class="token keyword">INT</span> <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span><span class="token punctuation">,</span>
+  order_id <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  product_id <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  quantity <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  price <span class="token keyword">DECIMAL</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">FOREIGN</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span>order_id<span class="token punctuation">)</span> <span class="token keyword">REFERENCES</span> orders<span class="token punctuation">(</span>id<span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">FOREIGN</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span>product_id<span class="token punctuation">)</span> <span class="token keyword">REFERENCES</span> products<span class="token punctuation">(</span>id<span class="token punctuation">)</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>💡 OLTPの主要機能</p><div class="admonition-content"><p><strong>高速応答時間</strong>：トランザクションあたりミリ秒</p>
+<p><strong>高い同時実行性</strong>：数千の同時ユーザー</p>
+<p><strong>ACID準拠</strong>：データ整合性の保証</p>
+<p><strong>正規化スキーマ</strong>：最小限のデータ冗長性</p>
+<p><strong>現在のデータ</strong>：リアルタイムで最新の情報</p>
+</div></div>
+<h2 id="OLAP：分析の強力なツール">OLAP：分析の強力なツール</h2>
+<p>OLAPシステムは、ビジネス上の意思決定をサポートするために履歴データを分析します。</p>
+<h3 id="特徴-2">特徴</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// OLAP：大規模データセット全体の複雑な分析</span>
+<span class="token keyword">class</span> <span class="token class-name">SalesAnalytics</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">getMonthlySalesTrend</span><span class="token punctuation">(</span><span class="token parameter">year</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// クエリは数百万行をスキャン</span>
+    <span class="token comment">// 複数の次元でデータを集約</span>
+    <span class="token keyword">const</span> query <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">
+      SELECT 
+        DATE_FORMAT(o.created_at, '%Y-%m') as month,
+        c.region,
+        p.category,
+        COUNT(DISTINCT o.id) as order_count,
+        SUM(oi.quantity) as units_sold,
+        SUM(oi.quantity * oi.price) as revenue,
+        AVG(o.total) as avg_order_value
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      JOIN order_items oi ON o.id = oi.order_id
+      JOIN products p ON oi.product_id = p.id
+      WHERE YEAR(o.created_at) = ?
+      GROUP BY 
+        DATE_FORMAT(o.created_at, '%Y-%m'),
+        c.region,
+        p.category
+      ORDER BY month, region, category
+    </span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token keyword">await</span> dataWarehouse<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>query<span class="token punctuation">,</span> <span class="token punctuation">[</span>year<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="OLAPデータベース設計：スタースキーマ">OLAPデータベース設計：スタースキーマ</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- クエリ用に最適化された非正規化設計</span>
+<span class="token comment">-- ファクトテーブルとディメンションテーブルを持つスタースキーマ</span>
+
+<span class="token comment">-- ファクトテーブル：メトリクスを含む</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> fact_sales <span class="token punctuation">(</span>
+  sale_id <span class="token keyword">BIGINT</span> <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span><span class="token punctuation">,</span>
+  date_key <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  customer_key <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  product_key <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  store_key <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  quantity <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  unit_price <span class="token keyword">DECIMAL</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  revenue <span class="token keyword">DECIMAL</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  profit <span class="token keyword">DECIMAL</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">,</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">FOREIGN</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span>date_key<span class="token punctuation">)</span> <span class="token keyword">REFERENCES</span> dim_date<span class="token punctuation">(</span>date_key<span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">FOREIGN</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span>customer_key<span class="token punctuation">)</span> <span class="token keyword">REFERENCES</span> dim_customer<span class="token punctuation">(</span>customer_key<span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">FOREIGN</span> <span class="token keyword">KEY</span> <span class="token punctuation">(</span>product_key<span class="token punctuation">)</span> <span class="token keyword">REFERENCES</span> dim_product<span class="token punctuation">(</span>product_key<span class="token punctuation">)</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- ディメンションテーブル：記述属性を含む</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> dim_date <span class="token punctuation">(</span>
+  date_key <span class="token keyword">INT</span> <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span><span class="token punctuation">,</span>
+  full_date <span class="token keyword">DATE</span><span class="token punctuation">,</span>
+  <span class="token keyword">year</span> <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  quarter <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  <span class="token keyword">month</span> <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  month_name <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">20</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  week <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  day_of_week <span class="token keyword">INT</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">CREATE</span> <span class="token keyword">TABLE</span> dim_customer <span class="token punctuation">(</span>
+  customer_key <span class="token keyword">INT</span> <span class="token keyword">PRIMARY</span> <span class="token keyword">KEY</span><span class="token punctuation">,</span>
+  customer_id <span class="token keyword">INT</span><span class="token punctuation">,</span>
+  name <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  segment <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  region <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  country <span class="token keyword">VARCHAR</span><span class="token punctuation">(</span><span class="token number">50</span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<div class="mermaid">graph TB
+    F[ファクトテーブル<br>fact_sales<br>sale_id, quantity, revenue, profit]
+    
+    D1[ディメンション<br>dim_date<br>year, quarter, month, week]
+    D2[ディメンション<br>dim_customer<br>name, segment, region]
+    D3[ディメンション<br>dim_product<br>category, brand, supplier]
+    
+    F --&gt; D1
+    F --&gt; D2
+    F --&gt; D3
+    
+    style F fill:#ffeb3b,stroke:#f57f17
+    style D1 fill:#81c784,stroke:#388e3c
+    style D2 fill:#81c784,stroke:#388e3c
+    style D3 fill:#81c784,stroke:#388e3c</div>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>💡 OLAPの主要機能</p><div class="admonition-content"><p><strong>複雑なクエリ</strong>：多次元分析</p>
+<p><strong>大量のデータボリューム</strong>：数百万から数十億行</p>
+<p><strong>履歴データ</strong>：時系列分析</p>
+<p><strong>非正規化スキーマ</strong>：読み取りパフォーマンスに最適化</p>
+<p><strong>バッチ更新</strong>：定期的なデータロード（ETL）</p>
+</div></div>
+<h2 id="並列比較">並列比較</h2>
+<table>
+<thead>
+<tr>
+<th>側面</th>
+<th>OLTP</th>
+<th>OLAP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>目的</strong></td>
+<td>日常業務</td>
+<td>ビジネスインテリジェンス</td>
+</tr>
+<tr>
+<td><strong>ユーザー</strong></td>
+<td>数千の同時ユーザー</td>
+<td>数十人のアナリスト</td>
+</tr>
+<tr>
+<td><strong>操作</strong></td>
+<td>INSERT、UPDATE、DELETE、SELECT</td>
+<td>複雑な集約を伴うSELECT</td>
+</tr>
+<tr>
+<td><strong>クエリの複雑さ</strong></td>
+<td>シンプル、事前定義</td>
+<td>複雑、アドホック</td>
+</tr>
+<tr>
+<td><strong>応答時間</strong></td>
+<td>ミリ秒</td>
+<td>秒から分</td>
+</tr>
+<tr>
+<td><strong>クエリあたりのデータ量</strong></td>
+<td>数行</td>
+<td>数百万行</td>
+</tr>
+<tr>
+<td><strong>データベース設計</strong></td>
+<td>正規化（3NF）</td>
+<td>非正規化（スター/スノーフレーク）</td>
+</tr>
+<tr>
+<td><strong>データの鮮度</strong></td>
+<td>リアルタイム</td>
+<td>定期更新</td>
+</tr>
+<tr>
+<td><strong>トランザクションサポート</strong></td>
+<td>ACID必須</td>
+<td>重要ではない</td>
+</tr>
+<tr>
+<td><strong>システム例</strong></td>
+<td>MySQL、PostgreSQL、Oracle</td>
+<td>Redshift、BigQuery、Snowflake</td>
+</tr>
+</tbody>
+</table>
+<h2 id="実世界の例：eコマースプラットフォーム">実世界の例：eコマースプラットフォーム</h2>
+<h3 id="OLTP：注文処理">OLTP：注文処理</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OrderProcessingService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">processCheckout</span><span class="token punctuation">(</span><span class="token parameter">cart<span class="token punctuation">,</span> customerId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// OLTP：高速トランザクション処理</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>db<span class="token punctuation">.</span><span class="token function">getConnection</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">beginTransaction</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 注文を作成（1行に影響）</span>
+      <span class="token keyword">const</span> order <span class="token operator">=</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+        <span class="token string">'INSERT INTO orders (customer_id, total, status) VALUES (?, ?, ?)'</span><span class="token punctuation">,</span>
+        <span class="token punctuation">[</span>customerId<span class="token punctuation">,</span> cart<span class="token punctuation">.</span>total<span class="token punctuation">,</span> <span class="token string">'PROCESSING'</span><span class="token punctuation">]</span>
+      <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 注文アイテムを追加（数行に影響）</span>
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> item <span class="token keyword">of</span> cart<span class="token punctuation">.</span>items<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+          <span class="token string">'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'</span><span class="token punctuation">,</span>
+          <span class="token punctuation">[</span>order<span class="token punctuation">.</span>id<span class="token punctuation">,</span> item<span class="token punctuation">.</span>id<span class="token punctuation">,</span> item<span class="token punctuation">.</span>quantity<span class="token punctuation">,</span> item<span class="token punctuation">.</span>price<span class="token punctuation">]</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">// 在庫を更新（1行に影響）</span>
+        <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+          <span class="token string">'UPDATE products SET stock = stock - ? WHERE id = ?'</span><span class="token punctuation">,</span>
+          <span class="token punctuation">[</span>item<span class="token punctuation">.</span>quantity<span class="token punctuation">,</span> item<span class="token punctuation">.</span>id<span class="token punctuation">]</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">commit</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// ミリ秒で応答</span>
+      <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span> <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'SUCCESS'</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">rollback</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="OLAP：販売パフォーマンスの分析">OLAP：販売パフォーマンスの分析</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">SalesReportingService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">generateQuarterlyReport</span><span class="token punctuation">(</span><span class="token parameter">year<span class="token punctuation">,</span> quarter</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// OLAP：複雑な分析クエリ</span>
+    <span class="token keyword">const</span> query <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">
+      SELECT 
+        d.month_name,
+        p.category,
+        s.region,
+        COUNT(DISTINCT f.sale_id) as transaction_count,
+        SUM(f.quantity) as units_sold,
+        SUM(f.revenue) as total_revenue,
+        SUM(f.profit) as total_profit,
+        AVG(f.revenue) as avg_transaction_value
+      FROM fact_sales f
+      JOIN dim_date d ON f.date_key = d.date_key
+      JOIN dim_product p ON f.product_key = p.product_key
+      JOIN dim_store s ON f.store_key = s.store_key
+      WHERE d.year = ? AND d.quarter = ?
+      GROUP BY d.month_name, p.category, s.region
+      ORDER BY d.month_name, total_revenue DESC
+    </span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// クエリは数百万行をスキャン</span>
+    <span class="token comment">// 秒単位で応答</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>dataWarehouse<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>query<span class="token punctuation">,</span> <span class="token punctuation">[</span>year<span class="token punctuation">,</span> quarter<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">formatReport</span><span class="token punctuation">(</span>results<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="適切なシステムの選択">適切なシステムの選択</h2>
+<h3 id="OLTPを使用する場合：">OLTPを使用する場合：</h3>
+<p>✅ <strong>高トランザクション量</strong>：数千の同時ユーザー</p>
+<p>✅ <strong>データ整合性が重要</strong>：金融トランザクション、在庫管理</p>
+<p>✅ <strong>リアルタイム更新</strong>：現在のデータが即座に利用可能である必要がある</p>
+<p>✅ <strong>シンプルなクエリ</strong>：IDによる検索、挿入、更新、削除</p>
+<p>✅ <strong>ACID準拠が必要</strong>：銀行、eコマース、予約システム</p>
+<h3 id="OLAPを使用する場合：">OLAPを使用する場合：</h3>
+<p>✅ <strong>複雑な分析</strong>：多次元分析、集約</p>
+<p>✅ <strong>履歴分析</strong>：トレンド分析、予測</p>
+<p>✅ <strong>大量のデータボリューム</strong>：数百万または数十億行の分析</p>
+<p>✅ <strong>ビジネスインテリジェンス</strong>：レポート、ダッシュボード、データマイニング</p>
+<p>✅ <strong>読み取り重視のワークロード</strong>：書き込みは少なく、複雑な読み取りが多い</p>
+<h2 id="まとめ">まとめ</h2>
+<p>OLTPとOLAPを理解することは、効果的なデータシステムを設計するための基本です：</p>
+<p><strong>OLTPシステム</strong>：</p>
+<ul>
+<li>高速で信頼性の高いトランザクションで日常業務を支える</li>
+<li>書き込みとシンプルな読み取りに最適化</li>
+<li>正規化スキーマがデータ整合性を保証</li>
+<li>リアルタイムで現在のデータ</li>
+</ul>
+<p><strong>OLAPシステム</strong>：</p>
+<ul>
+<li>ビジネスインテリジェンスと分析を可能にする</li>
+<li>大規模データセットでの複雑なクエリに最適化</li>
+<li>非正規化スキーマがクエリパフォーマンスを向上</li>
+<li>トレンド分析のための履歴データ</li>
+</ul>
+<p><strong>重要なポイント</strong>：ほとんどの組織は両方を必要とします——業務のためのOLTPと分析のためのOLAP。ETLプロセスが2つを橋渡しし、トランザクションシステムから分析ウェアハウスにデータを移動し、運用パフォーマンスに影響を与えることなく分析できるようにします。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 ベストプラクティス</p><div class="admonition-content"><p>OLTPデータベースで直接複雑な分析クエリを実行しないでください。ETLを使用してデータを専用のOLAPシステムに移動し、運用データベースをパフォーマンス低下から保護します。</p>
+</div></div>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://www.kimballgroup.com/">The Data Warehouse Toolkit by Ralph Kimball</a></li>
+<li><a target="_blank" rel="noopener" href="https://aws.amazon.com/compare/the-difference-between-olap-and-oltp/">AWS: OLTP vs OLAP</a></li>
+<li><a target="_blank" rel="noopener" href="https://cloud.google.com/learn/what-is-a-data-warehouse">Google Cloud: Data Warehouse Concepts</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2020/02/OLTP-vs-OLAP/" data-id="6d7ed23c" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "OLTP vs OLAP：トランザクションデータベースと分析データベースの理解",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2020-02-14",
+        "dateCreated": "2020-02-14",
+        "dateModified": "2025-10-22",
+        "url": "https://neo01.com//ja/2020/02/OLTP-vs-OLAP/",
+        "description": "OLTPとOLAPシステムの基本的な違いを発見します。日常業務にトランザクションデータベースを使用し、ビジネスインテリジェンスに分析データベースを使用するタイミングを学びます。",
+        "wordCount": 2746
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#2aa8abc3</div>
+                <img src="/qr/qr-7d8a0c0ac25ddc8c9fb7cbe63a15976b.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#2aa8abc3">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

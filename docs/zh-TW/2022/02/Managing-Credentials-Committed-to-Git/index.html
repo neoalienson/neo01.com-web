@@ -1,0 +1,1226 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>管理提交到 Git 的憑證：復原與預防 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Credentials,Git,Security">
+    
+    
+    <meta name="description" content="不小心將憑證提交到 Git？了解如何正確刪除它們，為什麼重寫 Git 歷史還不夠，以及如何防止未來的洩露。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="管理提交到 Git 的憑證：復原與預防">
+<meta property="og:url" content="https://neo01.com/zh-TW/2022/02/Managing-Credentials-Committed-to-Git/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="不小心將憑證提交到 Git？了解如何正確刪除它們，為什麼重寫 Git 歷史還不夠，以及如何防止未來的洩露。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/git/thumbnail.png">
+<meta property="article:published_time" content="2022-02-12T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-25T14:14:43.578Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Credentials">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/git/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/zh-TW/2022/02/Managing-Credentials-Committed-to-Git">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">简体中文</a>
+<span class="lang-sep">|</span>                                <a href="/ja/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">日本語</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2022/02/Managing-Credentials-Committed-to-Git-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        管理提交到 Git 的憑證：復原與預防
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2022-02-12T16:00:00.000Z" itemprop="datePublished">2022-02-13</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-25T14:14:43.578Z" itemprop="datePublished">2025-10-25</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/Security/">Security</a> <a class="tag-link" href="/zh-TW/tags/Git/">Git</a> <a class="tag-link" href="/zh-TW/tags/Credentials/">Credentials</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#Git-%E6%AD%B7%E5%8F%B2%E5%95%8F%E9%A1%8C"><span class="toc-text">Git 歷史問題</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AB%8B%E5%8D%B3%E5%9B%9E%E6%87%89%EF%BC%9A%E5%85%88%E8%BC%AA%E6%8F%9B%EF%BC%8C%E5%BE%8C%E6%B8%85%E7%90%86"><span class="toc-text">立即回應：先輪換，後清理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BE%9E-Git-%E6%AD%B7%E5%8F%B2%E4%B8%AD%E5%88%AA%E9%99%A4%E6%86%91%E8%AD%89"><span class="toc-text">從 Git 歷史中刪除憑證</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%B7%E5%88%B6%E6%8E%A8%E9%80%81%E5%92%8C%E5%8D%94%E8%AA%BF"><span class="toc-text">強制推送和協調</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%99%95%E7%90%86%E5%88%86%E6%94%AF%E5%92%8C%E9%8F%A1%E5%83%8F"><span class="toc-text">處理分支和鏡像</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%A0%90%E9%98%B2%EF%BC%9A%E6%9B%B4%E5%A5%BD%E7%9A%84%E6%96%B9%E6%B3%95"><span class="toc-text">預防：更好的方法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9C%9F%E5%AF%A6%E4%B8%96%E7%95%8C%E4%BA%8B%E4%BB%B6%EF%BC%9AAWS-%E9%87%91%E9%91%B0%E6%B4%A9%E9%9C%B2"><span class="toc-text">真實世界事件：AWS 金鑰洩露</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <p>每個開發者的噩夢：你提交程式碼，推送到儲存庫，突然意識到你的 AWS 存取金鑰、資料庫密碼或 API 權杖現在已經在 Git 歷史中了。恐慌隨之而來。你快速刪除憑證並再次提交，但損害已經造成——這些秘密仍然保留在 Git 歷史中，任何複製儲存庫的人都可以存取。</p>
+<p>這種情況每天在各個組織中上演數千次。回應通常涉及瘋狂地搜尋 Google、嘗試重寫 Git 歷史，並希望憑證尚未被洩露。然而，正確的憑證洩露回應不僅僅是刪除檔案——它需要理解 Git 的內部機制、立即輪換憑證以及實施預防機制。</p>
+<h2 id="Git-歷史問題">Git 歷史問題</h2>
+<p>Git 的設計使憑證洩露特別危險。理解原因需要檢查 Git 如何儲存資料。</p>
+<h3 id="為什麼刪除還不夠">為什麼刪除還不夠</h3>
+<p>當你提交包含憑證的檔案並稍後刪除它時，憑證仍然保留在 Git 歷史中：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 刪除的假象</p><div class="admonition-content"><p><strong>開發者通常做什麼</strong></p>
+<ul>
+<li>意外提交包含憑證的程式碼</li>
+<li>意識到錯誤</li>
+<li>刪除檔案或移除憑證</li>
+<li>提交刪除操作</li>
+<li>認為問題已解決</li>
+</ul>
+<p><strong>為什麼這會失敗</strong></p>
+<ul>
+<li>Git 保留所有提交的完整歷史</li>
+<li>之前的提交仍然包含憑證</li>
+<li>任何人都可以檢出舊提交</li>
+<li><code>git log -p</code> 會顯示憑證</li>
+<li>複製儲存庫包含完整歷史</li>
+</ul>
+<p><strong>現實情況</strong></p>
+<ul>
+<li>憑證無限期地保持可存取</li>
+<li>所有儲存庫複製都包含洩露</li>
+<li>分支和鏡像保留憑證</li>
+<li>搜尋引擎可能已索引洩露</li>
+<li>自動掃描器持續監控公共儲存庫</li>
+</ul>
+</div></div>
+<p>簡單地在新提交中刪除憑證就像在網上發布鑰匙後鎖門——損害已經造成。</p>
+<h3 id="Git-的不可變歷史">Git 的不可變歷史</h3>
+<p>Git 的內容可定址儲存使歷史修改變得複雜：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔗 Git 儲存模型</p><div class="admonition-content"><p><strong>Git 如何儲存資料</strong></p>
+<ul>
+<li>每個提交都有唯一的 SHA-1 雜湊</li>
+<li>雜湊從提交內容、父雜湊和中繼資料計算</li>
+<li>更改任何提交都會更改其雜湊</li>
+<li>所有後代提交也會更改雜湊</li>
+<li>建立歷史的加密鏈</li>
+</ul>
+<p><strong>對憑證刪除的影響</strong></p>
+<ul>
+<li>刪除憑證需要重寫歷史</li>
+<li>洩露後的所有提交都必須重新建立</li>
+<li>新雜湊會破壞現有參照</li>
+<li>協作者必須丟棄他們的本機副本</li>
+<li>分支和鏡像不受影響</li>
+</ul>
+<p><strong>協調挑戰</strong></p>
+<ul>
+<li>每個開發者必須取得重寫的歷史</li>
+<li>舊提交必須被垃圾回收</li>
+<li>遠端儲存庫必須強制推送新歷史</li>
+<li>CI/CD 系統必須更新參照</li>
+<li>備份系統可能保留舊歷史</li>
+</ul>
+</div></div>
+<p>這種架構意味著憑證洩露無法真正「撤銷」——只能透過輪換和歷史重寫來緩解。</p>
+<h2 id="立即回應：先輪換，後清理">立即回應：先輪換，後清理</h2>
+<p>當憑證洩露到 Git 時，優先順序至關重要。</p>
+<h3 id="步驟-1：立即輪換憑證">步驟 1：立即輪換憑證</h3>
+<p>在嘗試任何 Git 歷史操作之前，輪換被洩露的憑證：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>⚠️ 清理前先輪換</p><div class="admonition-content"><p><strong>為什麼輪換優先</strong></p>
+<ul>
+<li>Git 歷史重寫需要時間</li>
+<li>憑證可能已經被洩露</li>
+<li>自動掃描器在幾分鐘內偵測到洩露</li>
+<li>清理 Git 不會撤銷存取權限</li>
+<li>攻擊者可能已經複製了儲存庫</li>
+</ul>
+<p><strong>需要輪換什麼</strong></p>
+<ul>
+<li>API 金鑰和權杖</li>
+<li>資料庫密碼</li>
+<li>SSH 私鑰</li>
+<li>OAuth 用戶端密鑰</li>
+<li>加密金鑰</li>
+<li>服務帳戶憑證</li>
+</ul>
+<p><strong>輪換清單</strong></p>
+<ul>
+<li>立即產生新憑證</li>
+<li>更新所有使用憑證的服務</li>
+<li>完全撤銷舊憑證</li>
+<li>監控未經授權的存取嘗試</li>
+<li>記錄事件以供安全審查</li>
+<li>考慮未來使用短期憑證</li>
+</ul>
+</div></div>
+<p>立即輪換憑證限制了漏洞視窗。清理 Git 歷史很重要但次要。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>⏱️ 短期憑證建議</p><div class="admonition-content"><p><strong>為什麼短期憑證很重要</strong></p>
+<ul>
+<li>在定義的期限後自動過期</li>
+<li>如果洩露，減少暴露視窗</li>
+<li>無需手動輪換</li>
+<li>限制洩露的影響範圍</li>
+</ul>
+<p><strong>實施選項</strong></p>
+<ul>
+<li>AWS STS 臨時憑證（15 分鐘 - 12 小時）</li>
+<li>Vault 動態密鑰（幾分鐘到幾小時）</li>
+<li>具有短過期時間的 OAuth 權杖</li>
+<li>具有 TTL 的服務帳戶權杖</li>
+</ul>
+<p><strong>事後行動</strong></p>
+<ul>
+<li>儘可能遷移到短期憑證</li>
+<li>減少未來洩露的影響</li>
+<li>查看<a href="/zh-TW/2022/03/Preventing-Credentials-in-Git/">預防策略</a>了解實施細節</li>
+</ul>
+</div></div>
+<h3 id="步驟-2：評估暴露範圍">步驟 2：評估暴露範圍</h3>
+<p>確定憑證傳播的範圍：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 暴露評估</p><div class="admonition-content"><p><strong>需要回答的問題</strong></p>
+<ul>
+<li>儲存庫是公開的還是私有的？</li>
+<li>憑證暴露了多長時間？</li>
+<li>有多少人有儲存庫存取權限？</li>
+<li>是否有分支或鏡像？</li>
+<li>CI/CD 系統是否存取了憑證？</li>
+<li>提交是否推送到多個遠端？</li>
+</ul>
+<p><strong>公開儲存庫暴露</strong></p>
+<ul>
+<li>假設憑證已完全洩露</li>
+<li>GitHub、GitLab、Bitbucket 通知安全研究人員</li>
+<li>自動掃描器在幾分鐘內偵測到密鑰</li>
+<li>搜尋引擎可能已索引內容</li>
+<li>憑證輪換是強制性的，而非可選</li>
+</ul>
+<p><strong>私有儲存庫暴露</strong></p>
+<ul>
+<li>評估誰有儲存庫存取權限</li>
+<li>檢查存取日誌是否有異常活動</li>
+<li>審查憑證使用的稽核日誌</li>
+<li>考慮內部威脅情境</li>
+<li>作為預防措施輪換憑證</li>
+</ul>
+</div></div>
+<p>暴露評估決定了回應行動的緊迫性和範圍。</p>
+<h2 id="從-Git-歷史中刪除憑證">從 Git 歷史中刪除憑證</h2>
+<p>輪換憑證後，清理 Git 歷史以防止未來暴露。</p>
+<h3 id="使用-git-filter-branch（傳統方法）">使用 git filter-branch（傳統方法）</h3>
+<p>傳統方法使用 <code>git filter-branch</code> 重寫歷史：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 從所有提交中刪除特定檔案</span>
+<span class="token function">git</span> filter-branch <span class="token parameter variable">--force</span> --index-filter <span class="token punctuation">\</span>
+  <span class="token string">"git rm --cached --ignore-unmatch path/to/credentials.txt"</span> <span class="token punctuation">\</span>
+  --prune-empty --tag-name-filter <span class="token function">cat</span> -- <span class="token parameter variable">--all</span>
+
+<span class="token comment"># 強制垃圾回收</span>
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ filter-branch 的局限性</p><div class="admonition-content"><p><strong>為什麼 filter-branch 有問題</strong></p>
+<ul>
+<li>在大型儲存庫上極其緩慢</li>
+<li>複雜的語法容易出錯</li>
+<li>不處理所有邊緣情況</li>
+<li>如果中斷可能損壞儲存庫</li>
+<li>Git 文件推薦替代方案</li>
+</ul>
+<p><strong>何時仍可能使用</strong></p>
+<ul>
+<li>沒有 BFG 或 filter-repo 的傳統系統</li>
+<li>簡單的單檔案刪除情境</li>
+<li>歷史有限的小型儲存庫</li>
+<li>當其他工具不可用時</li>
+</ul>
+</div></div>
+<p>現代工具為大多數情境提供了更好的替代方案。</p>
+<h3 id="使用-BFG-Repo-Cleaner（推薦）">使用 BFG Repo-Cleaner（推薦）</h3>
+<p>BFG Repo-Cleaner 提供更快、更簡單的方法：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 下載 BFG（需要 Java）</span>
+<span class="token comment"># https://rtyley.github.io/bfg-repo-cleaner/</span>
+
+<span class="token comment"># 刪除特定檔案</span>
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --delete-files credentials.txt repo.git
+
+<span class="token comment"># 刪除符合模式的檔案</span>
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --delete-files <span class="token string">"*.key"</span> repo.git
+
+<span class="token comment"># 替換所有檔案中的憑證</span>
+<span class="token builtin class-name">echo</span> <span class="token string">"password123"</span> <span class="token operator">&gt;</span> passwords.txt
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --replace-text passwords.txt repo.git
+
+<span class="token comment"># 清理</span>
+<span class="token builtin class-name">cd</span> repo.git
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ BFG 的優勢</p><div class="admonition-content"><p><strong>為什麼 BFG 更好</strong></p>
+<ul>
+<li>比 filter-branch 快 10-720 倍</li>
+<li>簡單、直觀的語法</li>
+<li>預設保護 HEAD 提交</li>
+<li>高效處理大型儲存庫</li>
+<li>經過充分測試和廣泛使用</li>
+</ul>
+<p><strong>BFG 功能</strong></p>
+<ul>
+<li>按名稱或模式刪除檔案</li>
+<li>跨所有檔案替換文字</li>
+<li>刪除大檔案</li>
+<li>按大小剝離 blob</li>
+<li>保留最近的提交</li>
+</ul>
+</div></div>
+<p>BFG 是大多數憑證刪除情境的推薦工具。</p>
+<h3 id="使用-git-filter-repo（現代替代方案）">使用 git filter-repo（現代替代方案）</h3>
+<p><code>git filter-repo</code> 提供最強大和靈活的方法：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 安裝 filter-repo</span>
+pip <span class="token function">install</span> git-filter-repo
+
+<span class="token comment"># 刪除特定檔案</span>
+<span class="token function">git</span> filter-repo <span class="token parameter variable">--path</span> path/to/credentials.txt --invert-paths
+
+<span class="token comment"># 刪除符合模式的檔案</span>
+<span class="token function">git</span> filter-repo --path-glob <span class="token string">'*.key'</span> --invert-paths
+
+<span class="token comment"># 使用回呼替換憑證</span>
+<span class="token function">git</span> filter-repo --replace-text <span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token builtin class-name">echo</span> <span class="token string">"password123==&gt;REDACTED"</span><span class="token punctuation">)</span>
+
+<span class="token comment"># 從特定目錄刪除憑證</span>
+<span class="token function">git</span> filter-repo <span class="token parameter variable">--path</span> secrets/ --invert-paths</code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔧 filter-repo 功能</p><div class="admonition-content"><p><strong>進階功能</strong></p>
+<ul>
+<li>在大型儲存庫上效能快</li>
+<li>強大的過濾選項</li>
+<li>基於 Python 的可擴充性</li>
+<li>全面的安全檢查</li>
+<li>詳細的操作日誌</li>
+</ul>
+<p><strong>複雜情境</strong></p>
+<ul>
+<li>條件檔案刪除</li>
+<li>內容轉換</li>
+<li>路徑重寫</li>
+<li>提交訊息修改</li>
+<li>作者資訊更新</li>
+</ul>
+</div></div>
+<p>對於複雜情境或大型儲存庫，<code>git filter-repo</code> 提供了最佳的功能和安全性平衡。</p>
+<h2 id="強制推送和協調">強制推送和協調</h2>
+<p>重寫歷史後，將變更傳播到所有儲存庫副本。</p>
+<h3 id="強制推送到遠端">強制推送到遠端</h3>
+<p>重寫的歷史需要強制推送：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 強制推送到 origin</span>
+<span class="token function">git</span> push origin <span class="token parameter variable">--force</span> <span class="token parameter variable">--all</span>
+
+<span class="token comment"># 強制推送標籤</span>
+<span class="token function">git</span> push origin <span class="token parameter variable">--force</span> <span class="token parameter variable">--tags</span>
+
+<span class="token comment"># 替代方案：force-with-lease（更安全）</span>
+<span class="token function">git</span> push origin --force-with-lease <span class="token parameter variable">--all</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 強制推送風險</p><div class="admonition-content"><p><strong>強制推送的危險</strong></p>
+<ul>
+<li>覆寫遠端歷史</li>
+<li>破壞其他開發者的本機副本</li>
+<li>如果不協調可能遺失提交</li>
+<li>可能被儲存庫設定阻止</li>
+<li>需要特殊權限</li>
+</ul>
+<p><strong>使用 --force-with-lease</strong></p>
+<ul>
+<li>比普通 --force 更安全</li>
+<li>檢查遠端是否有意外變更</li>
+<li>防止意外覆寫</li>
+<li>仍需要協調</li>
+<li>推薦使用而非 --force</li>
+</ul>
+</div></div>
+<p>強制推送應與所有儲存庫使用者協調。</p>
+<h3 id="與團隊成員協調">與團隊成員協調</h3>
+<p>所有協作者必須更新他們的本機副本：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>👥 團隊協調步驟</p><div class="admonition-content"><p><strong>需要的溝通</strong></p>
+<ul>
+<li>在重寫前通知所有團隊成員</li>
+<li>解釋為什麼要重寫歷史</li>
+<li>提供清晰的更新說明</li>
+<li>設定本機更新的截止日期</li>
+<li>驗證每個人都已成功更新</li>
+</ul>
+<p><strong>團隊成員的說明</strong>
+</p><pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 儲存任何本機工作</span><p></p>
+</code></pre></div></div><code class="language-bash">
+
+<span class="token function">git</span> stash
+
+<span class="token comment"># 取得重寫的歷史</span>
+<span class="token function">git</span> fetch origin
+
+<span class="token comment"># 重設以符合遠端</span>
+<span class="token function">git</span> reset <span class="token parameter variable">--hard</span> origin/main
+
+<span class="token comment"># 清理舊參照</span>
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span>
+
+<span class="token comment"># 恢復本機工作</span>
+<span class="token function">git</span> stash pop</code>
+<pre><code>**處理衝突**
+- 本機提交必須變基到新歷史
+- 可能需要手動解決衝突
+- 考慮在更新前建立修補檔
+- 更新後徹底測試
+</code></pre>
+<p>協調不當可能導致舊歷史被重新引入。</p>
+<h2 id="處理分支和鏡像">處理分支和鏡像</h2>
+<p>儲存庫分支和鏡像保留原始歷史。</p>
+<h3 id="分支問題">分支問題</h3>
+<p>分支是保留洩露憑證的獨立副本：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 分支保留洩露</p><div class="admonition-content"><p><strong>為什麼分支有問題</strong></p>
+<ul>
+<li>分支是獨立的儲存庫</li>
+<li>重寫父歷史不影響分支</li>
+<li>分支擁有者可能不知道洩露</li>
+<li>公開分支是可發現的</li>
+<li>沒有機制強制分支更新</li>
+</ul>
+<p><strong>緩解策略</strong></p>
+<ul>
+<li>直接聯絡分支擁有者</li>
+<li>請求他們刪除或更新分支</li>
+<li>為公開分支提交 DMCA 刪除請求（極端情況）</li>
+<li>監控分支的憑證使用</li>
+<li>接受某些分支可能保留</li>
+</ul>
+</div></div>
+<p>對於公開儲存庫，假設分支憑證已永久暴露。</p>
+<h3 id="處理鏡像和備份">處理鏡像和備份</h3>
+<p>鏡像和備份系統可能保留舊歷史：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 鏡像注意事項</p><div class="admonition-content"><p><strong>常見鏡像位置</strong></p>
+<ul>
+<li>CI/CD 系統快取</li>
+<li>備份系統</li>
+<li>程式碼審查工具</li>
+<li>IDE 儲存庫快取</li>
+<li>容器映像層</li>
+<li>部署成品</li>
+</ul>
+<p><strong>清理操作</strong></p>
+<ul>
+<li>清除 CI/CD 快取</li>
+<li>更新備份系統</li>
+<li>重建容器映像</li>
+<li>重新部署應用程式</li>
+<li>清除 IDE 快取</li>
+<li>更新文件儲存庫</li>
+</ul>
+</div></div>
+<p>全面清理需要識別所有儲存庫副本。</p>
+<h2 id="預防：更好的方法">預防：更好的方法</h2>
+<p>雖然本文重點關注復原，但預防比修復更有效。全面的預防策略涉及多個層次：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>🛡️ 預防層次</p><div class="admonition-content"><p><strong>設定</strong></p>
+<ul>
+<li>憑證檔案的 <code>.gitignore</code> 模式</li>
+<li>個人模式的全域 gitignore</li>
+<li>指導的範本檔案（<code>.env.example</code>）</li>
+</ul>
+<p><strong>程式碼實踐</strong></p>
+<ul>
+<li>環境變數而非硬編碼憑證</li>
+<li>啟動時的設定驗證</li>
+<li>憑證偵測的程式碼審查</li>
+</ul>
+<p><strong>自動掃描</strong></p>
+<ul>
+<li>預提交鉤子（git-secrets、detect-secrets）</li>
+<li>CI/CD 管線掃描</li>
+<li>平台提供的掃描（GitHub、GitLab）</li>
+</ul>
+<p><strong>密鑰管理</strong></p>
+<ul>
+<li>AWS Secrets Manager、HashiCorp Vault</li>
+<li>執行時密鑰注入</li>
+<li>自動憑證輪換</li>
+</ul>
+</div></div>
+<p>有關防止憑證洩露的全面指南，包括詳細的程式碼範例和實施策略，請參閱<a href="/zh-TW/2022/03/Preventing-Credentials-in-Git/">在 Git 中防止憑證：分層防禦策略</a>。</p>
+<p>在預防上的投資消除了複雜復原程序、Git 歷史重寫和緊急憑證輪換的需要。在建構預防系統上花費的每一小時都能節省數天的事件回應時間。</p>
+<h2 id="真實世界事件：AWS-金鑰洩露">真實世界事件：AWS 金鑰洩露</h2>
+<p>一個常見情境說明了完整的回應過程：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 事件時間軸</p><div class="admonition-content"><p><strong>第 1 天：洩露</strong></p>
+<ul>
+<li>開發者在設定檔中提交 AWS 存取金鑰</li>
+<li>推送到公開 GitHub 儲存庫</li>
+<li>GitHub 密鑰掃描在 5 分鐘內偵測到金鑰</li>
+<li>AWS 收到通知並警告帳戶擁有者</li>
+<li>自動掃描器開始嘗試使用金鑰</li>
+</ul>
+<p><strong>第 1 小時：發現和回應</strong></p>
+<ul>
+<li>安全團隊收到 GitHub 警報</li>
+<li>立即輪換 AWS 存取金鑰</li>
+<li>審查 CloudTrail 日誌是否有未經授權的存取</li>
+<li>發現啟動了加密貨幣挖礦執行個體</li>
+<li>終止未經授權的資源</li>
+</ul>
+<p><strong>第 2-4 小時：清理</strong></p>
+<ul>
+<li>使用 BFG 從 Git 歷史中刪除金鑰</li>
+<li>強制推送清理後的歷史</li>
+<li>聯絡分支擁有者更新</li>
+<li>更新 CI/CD 系統</li>
+<li>清除備份系統</li>
+</ul>
+<p><strong>第 2-7 天：事後</strong></p>
+<ul>
+<li>實施預提交鉤子</li>
+<li>將 AWS 模式新增到 git-secrets</li>
+<li>進行安全訓練</li>
+<li>審查其他儲存庫是否有洩露</li>
+<li>記錄事件和回應</li>
+</ul>
+</div></div>
+<p>這個事件表明為什麼立即輪換至關重要——攻擊者在幾分鐘內利用洩露的憑證。</p>
+<h2 id="結論">結論</h2>
+<p>管理提交到 Git 的憑證需要理解僅刪除是不夠的。Git 的不可變歷史無限期地保留洩露的憑證，任何有儲存庫存取權限的人都可以存取。正確的回應優先考慮立即憑證輪換而非 Git 歷史清理——攻擊者在幾分鐘內利用洩露的憑證，而歷史重寫需要數小時或數天。</p>
+<p>從 Git 歷史中刪除憑證涉及使用 BFG Repo-Cleaner 或 git filter-repo 等工具重寫提交，然後強制推送並與所有協作者協調。然而，分支、鏡像和備份系統可能保留原始歷史，使公開儲存庫的完全刪除變得不可能。這一現實強化了憑證輪換是強制性的，而非可選的。</p>
+<p>關鍵見解：將任何提交到 Git 的憑證視為完全洩露，無論儲存庫可見性如何。立即輪換，徹底清理歷史，並實施<a href="/zh-TW/2022/03/Preventing-Credentials-in-Git/">全面的預防機制</a>以避免未來的事件。考慮遷移到自動過期的短期憑證——它們透過限制暴露視窗大幅減少了未來洩露的影響。正確的密鑰管理的營運負擔遠小於憑證洩露的成本和事後回應的複雜性。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2022/02/Managing-Credentials-Committed-to-Git/" data-id="30015f26" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "管理提交到 Git 的憑證：復原與預防",
+        "image": "https://neo01.com/assets/git/thumbnail.png",
+        "keywords": "Credentials Git Security",
+        "genre": "Development",
+        "datePublished": "2022-02-13",
+        "dateCreated": "2022-02-13",
+        "dateModified": "2025-10-25",
+        "url": "https://neo01.com//zh-TW/2022/02/Managing-Credentials-Committed-to-Git/",
+        "description": "不小心將憑證提交到 Git？了解如何正確刪除它們，為什麼重寫 Git 歷史還不夠，以及如何防止未來的洩露。",
+        "wordCount": 678
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="我如何使用 AI 學習：透過迭代知識建構的個人旅程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/How-I-Use-AI-to-Learn/" class="title">我如何使用 AI 學習：透過迭代知識建構的個人旅程</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="工具、遊戲與瀏覽器內建 AI 遊樂場" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">工具、遊戲與瀏覽器內建 AI 遊樂場</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="代理式編碼的崛起：AI 驅動的軟體工程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/AI/">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">代理式編碼的崛起：AI 驅動的軟體工程</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="理解臨時埠 Part 2：為什麼伺服器應用程式應避免使用動態埠" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Development/">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">理解臨時埠 Part 2：為什麼伺服器應用程式應避免使用動態埠</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="理解臨時埠：網路通訊的隱形工作者" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-TW/categories/Development/">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">理解臨時埠：網路通訊的隱形工作者</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#65d705e8</div>
+                <img src="/qr/qr-2b31cd964e54fc267b59b31c60bc3f86.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#65d705e8">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
