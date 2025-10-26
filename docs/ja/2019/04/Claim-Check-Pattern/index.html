@@ -1,0 +1,1021 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>クレームチェックパターン：分散システムでの大きなメッセージの処理 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Architecture,Design Patterns,Messaging">
+    
+    
+    <meta name="description" content="クレームチェックパターンを使用して、データを外部に保存し、軽量なトークンを渡すことで、メッセージングシステムで大きなペイロードを転送する課題を解決する方法を学びます。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="クレームチェックパターン：分散システムでの大きなメッセージの処理">
+<meta property="og:url" content="https://neo01.com/ja/2019/04/Claim-Check-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="クレームチェックパターンを使用して、データを外部に保存し、軽量なトークンを渡すことで、メッセージングシステムで大きなペイロードを転送する課題を解決する方法を学びます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-04-09T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-23T14:56:55.268Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="Design Patterns">
+<meta property="article:tag" content="Messaging">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/ja/2019/04/Claim-Check-Pattern">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2019/04/Claim-Check-Pattern/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2019/04/Claim-Check-Pattern/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2019/04/Claim-Check-Pattern/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/04/Claim-Check-Pattern-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        クレームチェックパターン：分散システムでの大きなメッセージの処理
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-04-09T16:00:00.000Z" itemprop="datePublished">2019-04-10</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-23T14:56:55.268Z" itemprop="datePublished">2025-10-23</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Architecture/">Architecture</a> <a class="tag-link" href="/ja/tags/Design-Patterns/">Design Patterns</a> <a class="tag-link" href="/ja/tags/Messaging/">Messaging</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%95%8F%E9%A1%8C%EF%BC%9A%E3%83%A1%E3%83%83%E3%82%BB%E3%83%BC%E3%82%B8%E3%81%8C%E9%87%8D%E3%81%99%E3%81%8E%E3%82%8B%E5%A0%B4%E5%90%88"><span class="toc-text">問題：メッセージが重すぎる場合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%BD%E3%83%AA%E3%83%A5%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%EF%BC%9A%E3%82%B9%E3%83%88%E3%83%AC%E3%83%BC%E3%82%B8%E3%81%A8%E3%83%A1%E3%83%83%E3%82%BB%E3%83%BC%E3%82%B8%E3%83%B3%E3%82%B0%E3%81%AE%E5%88%86%E9%9B%A2"><span class="toc-text">ソリューション：ストレージとメッセージングの分離</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%95%E7%B5%84%E3%81%BF%EF%BC%9A%E5%AE%9F%E9%9A%9B%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">仕組み：実際のパターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E8%A3%85%E3%81%AE%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">実装の考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%AF%E3%83%AC%E3%83%BC%E3%83%A0%E3%83%81%E3%82%A7%E3%83%83%E3%82%AF%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%99%E3%82%8B%E5%A0%B4%E5%90%88"><span class="toc-text">クレームチェックパターンを使用する場合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E5%93%81%E8%B3%AA%E5%B1%9E%E6%80%A7"><span class="toc-text">アーキテクチャ品質属性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%88%E3%83%AC%E3%83%BC%E3%83%89%E3%82%AA%E3%83%95%E3%81%A8%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">トレードオフと考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E4%B8%96%E7%95%8C%E3%81%AE%E5%AE%9F%E8%A3%85%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">実世界の実装パターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%96%A2%E9%80%A3%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">関連パターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"><span class="toc-text">参考文献</span></a></li></ol>
+            <p>空港で荷物を預けることを想像してください。重い荷物をセキュリティチェックや飛行機に持ち込む代わりに、チェックインで荷物を預け、小さなクレームチケットを受け取ります。目的地では、そのチケットを提示して荷物を受け取ります。この現実世界のプロセスは、分散システムの一般的な問題に対する最もエレガントなソリューションの1つであるクレームチェックパターンにインスピレーションを与えました。</p>
+<h2 id="問題：メッセージが重すぎる場合">問題：メッセージが重すぎる場合</h2>
+<p>従来のメッセージングシステムは、大量の小さなメッセージの処理に優れています。軽量データを扱う際の速度、スループット、信頼性のために最適化されています。しかし、いくつかの理由で大きなペイロードに苦労することがよくあります：</p>
+<ul>
+<li><strong>サイズ制限</strong>：ほとんどのメッセージングシステムは、メッセージサイズに厳しい制限を課しています（多くの場合256KBから1MB）</li>
+<li><strong>パフォーマンスの低下</strong>：大きなメッセージはより多くのメモリと帯域幅を消費し、システム全体を遅くします</li>
+<li><strong>タイムアウトの問題</strong>：大きなメッセージの処理がタイムアウトしきい値を超える可能性があります</li>
+<li><strong>リソースの枯渇</strong>：複数の大きなメッセージがメッセージングインフラストラクチャを圧倒する可能性があります</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 実世界への影響</p><div class="admonition-content"><p>64KBメッセージ用に設計されたキューの単一の10MBメッセージは、カスケード障害を引き起こし、すべてのコンシューマーに影響を与え、メッセージングシステム全体をダウンさせる可能性があります。</p>
+</div></div>
+<h2 id="ソリューション：ストレージとメッセージングの分離">ソリューション：ストレージとメッセージングの分離</h2>
+<p>クレームチェックパターンは、データストレージとメッセージ配信の関心事を分離することで、この問題をエレガントに解決します：</p>
+<ol>
+<li><strong>ペイロードを保存</strong>：大きなオブジェクト用に最適化された外部データストアに</li>
+<li><strong>クレームチェックトークンを生成</strong>：一意の識別子またはキー</li>
+<li><strong>トークンのみを送信</strong>：メッセージングシステムを通じて</li>
+<li><strong>ペイロードを取得</strong>：必要に応じてトークンを使用して</li>
+</ol>
+<div class="mermaid">sequenceDiagram
+    participant Sender
+    participant DataStore as 外部データストア
+    participant MsgSystem as メッセージングシステム
+    participant Receiver
+    
+    Sender-&gt;&gt;DataStore: 1. 大きなペイロードを保存
+    DataStore--&gt;&gt;Sender: 2. クレームチェックトークンを返す
+    Sender-&gt;&gt;MsgSystem: 3. トークン付きメッセージを送信
+    MsgSystem-&gt;&gt;Receiver: 4. トークン付きメッセージを配信
+    Receiver-&gt;&gt;DataStore: 5. トークンを使用してペイロードを取得
+    DataStore--&gt;&gt;Receiver: 6. ペイロードを返す
+    Receiver-&gt;&gt;Receiver: 7. ペイロードを処理</div>
+<h2 id="仕組み：実際のパターン">仕組み：実際のパターン</h2>
+<p>大きな添付ファイルを含む顧客注文を処理する具体的な例を見てみましょう：</p>
+<h3 id="ステップ1：ペイロードを保存">ステップ1：ペイロードを保存</h3>
+<p>送信者が大きなペイロード（高解像度画像、ビデオファイル、大きなドキュメントなど）を送信する必要がある場合：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 送信者アプリケーション</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">sendLargeMessage</span><span class="token punctuation">(</span><span class="token parameter">payload</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token comment">// 外部データストアにペイロードを保存</span>
+  <span class="token keyword">const</span> claimCheckToken <span class="token operator">=</span> <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">data</span><span class="token operator">:</span> payload<span class="token punctuation">,</span>
+    <span class="token literal-property property">expiresAt</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span><span class="token number">24</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">)</span> <span class="token comment">// 24時間</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token keyword">return</span> claimCheckToken<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="ステップ2：トークンを送信">ステップ2：トークンを送信</h3>
+<p>メッセージングシステムは軽量なトークンのみを処理します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// クレームチェックトークン付きメッセージを送信</span>
+<span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+  <span class="token literal-property property">orderId</span><span class="token operator">:</span> <span class="token string">"ORD-12345"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> claimCheckToken<span class="token punctuation">,</span>
+  <span class="token literal-property property">metadata</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">size</span><span class="token operator">:</span> payload<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">contentType</span><span class="token operator">:</span> <span class="token string">"application/pdf"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="ステップ3：取得して処理">ステップ3：取得して処理</h3>
+<p>受信者はトークンを使用して実際のペイロードを取得します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 受信者アプリケーション</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">processMessage</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token comment">// クレームチェックトークンを使用してペイロードを取得</span>
+  <span class="token keyword">const</span> payload <span class="token operator">=</span> <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">retrieve</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>claimCheck<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// ペイロードを処理</span>
+  <span class="token keyword">await</span> <span class="token function">processOrder</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>orderId<span class="token punctuation">,</span> payload<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// クリーンアップ</span>
+  <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>claimCheck<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="実装の考慮事項">実装の考慮事項</h2>
+<p>クレームチェックパターンを実装する際は、これらの重要な側面を考慮してください：</p>
+<h3 id="1-ペイロードライフサイクル管理">1. ペイロードライフサイクル管理</h3>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🗑️ クリーンアップ戦略</p><div class="admonition-content"><p><strong>同期削除</strong>：消費アプリケーションが処理後すぐにペイロードを削除します。これにより、削除がメッセージワークフローに結び付けられ、タイムリーなクリーンアップが保証されます。</p>
+<p><strong>非同期削除</strong>：別のバックグラウンドプロセスが、有効期限（TTL）または他の基準に基づいてクリーンアップを処理します。これにより、削除がメッセージ処理から切り離されますが、追加のインフラストラクチャが必要になります。</p>
+</div></div>
+<h3 id="2-条件付き適用">2. 条件付き適用</h3>
+<p>すべてのメッセージがクレームチェックパターンを必要とするわけではありません。選択的に適用するロジックを実装します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">sendMessage</span><span class="token punctuation">(</span><span class="token parameter">payload</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> <span class="token constant">MESSAGE_SIZE_THRESHOLD</span> <span class="token operator">=</span> <span class="token number">256</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">;</span> <span class="token comment">// 256KB</span>
+  
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>payload<span class="token punctuation">.</span>length <span class="token operator">&gt;</span> <span class="token constant">MESSAGE_SIZE_THRESHOLD</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// クレームチェックパターンを使用</span>
+    <span class="token keyword">const</span> token <span class="token operator">=</span> <span class="token keyword">await</span> dataStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span>payload<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> token <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 直接送信</span>
+    <span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">data</span><span class="token operator">:</span> payload <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>この条件付きアプローチ：</p>
+<ul>
+<li>小さなメッセージのレイテンシを削減</li>
+<li>リソース使用率を最適化</li>
+<li>全体的なスループットを向上</li>
+</ul>
+<h3 id="3-セキュリティの考慮事項">3. セキュリティの考慮事項</h3>
+<p>クレームチェックトークンは次のようにする必要があります：</p>
+<ul>
+<li><strong>一意</strong>：衝突と不正アクセスを防ぐ</li>
+<li><strong>不明瞭</strong>：連続IDではなく、UUIDまたは暗号化ハッシュを使用</li>
+<li><strong>時間制限</strong>：無期限のストレージを防ぐために有効期限を実装</li>
+<li><strong>アクセス制御</strong>：承認されたアプリケーションのみがペイロードを取得できることを確認</li>
+</ul>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 安全なクレームチェックトークンを生成</span>
+<span class="token keyword">function</span> <span class="token function">generateClaimCheck</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">id</span><span class="token operator">:</span> crypto<span class="token punctuation">.</span><span class="token function">randomUUID</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">signature</span><span class="token operator">:</span> crypto<span class="token punctuation">.</span><span class="token function">createHmac</span><span class="token punctuation">(</span><span class="token string">'sha256'</span><span class="token punctuation">,</span> secretKey<span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>id<span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">digest</span><span class="token punctuation">(</span><span class="token string">'hex'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">expiresAt</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token constant">TTL</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="クレームチェックパターンを使用する場合">クレームチェックパターンを使用する場合</h2>
+<h3 id="主な使用例">主な使用例</h3>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 理想的なシナリオ</p><div class="admonition-content"><p><strong>メッセージングシステムの制限</strong>：メッセージサイズがシステム制限を超える場合、ペイロードを外部ストレージにオフロードします。</p>
+<p><strong>パフォーマンスの最適化</strong>：大きなメッセージがメッセージングシステムのパフォーマンスを低下させる場合、ストレージと配信を分離します。</p>
+</div></div>
+<h3 id="二次的な使用例">二次的な使用例</h3>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📋 追加のメリット</p><div class="admonition-content"><p><strong>機密データの保護</strong>：より厳格なアクセス制御を持つ安全なデータストアに機密情報を保存し、メッセージングシステムから除外します。</p>
+<p><strong>複雑なルーティング</strong>：メッセージが複数のコンポーネントを通過する場合、中間者を通じてトークンのみを渡すことで、繰り返しのシリアル化/デシリアル化のオーバーヘッドを回避します。</p>
+</div></div>
+<div class="mermaid">graph TD
+    A[メッセージサイズ分析] --&gt; B{サイズ &gt; しきい値？}
+    B --&gt;|はい| C[クレームチェックを使用]
+    B --&gt;|いいえ| D{機密データを含む？}
+    D --&gt;|はい| C
+    D --&gt;|いいえ| E{複雑なルーティング？}
+    E --&gt;|はい| C
+    E --&gt;|いいえ| F[直接メッセージング]
+    
+    style C fill:#51cf66,stroke:#2f9e44
+    style F fill:#4dabf7,stroke:#1971c2</div>
+<h2 id="アーキテクチャ品質属性">アーキテクチャ品質属性</h2>
+<p>クレームチェックパターンは、いくつかのアーキテクチャ品質属性に影響を与えます：</p>
+<h3 id="信頼性">信頼性</h3>
+<p>データをメッセージから分離することで、次のことが可能になります：</p>
+<ul>
+<li><strong>データの冗長性</strong>：外部データストアは、より優れたレプリケーションとバックアップを提供することがよくあります</li>
+<li><strong>災害復旧</strong>：ペイロードはメッセージングシステムとは独立して回復できます</li>
+<li><strong>障害の分離</strong>：メッセージングシステムの障害は保存されたペイロードに影響しません</li>
+</ul>
+<h3 id="セキュリティ">セキュリティ</h3>
+<p>パターンは次のことでセキュリティを強化します：</p>
+<ul>
+<li><strong>データの分離</strong>：機密データは、より厳格なアクセス制御を持つ安全なストレージに留まります</li>
+<li><strong>アクセス制御</strong>：有効なトークンを持つサービスのみがペイロードを取得できます</li>
+<li><strong>監査証跡</strong>：別のストレージにより、詳細なアクセスログが可能になります</li>
+</ul>
+<h3 id="パフォーマンス">パフォーマンス</h3>
+<p>パフォーマンスの改善には次のものが含まれます：</p>
+<ul>
+<li><strong>メッセージサイズの削減</strong>：メッセージングシステムは軽量なトークンのみを処理します</li>
+<li><strong>最適化されたストレージ</strong>：各システム（メッセージング vs データストア）が最も得意なことを処理します</li>
+<li><strong>選択的な取得</strong>：受信者は必要な場合にのみペイロードを取得します</li>
+</ul>
+<h3 id="コストの最適化">コストの最適化</h3>
+<p>コストのメリットは次のことから生じます：</p>
+<ul>
+<li><strong>より安価なメッセージング</strong>：大きなメッセージサポートのためのプレミアム機能を回避します</li>
+<li><strong>ストレージの階層化</strong>：大きなペイロードにコスト効率の高いストレージを使用します</li>
+<li><strong>リソース効率</strong>：メッセージングインフラストラクチャのより良い利用</li>
+</ul>
+<h2 id="トレードオフと考慮事項">トレードオフと考慮事項</h2>
+<p>他のパターンと同様に、クレームチェックはトレードオフを導入します：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 潜在的な欠点</p><div class="admonition-content"><p><strong>複雑さの増加</strong>：追加のインフラストラクチャと調整が必要</p>
+<p><strong>レイテンシ</strong>：ペイロードを取得するための追加のネットワークラウンドトリップ</p>
+<p><strong>一貫性の課題</strong>：メッセージとペイロードが同期されたままであることを確認</p>
+<p><strong>運用オーバーヘッド</strong>：保存されたペイロードのライフサイクルの管理</p>
+</div></div>
+<p>特定の要件に対してこれらのトレードオフを評価してください。パターンは、メッセージサイズまたはパフォーマンスの問題が追加の複雑さを上回る場合に最適に機能します。</p>
+<h2 id="実世界の実装パターン">実世界の実装パターン</h2>
+<h3 id="パターン1：自動トークン生成">パターン1：自動トークン生成</h3>
+<p>ファイルがアップロードされたときに自動的にトークンを生成するイベント駆動メカニズムを使用します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// ファイルアップロードが自動クレームチェック生成をトリガー</span>
+dataStore<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'upload'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">file</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> token <span class="token operator">=</span> <span class="token function">generateClaimCheck</span><span class="token punctuation">(</span>file<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> messagingSystem<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">event</span><span class="token operator">:</span> <span class="token string">'file-uploaded'</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> token<span class="token punctuation">,</span>
+    <span class="token literal-property property">metadata</span><span class="token operator">:</span> file<span class="token punctuation">.</span>metadata
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="パターン2：手動トークン生成">パターン2：手動トークン生成</h3>
+<p>アプリケーションがトークン作成とペイロードストレージを明示的に管理します：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// アプリケーションがプロセス全体を制御</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">processLargeOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> token <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">storeOrderDocuments</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>documents<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> <span class="token function">sendOrderMessage</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">orderId</span><span class="token operator">:</span> order<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+    <span class="token literal-property property">claimCheck</span><span class="token operator">:</span> token
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="結論">結論</h2>
+<p>クレームチェックパターンは、メッセージングシステムで大きなペイロードを処理する課題に対するエレガントなソリューションを提供します。ストレージをメッセージ配信から分離することで、システムは次のことができます：</p>
+<ul>
+<li>メッセージサイズの制限を克服</li>
+<li>高いパフォーマンスを維持</li>
+<li>セキュリティと信頼性を強化</li>
+<li>コストを最適化</li>
+</ul>
+<p>追加の複雑さを導入しますが、大きなデータ転送を扱うシステムでは、メリットがコストを大幅に上回ることがよくあります。メッセージングインフラストラクチャがペイロードサイズに苦労している場合、または効率的なメッセージ配信を維持しながら機密データを保護する必要がある場合は、このパターンの実装を検討してください。</p>
+<h2 id="関連パターン">関連パターン</h2>
+<ul>
+<li><strong>非同期リクエスト-リプライ</strong>：長時間実行される操作のためにクレームチェックを補完します</li>
+<li><strong>競合コンシューマー</strong>：並列処理のためにクレームチェックとうまく機能します</li>
+<li><strong>分割と集約</strong>：大きなメッセージを処理するための代替アプローチ</li>
+</ul>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://www.enterpriseintegrationpatterns.com/patterns/messaging/StoreInLibrary.html">Enterprise Integration Patterns: Claim Check</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/claim-check">Microsoft Azure Architecture Patterns: Claim-Check</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2019/04/Claim-Check-Pattern/" data-id="39f11360" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "クレームチェックパターン：分散システムでの大きなメッセージの処理",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "Architecture Design Patterns Messaging",
+        "genre": "Architecture",
+        "datePublished": "2019-04-10",
+        "dateCreated": "2019-04-10",
+        "dateModified": "2025-10-23",
+        "url": "https://neo01.com//ja/2019/04/Claim-Check-Pattern/",
+        "description": "クレームチェックパターンを使用して、データを外部に保存し、軽量なトークンを渡すことで、メッセージングシステムで大きなペイロードを転送する課題を解決する方法を学びます。",
+        "wordCount": 1106
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#4d58519f</div>
+                <img src="/qr/qr-1d578ad0a76d1795c996f99f7802b7c5.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#4d58519f">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

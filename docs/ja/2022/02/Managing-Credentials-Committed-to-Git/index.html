@@ -1,0 +1,1226 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Gitにコミットされた認証情報の管理：復旧と予防 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Credentials,Git,Security">
+    
+    
+    <meta name="description" content="誤って認証情報をGitにコミットしてしまった？適切な削除方法、Gitの履歴書き換えだけでは不十分な理由、そして将来の漏洩を防ぐ方法を学びましょう。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Gitにコミットされた認証情報の管理：復旧と予防">
+<meta property="og:url" content="https://neo01.com/ja/2022/02/Managing-Credentials-Committed-to-Git/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="誤って認証情報をGitにコミットしてしまった？適切な削除方法、Gitの履歴書き換えだけでは不十分な理由、そして将来の漏洩を防ぐ方法を学びましょう。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/git/thumbnail.png">
+<meta property="article:published_time" content="2022-02-12T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-25T14:14:30.677Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Credentials">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/git/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/ja/2022/02/Managing-Credentials-Committed-to-Git">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2022/02/Managing-Credentials-Committed-to-Git/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2022/02/Managing-Credentials-Committed-to-Git-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Gitにコミットされた認証情報の管理：復旧と予防
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2022-02-12T16:00:00.000Z" itemprop="datePublished">2022-02-13</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-25T14:14:30.677Z" itemprop="datePublished">2025-10-25</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Security/">Security</a> <a class="tag-link" href="/ja/tags/Git/">Git</a> <a class="tag-link" href="/ja/tags/Credentials/">Credentials</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#Git%E5%B1%A5%E6%AD%B4%E3%81%AE%E5%95%8F%E9%A1%8C"><span class="toc-text">Git履歴の問題</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8D%B3%E5%BA%A7%E3%81%AE%E5%AF%BE%E5%BF%9C%EF%BC%9A%E3%81%BE%E3%81%9A%E3%83%AD%E3%83%BC%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E3%80%81%E5%BE%8C%E3%81%A7%E3%82%AF%E3%83%AA%E3%83%BC%E3%83%B3%E3%82%A2%E3%83%83%E3%83%97"><span class="toc-text">即座の対応：まずローテーション、後でクリーンアップ</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Git%E5%B1%A5%E6%AD%B4%E3%81%8B%E3%82%89%E8%AA%8D%E8%A8%BC%E6%83%85%E5%A0%B1%E3%82%92%E5%89%8A%E9%99%A4"><span class="toc-text">Git履歴から認証情報を削除</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%B7%E5%88%B6%E3%83%97%E3%83%83%E3%82%B7%E3%83%A5%E3%81%A8%E8%AA%BF%E6%95%B4"><span class="toc-text">強制プッシュと調整</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%95%E3%82%A9%E3%83%BC%E3%82%AF%E3%81%A8%E3%83%9F%E3%83%A9%E3%83%BC%E3%81%AE%E5%87%A6%E7%90%86"><span class="toc-text">フォークとミラーの処理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%88%E9%98%B2%EF%BC%9A%E3%82%88%E3%82%8A%E8%89%AF%E3%81%84%E3%82%A2%E3%83%97%E3%83%AD%E3%83%BC%E3%83%81"><span class="toc-text">予防：より良いアプローチ</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E4%B8%96%E7%95%8C%E3%81%AE%E3%82%A4%E3%83%B3%E3%82%B7%E3%83%87%E3%83%B3%E3%83%88%EF%BC%9AAWS%E3%82%AD%E3%83%BC%E6%BC%8F%E6%B4%A9"><span class="toc-text">実世界のインシデント：AWSキー漏洩</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <p>すべての開発者の悪夢：コードをコミットし、リポジトリにプッシュした後、AWSアクセスキー、データベースパスワード、またはAPIトークンがGit履歴に残っていることに突然気づく。パニックに陥る。急いで認証情報を削除して再度コミットするが、被害はすでに発生している——これらの秘密情報はGit履歴に残り、リポジトリをクローンする誰もがアクセスできる状態になっている。</p>
+<p>このシナリオは、組織全体で毎日何千回も繰り返されている。対応には、必死にGoogleで検索し、Git履歴の書き換えを試み、認証情報がまだ侵害されていないことを願うことが含まれる。しかし、適切な認証情報漏洩への対応は、単にファイルを削除するだけではない——Gitの内部構造の理解、即座の認証情報のローテーション、そして予防メカニズムの実装が必要である。</p>
+<h2 id="Git履歴の問題">Git履歴の問題</h2>
+<p>Gitの設計により、認証情報の漏洩は特に危険である。その理由を理解するには、Gitがデータをどのように保存するかを調べる必要がある。</p>
+<h3 id="削除だけでは不十分な理由">削除だけでは不十分な理由</h3>
+<p>認証情報を含むファイルをコミットし、後で削除しても、認証情報はGit履歴に残る：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 削除の錯覚</p><div class="admonition-content"><p><strong>開発者がよく行うこと</strong></p>
+<ul>
+<li>誤って認証情報を含むコードをコミット</li>
+<li>ミスに気づく</li>
+<li>ファイルを削除するか認証情報を削除</li>
+<li>削除をコミット</li>
+<li>問題が解決したと思い込む</li>
+</ul>
+<p><strong>これが失敗する理由</strong></p>
+<ul>
+<li>Gitはすべてのコミットの完全な履歴を保持</li>
+<li>以前のコミットには依然として認証情報が含まれている</li>
+<li>誰でも古いコミットをチェックアウトできる</li>
+<li><code>git log -p</code>で認証情報が表示される</li>
+<li>リポジトリのクローンには完全な履歴が含まれる</li>
+</ul>
+<p><strong>現実</strong></p>
+<ul>
+<li>認証情報は無期限にアクセス可能</li>
+<li>すべてのリポジトリクローンに漏洩が含まれる</li>
+<li>フォークとミラーが認証情報を保持</li>
+<li>検索エンジンが漏洩をインデックス化している可能性</li>
+<li>自動スキャナーが公開リポジトリを継続的に監視</li>
+</ul>
+</div></div>
+<p>新しいコミットで認証情報を削除するだけでは、オンラインで鍵を公開した後にドアに鍵をかけるようなもの——被害はすでに発生している。</p>
+<h3 id="Gitの不変な履歴">Gitの不変な履歴</h3>
+<p>Gitのコンテンツアドレス可能ストレージにより、履歴の変更は複雑になる：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔗 Gitストレージモデル</p><div class="admonition-content"><p><strong>Gitがデータを保存する方法</strong></p>
+<ul>
+<li>各コミットには一意のSHA-1ハッシュがある</li>
+<li>ハッシュはコミット内容、親ハッシュ、メタデータから計算される</li>
+<li>コミットを変更するとそのハッシュが変わる</li>
+<li>すべての子孫コミットもハッシュが変わる</li>
+<li>履歴の暗号チェーンを作成</li>
+</ul>
+<p><strong>認証情報削除への影響</strong></p>
+<ul>
+<li>認証情報の削除には履歴の書き換えが必要</li>
+<li>漏洩後のすべてのコミットを再作成する必要がある</li>
+<li>新しいハッシュは既存の参照を破壊</li>
+<li>共同作業者はローカルコピーを破棄する必要がある</li>
+<li>フォークとミラーは影響を受けない</li>
+</ul>
+<p><strong>調整の課題</strong></p>
+<ul>
+<li>すべての開発者が書き換えられた履歴を取得する必要がある</li>
+<li>古いコミットはガベージコレクションされる必要がある</li>
+<li>リモートリポジトリは新しい履歴を強制プッシュする必要がある</li>
+<li>CI/CDシステムは参照を更新する必要がある</li>
+<li>バックアップシステムが古い履歴を保持する可能性がある</li>
+</ul>
+</div></div>
+<p>このアーキテクチャは、認証情報の漏洩を真に「元に戻す」ことはできず、ローテーションと履歴の書き換えによって緩和するしかないことを意味する。</p>
+<h2 id="即座の対応：まずローテーション、後でクリーンアップ">即座の対応：まずローテーション、後でクリーンアップ</h2>
+<p>認証情報がGitに漏洩した場合、優先順位が重要である。</p>
+<h3 id="ステップ1：認証情報を即座にローテーション">ステップ1：認証情報を即座にローテーション</h3>
+<p>Git履歴の操作を試みる前に、侵害された認証情報をローテーションする：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>⚠️ クリーンアップ前にローテーション</p><div class="admonition-content"><p><strong>ローテーションが優先される理由</strong></p>
+<ul>
+<li>Git履歴の書き換えには時間がかかる</li>
+<li>認証情報はすでに侵害されている可能性がある</li>
+<li>自動スキャナーは数分以内に漏洩を検出</li>
+<li>Gitのクリーンアップではアクセスを取り消せない</li>
+<li>攻撃者がすでにリポジトリをクローンしている可能性がある</li>
+</ul>
+<p><strong>ローテーションすべきもの</strong></p>
+<ul>
+<li>APIキーとトークン</li>
+<li>データベースパスワード</li>
+<li>SSH秘密鍵</li>
+<li>OAuthクライアントシークレット</li>
+<li>暗号化キー</li>
+<li>サービスアカウント認証情報</li>
+</ul>
+<p><strong>ローテーションチェックリスト</strong></p>
+<ul>
+<li>新しい認証情報を即座に生成</li>
+<li>認証情報を使用するすべてのサービスを更新</li>
+<li>古い認証情報を完全に取り消す</li>
+<li>不正アクセスの試みを監視</li>
+<li>セキュリティレビューのためにインシデントを文書化</li>
+<li>将来的に短期認証情報の使用を検討</li>
+</ul>
+</div></div>
+<p>認証情報を即座にローテーションすることで、脆弱性のウィンドウを制限する。Git履歴のクリーンアップは重要だが二次的である。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>⏱️ 短期認証情報の推奨</p><div class="admonition-content"><p><strong>短期認証情報が重要な理由</strong></p>
+<ul>
+<li>定義された期間後に自動的に期限切れ</li>
+<li>漏洩した場合の露出ウィンドウを削減</li>
+<li>手動ローテーションが不要</li>
+<li>侵害の影響範囲を制限</li>
+</ul>
+<p><strong>実装オプション</strong></p>
+<ul>
+<li>AWS STS一時認証情報（15分〜12時間）</li>
+<li>Vault動的シークレット（数分〜数時間）</li>
+<li>短い有効期限のOAuthトークン</li>
+<li>TTL付きサービスアカウントトークン</li>
+</ul>
+<p><strong>インシデント後のアクション</strong></p>
+<ul>
+<li>可能な限り短期認証情報に移行</li>
+<li>将来の漏洩の影響を軽減</li>
+<li>実装の詳細については<a href="/ja/2022/03/Preventing-Credentials-in-Git/">予防戦略</a>を参照</li>
+</ul>
+</div></div>
+<h3 id="ステップ2：露出範囲の評価">ステップ2：露出範囲の評価</h3>
+<p>認証情報がどの程度広がったかを判断する：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 露出評価</p><div class="admonition-content"><p><strong>回答すべき質問</strong></p>
+<ul>
+<li>リポジトリは公開か非公開か？</li>
+<li>認証情報はどのくらいの期間露出していたか？</li>
+<li>何人がリポジトリへのアクセス権を持っているか？</li>
+<li>フォークやミラーは存在するか？</li>
+<li>CI/CDシステムが認証情報にアクセスしたか？</li>
+<li>コミットは複数のリモートにプッシュされたか？</li>
+</ul>
+<p><strong>公開リポジトリの露出</strong></p>
+<ul>
+<li>認証情報は完全に侵害されたと仮定</li>
+<li>GitHub、GitLab、Bitbucketはセキュリティ研究者に通知</li>
+<li>自動スキャナーは数分以内にシークレットを検出</li>
+<li>検索エンジンがコンテンツをインデックス化している可能性</li>
+<li>認証情報のローテーションは必須であり、オプションではない</li>
+</ul>
+<p><strong>非公開リポジトリの露出</strong></p>
+<ul>
+<li>誰がリポジトリへのアクセス権を持っているかを評価</li>
+<li>予期しないアクティビティのアクセスログを確認</li>
+<li>認証情報使用の監査ログをレビュー</li>
+<li>内部脅威のシナリオを考慮</li>
+<li>予防措置として認証情報をローテーション</li>
+</ul>
+</div></div>
+<p>露出評価により、対応アクションの緊急性と範囲が決定される。</p>
+<h2 id="Git履歴から認証情報を削除">Git履歴から認証情報を削除</h2>
+<p>認証情報をローテーションした後、将来の露出を防ぐためにGit履歴をクリーンアップする。</p>
+<h3 id="git-filter-branchの使用（レガシーアプローチ）">git filter-branchの使用（レガシーアプローチ）</h3>
+<p>従来の方法では<code>git filter-branch</code>を使用して履歴を書き換える：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># すべてのコミットから特定のファイルを削除</span>
+<span class="token function">git</span> filter-branch <span class="token parameter variable">--force</span> --index-filter <span class="token punctuation">\</span>
+  <span class="token string">"git rm --cached --ignore-unmatch path/to/credentials.txt"</span> <span class="token punctuation">\</span>
+  --prune-empty --tag-name-filter <span class="token function">cat</span> -- <span class="token parameter variable">--all</span>
+
+<span class="token comment"># 強制ガベージコレクション</span>
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ filter-branchの制限</p><div class="admonition-content"><p><strong>filter-branchが問題である理由</strong></p>
+<ul>
+<li>大規模リポジトリでは非常に遅い</li>
+<li>複雑な構文でエラーが発生しやすい</li>
+<li>すべてのエッジケースを処理しない</li>
+<li>中断されるとリポジトリが破損する可能性</li>
+<li>Gitドキュメントは代替案を推奨</li>
+</ul>
+<p><strong>まだ使用される可能性がある場合</strong></p>
+<ul>
+<li>BFGやfilter-repoのないレガシーシステム</li>
+<li>シンプルな単一ファイル削除シナリオ</li>
+<li>履歴が限られた小規模リポジトリ</li>
+<li>他のツールが利用できない場合</li>
+</ul>
+</div></div>
+<p>現代のツールは、ほとんどのシナリオでより良い代替案を提供する。</p>
+<h3 id="BFG-Repo-Cleanerの使用（推奨）">BFG Repo-Cleanerの使用（推奨）</h3>
+<p>BFG Repo-Cleanerは、より高速でシンプルなアプローチを提供する：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># BFGをダウンロード（Javaが必要）</span>
+<span class="token comment"># https://rtyley.github.io/bfg-repo-cleaner/</span>
+
+<span class="token comment"># 特定のファイルを削除</span>
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --delete-files credentials.txt repo.git
+
+<span class="token comment"># パターンに一致するファイルを削除</span>
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --delete-files <span class="token string">"*.key"</span> repo.git
+
+<span class="token comment"># すべてのファイル内の認証情報を置換</span>
+<span class="token builtin class-name">echo</span> <span class="token string">"password123"</span> <span class="token operator">&gt;</span> passwords.txt
+<span class="token function">java</span> <span class="token parameter variable">-jar</span> bfg.jar --replace-text passwords.txt repo.git
+
+<span class="token comment"># クリーンアップ</span>
+<span class="token builtin class-name">cd</span> repo.git
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ BFGの利点</p><div class="admonition-content"><p><strong>BFGが優れている理由</strong></p>
+<ul>
+<li>filter-branchより10〜720倍高速</li>
+<li>シンプルで直感的な構文</li>
+<li>デフォルトでHEADコミットを保護</li>
+<li>大規模リポジトリを効率的に処理</li>
+<li>十分にテストされ広く使用されている</li>
+</ul>
+<p><strong>BFGの機能</strong></p>
+<ul>
+<li>名前またはパターンでファイルを削除</li>
+<li>すべてのファイルでテキストを置換</li>
+<li>大きなファイルを削除</li>
+<li>サイズでblobを削除</li>
+<li>最近のコミットを保持</li>
+</ul>
+</div></div>
+<p>BFGは、ほとんどの認証情報削除シナリオで推奨されるツールである。</p>
+<h3 id="git-filter-repoの使用（現代的な代替案）">git filter-repoの使用（現代的な代替案）</h3>
+<p><code>git filter-repo</code>は、最も強力で柔軟なアプローチを提供する：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># filter-repoをインストール</span>
+pip <span class="token function">install</span> git-filter-repo
+
+<span class="token comment"># 特定のファイルを削除</span>
+<span class="token function">git</span> filter-repo <span class="token parameter variable">--path</span> path/to/credentials.txt --invert-paths
+
+<span class="token comment"># パターンに一致するファイルを削除</span>
+<span class="token function">git</span> filter-repo --path-glob <span class="token string">'*.key'</span> --invert-paths
+
+<span class="token comment"># コールバックを使用して認証情報を置換</span>
+<span class="token function">git</span> filter-repo --replace-text <span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token builtin class-name">echo</span> <span class="token string">"password123==&gt;REDACTED"</span><span class="token punctuation">)</span>
+
+<span class="token comment"># 特定のディレクトリから認証情報を削除</span>
+<span class="token function">git</span> filter-repo <span class="token parameter variable">--path</span> secrets/ --invert-paths</code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔧 filter-repoの機能</p><div class="admonition-content"><p><strong>高度な機能</strong></p>
+<ul>
+<li>大規模リポジトリでの高速パフォーマンス</li>
+<li>強力なフィルタリングオプション</li>
+<li>Pythonベースの拡張性</li>
+<li>包括的な安全性チェック</li>
+<li>詳細な操作ログ</li>
+</ul>
+<p><strong>複雑なシナリオ</strong></p>
+<ul>
+<li>条件付きファイル削除</li>
+<li>コンテンツ変換</li>
+<li>パスの書き換え</li>
+<li>コミットメッセージの変更</li>
+<li>作成者情報の更新</li>
+</ul>
+</div></div>
+<p>複雑なシナリオや大規模リポジトリの場合、<code>git filter-repo</code>は機能と安全性の最適なバランスを提供する。</p>
+<h2 id="強制プッシュと調整">強制プッシュと調整</h2>
+<p>履歴を書き換えた後、すべてのリポジトリコピーに変更を伝播する。</p>
+<h3 id="リモートへの強制プッシュ">リモートへの強制プッシュ</h3>
+<p>書き換えられた履歴には強制プッシュが必要：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># originに強制プッシュ</span>
+<span class="token function">git</span> push origin <span class="token parameter variable">--force</span> <span class="token parameter variable">--all</span>
+
+<span class="token comment"># タグを強制プッシュ</span>
+<span class="token function">git</span> push origin <span class="token parameter variable">--force</span> <span class="token parameter variable">--tags</span>
+
+<span class="token comment"># 代替案：force-with-lease（より安全）</span>
+<span class="token function">git</span> push origin --force-with-lease <span class="token parameter variable">--all</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 強制プッシュのリスク</p><div class="admonition-content"><p><strong>強制プッシュの危険性</strong></p>
+<ul>
+<li>リモート履歴を上書き</li>
+<li>他の開発者のローカルコピーを破壊</li>
+<li>調整されていない場合、コミットを失う可能性</li>
+<li>リポジトリ設定によってブロックされる可能性</li>
+<li>特別な権限が必要</li>
+</ul>
+<p><strong>--force-with-leaseの使用</strong></p>
+<ul>
+<li>通常の--forceより安全</li>
+<li>リモートに予期しない変更があるかチェック</li>
+<li>偶発的な上書きを防止</li>
+<li>依然として調整が必要</li>
+<li>--forceより推奨</li>
+</ul>
+</div></div>
+<p>強制プッシュは、すべてのリポジトリユーザーと調整する必要がある。</p>
+<h3 id="チームメンバーとの調整">チームメンバーとの調整</h3>
+<p>すべての共同作業者はローカルコピーを更新する必要がある：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>👥 チーム調整ステップ</p><div class="admonition-content"><p><strong>必要なコミュニケーション</strong></p>
+<ul>
+<li>書き換え前にすべてのチームメンバーに通知</li>
+<li>履歴を書き換える理由を説明</li>
+<li>更新のための明確な指示を提供</li>
+<li>ローカル更新の期限を設定</li>
+<li>全員が正常に更新したことを確認</li>
+</ul>
+<p><strong>チームメンバーへの指示</strong>
+</p><pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># ローカル作業を保存</span><p></p>
+</code></pre></div></div><code class="language-bash">
+
+<span class="token function">git</span> stash
+
+<span class="token comment"># 書き換えられた履歴を取得</span>
+<span class="token function">git</span> fetch origin
+
+<span class="token comment"># リモートに合わせてリセット</span>
+<span class="token function">git</span> reset <span class="token parameter variable">--hard</span> origin/main
+
+<span class="token comment"># 古い参照をクリーンアップ</span>
+<span class="token function">git</span> reflog expire <span class="token parameter variable">--expire</span><span class="token operator">=</span>now <span class="token parameter variable">--all</span>
+<span class="token function">git</span> gc <span class="token parameter variable">--prune</span><span class="token operator">=</span>now <span class="token parameter variable">--aggressive</span>
+
+<span class="token comment"># ローカル作業を復元</span>
+<span class="token function">git</span> stash pop</code>
+<pre><code>**競合の処理**
+- ローカルコミットは新しい履歴にリベースする必要がある
+- 手動での競合解決が必要な場合がある
+- 更新前にパッチの作成を検討
+- 更新後に徹底的にテスト
+</code></pre>
+<p>調整が不十分だと、古い履歴が再導入される可能性がある。</p>
+<h2 id="フォークとミラーの処理">フォークとミラーの処理</h2>
+<p>リポジトリのフォークとミラーは元の履歴を保持する。</p>
+<h3 id="フォークの問題">フォークの問題</h3>
+<p>フォークは漏洩した認証情報を保持する独立したコピーである：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 フォークは漏洩を保持</p><div class="admonition-content"><p><strong>フォークが問題である理由</strong></p>
+<ul>
+<li>フォークは独立したリポジトリ</li>
+<li>親履歴の書き換えはフォークに影響しない</li>
+<li>フォーク所有者は漏洩に気づいていない可能性</li>
+<li>公開フォークは発見可能</li>
+<li>フォーク更新を強制するメカニズムがない</li>
+</ul>
+<p><strong>緩和戦略</strong></p>
+<ul>
+<li>フォーク所有者に直接連絡</li>
+<li>フォークの削除または更新を依頼</li>
+<li>公開フォークにDMCA削除申請を提出（極端なケース）</li>
+<li>フォークでの認証情報使用を監視</li>
+<li>一部のフォークが残る可能性を受け入れる</li>
+</ul>
+</div></div>
+<p>公開リポジトリの場合、フォークされた認証情報は永久に露出していると仮定する。</p>
+<h3 id="ミラーとバックアップの処理">ミラーとバックアップの処理</h3>
+<p>ミラーとバックアップシステムは古い履歴を保持する可能性がある：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ ミラーの考慮事項</p><div class="admonition-content"><p><strong>一般的なミラーの場所</strong></p>
+<ul>
+<li>CI/CDシステムキャッシュ</li>
+<li>バックアップシステム</li>
+<li>コードレビューツール</li>
+<li>IDEリポジトリキャッシュ</li>
+<li>コンテナイメージレイヤー</li>
+<li>デプロイメントアーティファクト</li>
+</ul>
+<p><strong>クリーンアップアクション</strong></p>
+<ul>
+<li>CI/CDキャッシュをクリア</li>
+<li>バックアップシステムを更新</li>
+<li>コンテナイメージを再構築</li>
+<li>アプリケーションを再デプロイ</li>
+<li>IDEキャッシュをクリア</li>
+<li>ドキュメントリポジトリを更新</li>
+</ul>
+</div></div>
+<p>包括的なクリーンアップには、すべてのリポジトリコピーの特定が必要である。</p>
+<h2 id="予防：より良いアプローチ">予防：より良いアプローチ</h2>
+<p>この記事は復旧に焦点を当てているが、予防は修復よりもはるかに効果的である。包括的な予防戦略には複数の層が含まれる：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>🛡️ 予防層</p><div class="admonition-content"><p><strong>設定</strong></p>
+<ul>
+<li>認証情報ファイルの<code>.gitignore</code>パターン</li>
+<li>個人パターンのグローバルgitignore</li>
+<li>ガイダンスのためのテンプレートファイル（<code>.env.example</code>）</li>
+</ul>
+<p><strong>コード実践</strong></p>
+<ul>
+<li>ハードコードされた認証情報の代わりに環境変数</li>
+<li>起動時の設定検証</li>
+<li>認証情報検出のためのコードレビュー</li>
+</ul>
+<p><strong>自動スキャン</strong></p>
+<ul>
+<li>プレコミットフック（git-secrets、detect-secrets）</li>
+<li>CI/CDパイプラインスキャン</li>
+<li>プラットフォーム提供のスキャン（GitHub、GitLab）</li>
+</ul>
+<p><strong>シークレット管理</strong></p>
+<ul>
+<li>AWS Secrets Manager、HashiCorp Vault</li>
+<li>ランタイムシークレット注入</li>
+<li>自動認証情報ローテーション</li>
+</ul>
+</div></div>
+<p>詳細なコードサンプルと実装戦略を含む認証情報漏洩防止の包括的なガイドについては、<a href="/ja/2022/03/Preventing-Credentials-in-Git/">Gitでの認証情報防止：多層防御戦略</a>を参照してください。</p>
+<p>予防への投資により、複雑な復旧手順、Git履歴の書き換え、緊急認証情報ローテーションの必要性がなくなる。予防システムの構築に費やす1時間ごとに、インシデント対応の数日を節約できる。</p>
+<h2 id="実世界のインシデント：AWSキー漏洩">実世界のインシデント：AWSキー漏洩</h2>
+<p>一般的なシナリオが完全な対応プロセスを示している：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ インシデントタイムライン</p><div class="admonition-content"><p><strong>1日目：漏洩</strong></p>
+<ul>
+<li>開発者が設定ファイルにAWSアクセスキーをコミット</li>
+<li>公開GitHubリポジトリにプッシュ</li>
+<li>GitHubシークレットスキャンが5分以内にキーを検出</li>
+<li>AWSが通知を受け取りアカウント所有者に警告</li>
+<li>自動スキャナーがキーの使用を試み始める</li>
+</ul>
+<p><strong>1時間目：発見と対応</strong></p>
+<ul>
+<li>セキュリティチームがGitHubアラートを受信</li>
+<li>AWSアクセスキーを即座にローテーション</li>
+<li>不正アクセスのCloudTrailログをレビュー</li>
+<li>暗号通貨マイニングインスタンスが起動されていることを発見</li>
+<li>不正なリソースを終了</li>
+</ul>
+<p><strong>2〜4時間目：クリーンアップ</strong></p>
+<ul>
+<li>BFGを使用してGit履歴からキーを削除</li>
+<li>クリーンアップされた履歴を強制プッシュ</li>
+<li>フォーク所有者に連絡して更新を依頼</li>
+<li>CI/CDシステムを更新</li>
+<li>バックアップシステムをクリア</li>
+</ul>
+<p><strong>2〜7日目：事後</strong></p>
+<ul>
+<li>プレコミットフックを実装</li>
+<li>AWSパターンをgit-secretsに追加</li>
+<li>セキュリティトレーニングを実施</li>
+<li>他のリポジトリの漏洩をレビュー</li>
+<li>インシデントと対応を文書化</li>
+</ul>
+</div></div>
+<p>このインシデントは、即座のローテーションが重要である理由を示している——攻撃者は数分以内に漏洩した認証情報を悪用する。</p>
+<h2 id="結論">結論</h2>
+<p>Gitにコミットされた認証情報の管理には、削除だけでは不十分であることを理解する必要がある。Gitの不変な履歴は、漏洩した認証情報を無期限に保持し、リポジトリへのアクセス権を持つ誰もがアクセスできる。適切な対応は、Git履歴のクリーンアップよりも即座の認証情報ローテーションを優先する——攻撃者は数分以内に漏洩した認証情報を悪用するが、履歴の書き換えには数時間または数日かかる。</p>
+<p>Git履歴から認証情報を削除するには、BFG Repo-Cleanerやgit filter-repoなどのツールを使用してコミットを書き換え、その後強制プッシュしてすべての共同作業者と調整する必要がある。しかし、フォーク、ミラー、バックアップシステムは元の履歴を保持する可能性があり、公開リポジトリの完全な削除は不可能である。この現実は、認証情報のローテーションが必須であり、オプションではないことを強調している。</p>
+<p>重要な洞察：リポジトリの可視性に関係なく、Gitにコミットされた認証情報は完全に侵害されたものとして扱う。即座にローテーションし、履歴を徹底的にクリーンアップし、将来のインシデントを回避するために<a href="/ja/2022/03/Preventing-Credentials-in-Git/">包括的な予防メカニズム</a>を実装する。自動的に期限切れになる短期認証情報への移行を検討する——露出ウィンドウを制限することで、将来の漏洩の影響を劇的に軽減する。適切なシークレット管理の運用負担は、認証情報侵害のコストとインシデント後の対応の複雑さよりもはるかに少ない。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2022/02/Managing-Credentials-Committed-to-Git/" data-id="4c74c279" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Gitにコミットされた認証情報の管理：復旧と予防",
+        "image": "https://neo01.com/assets/git/thumbnail.png",
+        "keywords": "Credentials Git Security",
+        "genre": "Development",
+        "datePublished": "2022-02-13",
+        "dateCreated": "2022-02-13",
+        "dateModified": "2025-10-25",
+        "url": "https://neo01.com//ja/2022/02/Managing-Credentials-Committed-to-Git/",
+        "description": "誤って認証情報をGitにコミットしてしまった？適切な削除方法、Gitの履歴書き換えだけでは不十分な理由、そして将来の漏洩を防ぐ方法を学びましょう。",
+        "wordCount": 521
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#b5b87406</div>
+                <img src="/qr/qr-cf4c6df2a0d45bee294d3d817d079b4b.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#b5b87406">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

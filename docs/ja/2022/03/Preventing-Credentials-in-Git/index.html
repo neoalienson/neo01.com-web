@@ -1,0 +1,1660 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Gitでの認証情報の防止：多層防御戦略 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Credentials,DevOps,Git,Security">
+    
+    
+    <meta name="description" content="予防は修復に勝る。OWASP DevSecOps原則に従い、プレコミットフック、シークレットスキャン、コードリンティング、自動検出で多層防御を構築。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Gitでの認証情報の防止：多層防御戦略">
+<meta property="og:url" content="https://neo01.com/ja/2022/03/Preventing-Credentials-in-Git/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="予防は修復に勝る。OWASP DevSecOps原則に従い、プレコミットフック、シークレットスキャン、コードリンティング、自動検出で多層防御を構築。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/git/thumbnail.png">
+<meta property="article:published_time" content="2022-03-20T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-25T14:14:54.712Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Credentials">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/git/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/ja/2022/03/Preventing-Credentials-in-Git">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2022/03/Preventing-Credentials-in-Git/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2022/03/Preventing-Credentials-in-Git/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2022/03/Preventing-Credentials-in-Git/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2022/03/Preventing-Credentials-in-Git-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Gitでの認証情報の防止：多層防御戦略
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2022-03-20T16:00:00.000Z" itemprop="datePublished">2022-03-21</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-25T14:14:54.712Z" itemprop="datePublished">2025-10-25</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Security/">Security</a> <a class="tag-link" href="/ja/tags/DevOps/">DevOps</a> <a class="tag-link" href="/ja/tags/Git/">Git</a> <a class="tag-link" href="/ja/tags/Credentials/">Credentials</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%B2%E5%BE%A1%E5%B1%A4"><span class="toc-text">防御層</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC1%EF%BC%9AGitignore%E8%A8%AD%E5%AE%9A"><span class="toc-text">レイヤー1：Gitignore設定</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC2%EF%BC%9A%E7%92%B0%E5%A2%83%E5%A4%89%E6%95%B0%E3%81%A8%E8%A8%AD%E5%AE%9A"><span class="toc-text">レイヤー2：環境変数と設定</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC3%EF%BC%9A%E3%83%97%E3%83%AC%E3%82%B3%E3%83%9F%E3%83%83%E3%83%88%E3%83%95%E3%83%83%E3%82%AF"><span class="toc-text">レイヤー3：プレコミットフック</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC4%EF%BC%9ACI-CD%E3%83%91%E3%82%A4%E3%83%97%E3%83%A9%E3%82%A4%E3%83%B3%E3%82%B9%E3%82%AD%E3%83%A3%E3%83%B3"><span class="toc-text">レイヤー4：CI/CDパイプラインスキャン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC5%EF%BC%9A%E3%82%B7%E3%83%BC%E3%82%AF%E3%83%AC%E3%83%83%E3%83%88%E7%AE%A1%E7%90%86%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0"><span class="toc-text">レイヤー5：シークレット管理システム</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC6%EF%BC%9AGitProxy%E3%81%AB%E3%82%88%E3%82%8B%E3%83%97%E3%83%83%E3%82%B7%E3%83%A5%E4%BF%9D%E8%AD%B7"><span class="toc-text">レイヤー6：GitProxyによるプッシュ保護</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%AC%E3%82%A4%E3%83%A4%E3%83%BC7%EF%BC%9A%E3%83%97%E3%83%A9%E3%83%83%E3%83%88%E3%83%95%E3%82%A9%E3%83%BC%E3%83%A0%E3%82%B9%E3%82%AD%E3%83%A3%E3%83%B3%E3%81%A8%E7%9B%A3%E8%A6%96"><span class="toc-text">レイヤー7：プラットフォームスキャンと監視</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E8%A3%85%E6%88%A6%E7%95%A5"><span class="toc-text">実装戦略</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AA%A4%E6%A4%9C%E5%87%BA%E3%81%AE%E5%87%A6%E7%90%86"><span class="toc-text">誤検出の処理</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <p><a href="/ja/2022/02/Managing-Credentials-Committed-to-Git/">認証情報漏洩からの復旧方法</a>を探った後、明白な疑問が浮かびます：そもそも認証情報がGitに入るのをどう防ぐか？答えは単一のツールや技術ではなく、インシデントになる前に複数の段階でミスを捕捉する多層防御戦略です。</p>
+<p>予防は修復よりもはるかに効果的です。Git履歴から認証情報を削除するには、コミットの書き換え、チームメンバーとの調整、そしてフォークやミラーが漏洩を永久に保持する可能性を受け入れる必要があります。対照的に、最初のコミットを防ぐには数秒しかかからず、すべての下流の複雑さを排除します。この記事では、包括的な認証情報保護戦略を形成する実用的なツールと技術を探ります。</p>
+<h2 id="防御層">防御層</h2>
+<p>効果的な認証情報保護には、複数の重複する防御が必要です：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🛡️ 多層防御</p><div class="admonition-content"><p><strong>レイヤー1：設定</strong></p>
+<ul>
+<li><code>.gitignore</code>が認証情報ファイルの追跡を防止</li>
+<li>グローバルパターンが一般的なミスを捕捉</li>
+<li>テンプレートファイルが適切な構造を案内</li>
+</ul>
+<p><strong>レイヤー2：コード実践</strong></p>
+<ul>
+<li>環境変数が設定とコードを分離</li>
+<li>設定ライブラリがパターンを強制</li>
+<li>コードレビューがハードコードされたシークレットを捕捉</li>
+</ul>
+<p><strong>レイヤー3：自動スキャン</strong></p>
+<ul>
+<li>プレコミットフックが認証情報を含むコミットをブロック</li>
+<li>CI/CDパイプラインスキャンがバイパスされたフックを捕捉</li>
+<li>リポジトリスキャンが履歴の漏洩を検出</li>
+</ul>
+<p><strong>レイヤー4：シークレット管理</strong></p>
+<ul>
+<li>集中型認証情報ストレージ</li>
+<li>ランタイムシークレット注入</li>
+<li>自動ローテーション機能</li>
+</ul>
+<p><strong>レイヤー5：監視</strong></p>
+<ul>
+<li>プラットフォーム提供のスキャン（GitHub、GitLab）</li>
+<li>カスタムパターン検出</li>
+<li>迅速な対応のためのアラートシステム</li>
+</ul>
+</div></div>
+<p>各層は異なるタイプのミスを捕捉し、他の層が失敗したときに冗長性を提供します。</p>
+<h2 id="レイヤー1：Gitignore設定">レイヤー1：Gitignore設定</h2>
+<p>最初の防御線はGitが認証情報ファイルを追跡するのを防ぎます。</p>
+<h3 id="必須のGitignoreパターン">必須のGitignoreパターン</h3>
+<p><code>.gitignore</code>を設定して一般的な認証情報の場所を除外します：</p>
+<pre class="language-ignore" data-language="ignore"><code class="language-ignore"><span class="token comment"># 環境ファイル</span>
+<span class="token entry string">.env</span>
+<span class="token entry string">.env.local</span>
+<span class="token entry string">.env.<span class="token operator">*</span>.local</span>
+<span class="token entry string">.env.development</span>
+<span class="token entry string">.env.production</span>
+
+<span class="token comment"># 設定ファイル</span>
+<span class="token entry string">config<span class="token punctuation">/</span>secrets.yml</span>
+<span class="token entry string">config<span class="token punctuation">/</span>database.yml</span>
+<span class="token entry string">config<span class="token punctuation">/</span>credentials.yml</span>
+<span class="token entry string">secrets.json</span>
+<span class="token entry string">secrets.yaml</span>
+
+<span class="token comment"># キーファイル</span>
+<span class="token entry string"><span class="token operator">*</span>.key</span>
+<span class="token entry string"><span class="token operator">*</span>.pem</span>
+<span class="token entry string"><span class="token operator">*</span>.p12</span>
+<span class="token entry string"><span class="token operator">*</span>.pfx</span>
+<span class="token entry string"><span class="token operator">*</span>.cer</span>
+<span class="token entry string"><span class="token operator">*</span>.crt</span>
+<span class="token entry string">id_rsa</span>
+<span class="token entry string">id_dsa</span>
+
+<span class="token comment"># クラウドプロバイダー認証情報</span>
+<span class="token entry string">.aws<span class="token punctuation">/</span>credentials</span>
+<span class="token entry string">.azure<span class="token punctuation">/</span>credentials</span>
+<span class="token entry string">gcloud-service-key.json</span>
+
+<span class="token comment"># 認証情報を含む可能性のあるIDEファイル</span>
+<span class="token entry string">.vscode<span class="token punctuation">/</span>settings.json</span>
+<span class="token entry string">.idea<span class="token punctuation">/</span>workspace.xml</span>
+<span class="token entry string">.idea<span class="token punctuation">/</span>dataSources.xml</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>📝 Gitignoreベストプラクティス</p><div class="admonition-content"><p><strong>リポジトリレベルパターン</strong></p>
+<ul>
+<li>最初のコミット前にパターンを追加</li>
+<li>プロジェクト固有の認証情報ファイルを含める</li>
+<li>ファイルが無視される理由を文書化</li>
+<li><code>.gitignore</code>をリポジトリにコミット</li>
+</ul>
+<p><strong>グローバルGitignore</strong></p>
+<ul>
+<li>個人パターンをグローバルに設定</li>
+<li>IDE固有のファイルをカバー</li>
+<li>すべてのリポジトリに適用</li>
+</ul>
+<p></p><pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># グローバルgitignoreを設定</span><p></p>
+</code></pre></div></div><code class="language-bash">
+
+<span class="token function">git</span> config <span class="token parameter variable">--global</span> core.excludesfile ~/.gitignore_global
+
+<span class="token comment"># 一般的なパターンを追加</span>
+<span class="token function">cat</span> <span class="token operator">&gt;&gt;</span> ~/.gitignore_global <span class="token operator">&lt;&lt;</span> <span class="token string">EOF
+.env
+*.key
+*.pem
+.DS_Store
+EOF</span></code>
+<h3 id="ガイダンス用のテンプレートファイル">ガイダンス用のテンプレートファイル</h3>
+<p>実際の認証情報なしで必要な構造を示す<code>.env.example</code>ファイルを提供します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># .env.example</span>
+<span class="token assign-left variable">DATABASE_URL</span><span class="token operator">=</span>postgresql://user:password@localhost:5432/dbname
+<span class="token assign-left variable">API_KEY</span><span class="token operator">=</span>your_api_key_here
+<span class="token assign-left variable">AWS_ACCESS_KEY_ID</span><span class="token operator">=</span>your_access_key
+<span class="token assign-left variable">AWS_SECRET_ACCESS_KEY</span><span class="token operator">=</span>your_secret_key
+<span class="token assign-left variable">STRIPE_SECRET_KEY</span><span class="token operator">=</span>sk_test_your_key_here</code></pre>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># .gitignore</span>
+.env
+.env.local
+
+<span class="token comment"># README.md 説明</span>
+<span class="token comment"># .env.exampleを.envにコピーして実際の値を入力</span></code></pre>
+<p>テンプレートファイルは、実際のシークレットを公開することなく、開発者を適切な認証情報管理に導きます。</p>
+<h2 id="レイヤー2：環境変数と設定">レイヤー2：環境変数と設定</h2>
+<p>環境変数と設定管理を通じて認証情報とコードを分離します。</p>
+<h3 id="環境変数パターン">環境変数パターン</h3>
+<p>認証情報は環境変数に保存し、決してコードには含めません：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># config.py - 悪い例：ハードコードされた認証情報</span>
+DATABASE_URL <span class="token operator">=</span> <span class="token string">"postgresql://user:pass123@localhost/db"</span>
+API_KEY <span class="token operator">=</span> <span class="token string">"sk_live_abc123xyz789"</span>
+
+<span class="token comment"># config.py - 良い例：環境変数</span>
+<span class="token keyword">import</span> os
+
+DATABASE_URL <span class="token operator">=</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">"DATABASE_URL"</span><span class="token punctuation">]</span>
+API_KEY <span class="token operator">=</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">"API_KEY"</span><span class="token punctuation">]</span>
+
+<span class="token comment"># config.py - より良い例：検証とデフォルト値付き</span>
+<span class="token keyword">import</span> os
+
+<span class="token keyword">def</span> <span class="token function">get_required_env</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    value <span class="token operator">=</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>get<span class="token punctuation">(</span>key<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> value<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"Required environment variable </span><span class="token interpolation"><span class="token punctuation">{</span>key<span class="token punctuation">}</span></span><span class="token string"> is not set"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> value
+
+DATABASE_URL <span class="token operator">=</span> get_required_env<span class="token punctuation">(</span><span class="token string">"DATABASE_URL"</span><span class="token punctuation">)</span>
+API_KEY <span class="token operator">=</span> get_required_env<span class="token punctuation">(</span><span class="token string">"API_KEY"</span><span class="token punctuation">)</span>
+DEBUG <span class="token operator">=</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"DEBUG"</span><span class="token punctuation">,</span> <span class="token string">"false"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>lower<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token string">"true"</span></code></pre>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// config.js - 悪い例：ハードコードされた認証情報</span>
+<span class="token keyword">const</span> config <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">apiKey</span><span class="token operator">:</span> <span class="token string">"sk_live_abc123xyz789"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">dbPassword</span><span class="token operator">:</span> <span class="token string">"password123"</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token comment">// config.js - 良い例：環境変数</span>
+<span class="token keyword">const</span> config <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">apiKey</span><span class="token operator">:</span> process<span class="token punctuation">.</span>env<span class="token punctuation">.</span><span class="token constant">API_KEY</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">dbPassword</span><span class="token operator">:</span> process<span class="token punctuation">.</span>env<span class="token punctuation">.</span><span class="token constant">DB_PASSWORD</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token comment">// config.js - より良い例：検証付き</span>
+<span class="token keyword">function</span> <span class="token function">requireEnv</span><span class="token punctuation">(</span><span class="token parameter">key</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> value <span class="token operator">=</span> process<span class="token punctuation">.</span>env<span class="token punctuation">[</span>key<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>value<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Required environment variable </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>key<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> is not set</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">return</span> value<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">const</span> config <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">apiKey</span><span class="token operator">:</span> <span class="token function">requireEnv</span><span class="token punctuation">(</span><span class="token string">"API_KEY"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">dbPassword</span><span class="token operator">:</span> <span class="token function">requireEnv</span><span class="token punctuation">(</span><span class="token string">"DB_PASSWORD"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">debug</span><span class="token operator">:</span> process<span class="token punctuation">.</span>env<span class="token punctuation">.</span><span class="token constant">DEBUG</span> <span class="token operator">===</span> <span class="token string">"true"</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 環境変数の利点</p><div class="admonition-content"><p><strong>メリット</strong></p>
+<ul>
+<li>認証情報がソースコードに含まれない</li>
+<li>環境ごとに異なる値</li>
+<li>コード変更なしで簡単にローテーション</li>
+<li>言語とプラットフォーム間の標準</li>
+<li>デプロイメントシステムでサポート</li>
+</ul>
+<p><strong>実装ガイドライン</strong></p>
+<ul>
+<li>起動時に必要な変数を検証</li>
+<li>認証情報が欠落している場合は即座に失敗</li>
+<li>すべての必要な変数を文書化</li>
+<li>非シークレットには適切なデフォルト値を提供</li>
+<li>一貫した命名規則を使用</li>
+</ul>
+</div></div>
+<h3 id="設定ライブラリ">設定ライブラリ</h3>
+<p>環境変数パターンを強制する設定ライブラリを使用します：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># python-decoupleを使用</span>
+<span class="token keyword">from</span> decouple <span class="token keyword">import</span> config
+
+DATABASE_URL <span class="token operator">=</span> config<span class="token punctuation">(</span><span class="token string">"DATABASE_URL"</span><span class="token punctuation">)</span>
+API_KEY <span class="token operator">=</span> config<span class="token punctuation">(</span><span class="token string">"API_KEY"</span><span class="token punctuation">)</span>
+DEBUG <span class="token operator">=</span> config<span class="token punctuation">(</span><span class="token string">"DEBUG"</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> cast<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span></code></pre>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// dotenvを使用</span>
+<span class="token function">require</span><span class="token punctuation">(</span><span class="token string">'dotenv'</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">config</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> config <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">apiKey</span><span class="token operator">:</span> process<span class="token punctuation">.</span>env<span class="token punctuation">.</span><span class="token constant">API_KEY</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">dbPassword</span><span class="token operator">:</span> process<span class="token punctuation">.</span>env<span class="token punctuation">.</span><span class="token constant">DB_PASSWORD</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span></code></pre>
+<p>設定ライブラリは一貫したパターンを提供し、ボイラープレートを削減します。</p>
+<h2 id="レイヤー3：プレコミットフック">レイヤー3：プレコミットフック</h2>
+<p>自動スキャンは認証情報がGit履歴に入る前に捕捉します。<a target="_blank" rel="noopener" href="https://owasp.org/www-project-devsecops-guideline/latest/01-Pre-commit">OWASP DevSecOpsガイドライン</a>によると、プレコミットフェーズは重要です。なぜなら、セキュリティ問題が中央リポジトリに到達する前に防止するからです。このフェーズは2つの重要な領域に焦点を当てています：シークレット管理とコードリンティングで、早期検出を通じてより高品質なコードを保証します。</p>
+<h3 id="プレコミットが重要な理由">プレコミットが重要な理由</h3>
+<p>プレコミットフェーズは最初の防御線として機能します：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🎯 プレコミットの利点</p><div class="admonition-content"><p><strong>早期検出</strong></p>
+<ul>
+<li>問題がリポジトリに入る前に捕捉</li>
+<li>シークレットが中央Gitサーバーに到達するのを防止</li>
+<li>開発者のワークステーションで即座にコミットをブロック</li>
+<li>修復コストを大幅に削減</li>
+</ul>
+<p><strong>品質強制</strong></p>
+<ul>
+<li>リンターを通じてコーディング標準を強制</li>
+<li>コードフォーマットの一貫性を検証</li>
+<li>セキュリティ脆弱性をチェック</li>
+<li>チームガイドラインへの準拠を保証</li>
+</ul>
+<p><strong>開発者フィードバック</strong></p>
+<ul>
+<li>即座のフィードバックループ</li>
+<li>開発者にセキュリティ実践を教育</li>
+<li>恥ずかしい公開漏洩を防止</li>
+<li>セキュリティ意識を構築</li>
+</ul>
+</div></div>
+<h3 id="基本的なプレコミットフック">基本的なプレコミットフック</h3>
+<p>一般的な認証情報パターンを検出する簡単なフックを作成します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token shebang important">#!/bin/bash</span>
+<span class="token comment"># .git/hooks/pre-commit</span>
+
+<span class="token comment"># ステージされた変更を取得</span>
+<span class="token assign-left variable">STAGED_DIFF</span><span class="token operator">=</span><span class="token variable"><span class="token variable">$(</span><span class="token function">git</span> <span class="token function">diff</span> <span class="token parameter variable">--cached</span><span class="token variable">)</span></span>
+
+<span class="token comment"># 一般的な認証情報パターンをチェック</span>
+<span class="token keyword">if</span> <span class="token builtin class-name">echo</span> <span class="token string">"<span class="token variable">$STAGED_DIFF</span>"</span> <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-qE</span> <span class="token string">"(password|api_key|secret|token)\s*=\s*['<span class="token entity" title="\&quot;">\"</span>][^'<span class="token entity" title="\&quot;">\"</span>]+['<span class="token entity" title="\&quot;">\"</span>]"</span><span class="token punctuation">;</span> <span class="token keyword">then</span>
+  <span class="token builtin class-name">echo</span> <span class="token string">"❌ エラー：コミットに潜在的な認証情報を検出"</span>
+  <span class="token builtin class-name">echo</span> <span class="token string">"認証情報を削除して環境変数を使用してください"</span>
+  <span class="token builtin class-name">exit</span> <span class="token number">1</span>
+<span class="token keyword">fi</span>
+
+<span class="token comment"># AWSアクセスキーをチェック</span>
+<span class="token keyword">if</span> <span class="token builtin class-name">echo</span> <span class="token string">"<span class="token variable">$STAGED_DIFF</span>"</span> <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-qE</span> <span class="token string">"AKIA[0-9A-Z]{16}"</span><span class="token punctuation">;</span> <span class="token keyword">then</span>
+  <span class="token builtin class-name">echo</span> <span class="token string">"❌ エラー：AWSアクセスキーを検出"</span>
+  <span class="token builtin class-name">exit</span> <span class="token number">1</span>
+<span class="token keyword">fi</span>
+
+<span class="token comment"># 秘密鍵をチェック</span>
+<span class="token keyword">if</span> <span class="token builtin class-name">echo</span> <span class="token string">"<span class="token variable">$STAGED_DIFF</span>"</span> <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-qE</span> <span class="token string">"BEGIN.*PRIVATE KEY"</span><span class="token punctuation">;</span> <span class="token keyword">then</span>
+  <span class="token builtin class-name">echo</span> <span class="token string">"❌ エラー：秘密鍵を検出"</span>
+  <span class="token builtin class-name">exit</span> <span class="token number">1</span>
+<span class="token keyword">fi</span>
+
+<span class="token comment"># 高エントロピー文字列をチェック（潜在的なシークレット）</span>
+<span class="token keyword">if</span> <span class="token builtin class-name">echo</span> <span class="token string">"<span class="token variable">$STAGED_DIFF</span>"</span> <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-qE</span> <span class="token string">"['<span class="token entity" title="\&quot;">\"</span>][a-zA-Z0-9]{32,}['<span class="token entity" title="\&quot;">\"</span>]"</span><span class="token punctuation">;</span> <span class="token keyword">then</span>
+  <span class="token builtin class-name">echo</span> <span class="token string">"⚠️  警告：高エントロピー文字列を検出（シークレットの可能性）"</span>
+  <span class="token builtin class-name">echo</span> <span class="token string">"コミット前に慎重に確認してください"</span>
+<span class="token keyword">fi</span>
+
+<span class="token builtin class-name">exit</span> <span class="token number">0</span></code></pre>
+<h3 id="git-secretsの使用">git-secretsの使用</h3>
+<p>AWSのgit-secretsは包括的な認証情報検出を提供します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># git-secretsをインストール</span>
+brew <span class="token function">install</span> git-secrets  <span class="token comment"># macOS</span>
+<span class="token comment"># または</span>
+<span class="token function">git</span> clone https://github.com/awslabs/git-secrets.git
+<span class="token builtin class-name">cd</span> git-secrets
+<span class="token function">make</span> <span class="token function">install</span>
+
+<span class="token comment"># リポジトリにフックをインストール</span>
+<span class="token builtin class-name">cd</span> /path/to/your/repo
+<span class="token function">git</span> secrets <span class="token parameter variable">--install</span>
+
+<span class="token comment"># AWSパターンを登録</span>
+<span class="token function">git</span> secrets --register-aws
+
+<span class="token comment"># カスタムパターンを追加</span>
+<span class="token function">git</span> secrets <span class="token parameter variable">--add</span> <span class="token string">'password\s*=\s*["\'</span><span class="token punctuation">]</span><span class="token punctuation">[</span>^<span class="token string">"\']+["</span><span class="token punctuation">\</span>'<span class="token punctuation">]</span><span class="token string">'
+git secrets --add '</span>api<span class="token punctuation">[</span>_-<span class="token punctuation">]</span>?key<span class="token punctuation">\</span>s*<span class="token operator">=</span><span class="token punctuation">\</span>s*<span class="token punctuation">[</span><span class="token string">"\'][^"</span><span class="token punctuation">\</span>'<span class="token punctuation">]</span>+<span class="token punctuation">[</span><span class="token string">"\']'
+git secrets --add '["</span><span class="token punctuation">\</span>'<span class="token punctuation">]</span><span class="token punctuation">[</span>a-zA-Z0-9<span class="token punctuation">]</span><span class="token punctuation">{</span><span class="token number">32</span>,<span class="token punctuation">}</span><span class="token punctuation">[</span>"<span class="token punctuation">\</span>'<span class="token punctuation">]</span>'
+
+<span class="token comment"># リポジトリ履歴をスキャン</span>
+<span class="token function">git</span> secrets --scan-history</code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔧 git-secrets設定</p><div class="admonition-content"><p><strong>グローバルインストール</strong>
+</p><pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># すべてのリポジトリにフックをインストール</span><p></p>
+</code></pre></div></div><code class="language-bash">
+
+<span class="token function">git</span> secrets <span class="token parameter variable">--install</span> ~/.git-templates/git-secrets
+<span class="token function">git</span> config <span class="token parameter variable">--global</span> init.templateDir ~/.git-templates/git-secrets</code>
+<pre><code>**カスタムパターン**
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 組織固有のパターンを追加</span>
+<span class="token function">git</span> secrets <span class="token parameter variable">--add</span> <span class="token string">'MYCOMPANY_[A-Z_]+\s*=\s*["\'</span><span class="token punctuation">]</span><span class="token punctuation">[</span>^<span class="token string">"\']+["</span><span class="token punctuation">\</span>'<span class="token punctuation">]</span><span class="token string">'
+git secrets --add '</span>internal<span class="token punctuation">[</span>_-<span class="token punctuation">]</span>token<span class="token punctuation">\</span>s*:<span class="token punctuation">\</span>s*<span class="token punctuation">[</span><span class="token string">"\'][^"</span><span class="token punctuation">\</span>'<span class="token punctuation">]</span>+<span class="token punctuation">[</span>"<span class="token punctuation">\</span>'<span class="token punctuation">]</span>'</code></pre>
+
+**許可されたパターン**
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 誤検出をホワイトリストに追加</span>
+<span class="token function">git</span> secrets <span class="token parameter variable">--add</span> <span class="token parameter variable">--allowed</span> <span class="token string">'example_password'</span>
+<span class="token function">git</span> secrets <span class="token parameter variable">--add</span> <span class="token parameter variable">--allowed</span> <span class="token string">'test_api_key'</span></code></pre>
+</code></pre>
+<h3 id="detect-secretsの使用">detect-secretsの使用</h3>
+<p>Yelpのdetect-secretsは高度なエントロピーベースの検出を提供します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># detect-secretsをインストール</span>
+pip <span class="token function">install</span> detect-secrets
+
+<span class="token comment"># ベースラインを作成</span>
+detect-secrets scan <span class="token operator">&gt;</span> .secrets.baseline
+
+<span class="token comment"># ベースラインをコミット</span>
+<span class="token function">git</span> <span class="token function">add</span> .secrets.baseline
+<span class="token function">git</span> commit <span class="token parameter variable">-m</span> <span class="token string">"Add secrets baseline"</span>
+
+<span class="token comment"># プレコミットフックをインストール</span>
+<span class="token function">cat</span> <span class="token operator">&gt;</span> .git/hooks/pre-commit <span class="token operator">&lt;&lt;</span> <span class="token string">'EOF'
+#!/bin/bash
+detect-secrets-hook --baseline .secrets.baseline $(git diff --cached --name-only)
+EOF</span>
+<span class="token function">chmod</span> +x .git/hooks/pre-commit</code></pre>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># .pre-commit-config.yaml</span>
+<span class="token key atrule">repos</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/Yelp/detect<span class="token punctuation">-</span>secrets
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v1.4.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> detect<span class="token punctuation">-</span>secrets
+        <span class="token key atrule">args</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">'--baseline'</span><span class="token punctuation">,</span> <span class="token string">'.secrets.baseline'</span><span class="token punctuation">]</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ detect-secrets機能</p><div class="admonition-content"><p><strong>高度な検出</strong></p>
+<ul>
+<li>エントロピーベースのシークレット検出</li>
+<li>カスタム検出器のプラグインシステム</li>
+<li>誤検出管理のためのベースライン</li>
+<li>複数のシークレットタイプをサポート</li>
+</ul>
+<p><strong>誤検出の管理</strong>
+</p><pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># ベースラインを監査</span><p></p>
+</code></pre></div></div><code class="language-bash">
+
+detect-secrets audit .secrets.baseline
+
+<span class="token comment"># ベースラインを更新</span>
+detect-secrets scan <span class="token parameter variable">--baseline</span> .secrets.baseline</code>
+<h3 id="pre-commitフレームワークの使用">pre-commitフレームワークの使用</h3>
+<p>pre-commitフレームワークは複数のフックを管理します：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># .pre-commit-config.yaml</span>
+<span class="token key atrule">repos</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/pre<span class="token punctuation">-</span>commit/pre<span class="token punctuation">-</span>commit<span class="token punctuation">-</span>hooks
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v4.4.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> detect<span class="token punctuation">-</span>private<span class="token punctuation">-</span>key
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> check<span class="token punctuation">-</span>added<span class="token punctuation">-</span>large<span class="token punctuation">-</span>files
+      
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/Yelp/detect<span class="token punctuation">-</span>secrets
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v1.4.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> detect<span class="token punctuation">-</span>secrets
+        <span class="token key atrule">args</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">'--baseline'</span><span class="token punctuation">,</span> <span class="token string">'.secrets.baseline'</span><span class="token punctuation">]</span>
+        
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/gitleaks/gitleaks
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v8.16.1
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> gitleaks</code></pre>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># pre-commitをインストール</span>
+pip <span class="token function">install</span> pre-commit
+
+<span class="token comment"># フックをインストール</span>
+pre-commit <span class="token function">install</span>
+
+<span class="token comment"># 手動で実行</span>
+pre-commit run --all-files</code></pre>
+<p>pre-commitフレームワークはプロジェクト間で一貫したフック管理を提供します。</p>
+<h3 id="コードリンティング統合">コードリンティング統合</h3>
+<p>シークレット検出に加えて、プレコミットフックはコード品質を強制すべきです：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># .pre-commit-config.yaml - 包括的なセットアップ</span>
+<span class="token key atrule">repos</span><span class="token punctuation">:</span>
+  <span class="token comment"># セキュリティ：シークレット検出</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/Yelp/detect<span class="token punctuation">-</span>secrets
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v1.4.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> detect<span class="token punctuation">-</span>secrets
+        <span class="token key atrule">args</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">'--baseline'</span><span class="token punctuation">,</span> <span class="token string">'.secrets.baseline'</span><span class="token punctuation">]</span>
+  
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/pre<span class="token punctuation">-</span>commit/pre<span class="token punctuation">-</span>commit<span class="token punctuation">-</span>hooks
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v4.4.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> detect<span class="token punctuation">-</span>private<span class="token punctuation">-</span>key
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> check<span class="token punctuation">-</span>added<span class="token punctuation">-</span>large<span class="token punctuation">-</span>files
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> check<span class="token punctuation">-</span>merge<span class="token punctuation">-</span>conflict
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> trailing<span class="token punctuation">-</span>whitespace
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> end<span class="token punctuation">-</span>of<span class="token punctuation">-</span>file<span class="token punctuation">-</span>fixer
+  
+  <span class="token comment"># コード品質：リンティング</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/psf/black
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> 23.3.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> black
+        <span class="token key atrule">language_version</span><span class="token punctuation">:</span> python3
+  
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/pycqa/flake8
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> 6.0.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> flake8
+        <span class="token key atrule">args</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">'--max-line-length=88'</span><span class="token punctuation">]</span>
+  
+  <span class="token punctuation">-</span> <span class="token key atrule">repo</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/pre<span class="token punctuation">-</span>commit/mirrors<span class="token punctuation">-</span>eslint
+    <span class="token key atrule">rev</span><span class="token punctuation">:</span> v8.40.0
+    <span class="token key atrule">hooks</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">id</span><span class="token punctuation">:</span> eslint
+        <span class="token key atrule">files</span><span class="token punctuation">:</span> \.<span class="token punctuation">[</span>jt<span class="token punctuation">]</span>sx<span class="token punctuation">?</span>$
+        <span class="token key atrule">types</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>file<span class="token punctuation">]</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔧 リンティングベストプラクティス</p><div class="admonition-content"><p><strong>Pythonプロジェクト</strong></p>
+<ul>
+<li><strong>Black</strong>：コードフォーマット</li>
+<li><strong>Flake8</strong>：スタイルガイド強制</li>
+<li><strong>Pylint</strong>：コード分析</li>
+<li><strong>mypy</strong>：型チェック</li>
+</ul>
+<p><strong>JavaScript/TypeScriptプロジェクト</strong></p>
+<ul>
+<li><strong>ESLint</strong>：コード品質とスタイル</li>
+<li><strong>Prettier</strong>：コードフォーマット</li>
+<li><strong>TSLint</strong>：TypeScript固有のルール</li>
+</ul>
+<p><strong>リンティングの利点</strong></p>
+<ul>
+<li>チーム間で一貫したコードスタイル</li>
+<li>一般的なバグを早期に捕捉</li>
+<li>セキュリティベストプラクティスを強制</li>
+<li>コードレビューの摩擦を削減</li>
+<li>コードの保守性を向上</li>
+</ul>
+</div></div>
+<p>シークレット検出とコードリンティングを組み合わせることで、セキュリティと品質の両方の懸念に対処する包括的なプレコミット防御を作成します。</p>
+<h2 id="レイヤー4：CI-CDパイプラインスキャン">レイヤー4：CI/CDパイプラインスキャン</h2>
+<p>CI/CDスキャンを通じてプレコミットフックをバイパスした認証情報を捕捉します。</p>
+<h3 id="GitHub-Actions統合">GitHub Actions統合</h3>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># .github/workflows/security.yml</span>
+<span class="token key atrule">name</span><span class="token punctuation">:</span> Security Scan
+
+<span class="token key atrule">on</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>push<span class="token punctuation">,</span> pull_request<span class="token punctuation">]</span>
+
+<span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+  <span class="token key atrule">gitleaks</span><span class="token punctuation">:</span>
+    <span class="token key atrule">runs-on</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+    <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/checkout@v3
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">fetch-depth</span><span class="token punctuation">:</span> <span class="token number">0</span>
+          
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Run Gitleaks
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> gitleaks/gitleaks<span class="token punctuation">-</span>action@v2
+        <span class="token key atrule">env</span><span class="token punctuation">:</span>
+          <span class="token key atrule">GITHUB_TOKEN</span><span class="token punctuation">:</span> $<span class="token punctuation">{</span><span class="token punctuation">{</span> secrets.GITHUB_TOKEN <span class="token punctuation">}</span><span class="token punctuation">}</span></code></pre>
+<h3 id="GitLab-CI統合">GitLab CI統合</h3>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># .gitlab-ci.yml</span>
+<span class="token key atrule">secret-detection</span><span class="token punctuation">:</span>
+  <span class="token key atrule">stage</span><span class="token punctuation">:</span> test
+  <span class="token key atrule">image</span><span class="token punctuation">:</span> python<span class="token punctuation">:</span><span class="token number">3.9</span>
+  <span class="token key atrule">before_script</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> pip install detect<span class="token punctuation">-</span>secrets
+  <span class="token key atrule">script</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> detect<span class="token punctuation">-</span>secrets scan <span class="token punctuation">-</span><span class="token punctuation">-</span>baseline .secrets.baseline
+  <span class="token key atrule">only</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> merge_requests
+    <span class="token punctuation">-</span> main</code></pre>
+<h3 id="カスタムスキャンスクリプト">カスタムスキャンスクリプト</h3>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># scripts/scan_secrets.py</span>
+<span class="token keyword">import</span> re
+<span class="token keyword">import</span> sys
+<span class="token keyword">import</span> subprocess
+
+PATTERNS <span class="token operator">=</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">(</span><span class="token string">r'AKIA[0-9A-Z]{16}'</span><span class="token punctuation">,</span> <span class="token string">'AWS Access Key'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">r'password\s*=\s*["\'][^"\']+["\']'</span><span class="token punctuation">,</span> <span class="token string">'Password'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">r'api[_-]?key\s*=\s*["\'][^"\']+["\']'</span><span class="token punctuation">,</span> <span class="token string">'API Key'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">r'BEGIN.*PRIVATE KEY'</span><span class="token punctuation">,</span> <span class="token string">'Private Key'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">scan_commit</span><span class="token punctuation">(</span>commit_hash<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    diff <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>check_output<span class="token punctuation">(</span>
+        <span class="token punctuation">[</span><span class="token string">'git'</span><span class="token punctuation">,</span> <span class="token string">'show'</span><span class="token punctuation">,</span> commit_hash<span class="token punctuation">]</span><span class="token punctuation">,</span>
+        text<span class="token operator">=</span><span class="token boolean">True</span>
+    <span class="token punctuation">)</span>
+    
+    findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> pattern<span class="token punctuation">,</span> name <span class="token keyword">in</span> PATTERNS<span class="token punctuation">:</span>
+        matches <span class="token operator">=</span> re<span class="token punctuation">.</span>findall<span class="token punctuation">(</span>pattern<span class="token punctuation">,</span> diff<span class="token punctuation">,</span> re<span class="token punctuation">.</span>IGNORECASE<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> matches<span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">'type'</span><span class="token punctuation">:</span> name<span class="token punctuation">,</span>
+                <span class="token string">'pattern'</span><span class="token punctuation">:</span> pattern<span class="token punctuation">,</span>
+                <span class="token string">'count'</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>matches<span class="token punctuation">)</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">return</span> findings
+
+<span class="token keyword">if</span> __name__ <span class="token operator">==</span> <span class="token string">'__main__'</span><span class="token punctuation">:</span>
+    commit <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>check_output<span class="token punctuation">(</span>
+        <span class="token punctuation">[</span><span class="token string">'git'</span><span class="token punctuation">,</span> <span class="token string">'rev-parse'</span><span class="token punctuation">,</span> <span class="token string">'HEAD'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        text<span class="token operator">=</span><span class="token boolean">True</span>
+    <span class="token punctuation">)</span><span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    findings <span class="token operator">=</span> scan_commit<span class="token punctuation">(</span>commit<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> findings<span class="token punctuation">:</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"❌ コミットで認証情報を検出！"</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> finding <span class="token keyword">in</span> findings<span class="token punctuation">:</span>
+            <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"  - </span><span class="token interpolation"><span class="token punctuation">{</span>finding<span class="token punctuation">[</span><span class="token string">'type'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>finding<span class="token punctuation">[</span><span class="token string">'count'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> 件の一致"</span></span><span class="token punctuation">)</span>
+        sys<span class="token punctuation">.</span>exit<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+    
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"✅ 認証情報は検出されませんでした"</span><span class="token punctuation">)</span></code></pre>
+<p>CI/CDスキャンは開発者がローカルフックをバイパスしたときにセーフティネットを提供します。</p>
+<h2 id="レイヤー5：シークレット管理システム">レイヤー5：シークレット管理システム</h2>
+<p>本番環境では環境変数を集中型シークレット管理に置き換えます。</p>
+<h3 id="AWS-Secrets-Manager">AWS Secrets Manager</h3>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># ランタイムでシークレットを取得</span>
+<span class="token keyword">import</span> boto3
+<span class="token keyword">import</span> json
+
+<span class="token keyword">def</span> <span class="token function">get_secret</span><span class="token punctuation">(</span>secret_name<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    client <span class="token operator">=</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">'secretsmanager'</span><span class="token punctuation">,</span> region_name<span class="token operator">=</span><span class="token string">'us-east-1'</span><span class="token punctuation">)</span>
+    response <span class="token operator">=</span> client<span class="token punctuation">.</span>get_secret_value<span class="token punctuation">(</span>SecretId<span class="token operator">=</span>secret_name<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>response<span class="token punctuation">[</span><span class="token string">'SecretString'</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+<span class="token comment"># アプリケーションで使用</span>
+secrets <span class="token operator">=</span> get_secret<span class="token punctuation">(</span><span class="token string">'production/app/credentials'</span><span class="token punctuation">)</span>
+DATABASE_URL <span class="token operator">=</span> secrets<span class="token punctuation">[</span><span class="token string">'database_url'</span><span class="token punctuation">]</span>
+API_KEY <span class="token operator">=</span> secrets<span class="token punctuation">[</span><span class="token string">'api_key'</span><span class="token punctuation">]</span></code></pre>
+<h3 id="HashiCorp-Vault">HashiCorp Vault</h3>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># hvacライブラリを使用</span>
+<span class="token keyword">import</span> hvac
+
+client <span class="token operator">=</span> hvac<span class="token punctuation">.</span>Client<span class="token punctuation">(</span>url<span class="token operator">=</span><span class="token string">'https://vault.example.com'</span><span class="token punctuation">)</span>
+client<span class="token punctuation">.</span>auth<span class="token punctuation">.</span>approle<span class="token punctuation">.</span>login<span class="token punctuation">(</span>
+    role_id<span class="token operator">=</span>os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">'VAULT_ROLE_ID'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    secret_id<span class="token operator">=</span>os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">'VAULT_SECRET_ID'</span><span class="token punctuation">]</span>
+<span class="token punctuation">)</span>
+
+secrets <span class="token operator">=</span> client<span class="token punctuation">.</span>secrets<span class="token punctuation">.</span>kv<span class="token punctuation">.</span>v2<span class="token punctuation">.</span>read_secret_version<span class="token punctuation">(</span>
+    path<span class="token operator">=</span><span class="token string">'production/app'</span>
+<span class="token punctuation">)</span>
+DATABASE_URL <span class="token operator">=</span> secrets<span class="token punctuation">[</span><span class="token string">'data'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'data'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'database_url'</span><span class="token punctuation">]</span></code></pre>
+<h3 id="Kubernetes-Secrets">Kubernetes Secrets</h3>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># secret.yaml</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> Secret
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> app<span class="token punctuation">-</span>secrets
+<span class="token key atrule">type</span><span class="token punctuation">:</span> Opaque
+<span class="token key atrule">data</span><span class="token punctuation">:</span>
+  <span class="token key atrule">database-url</span><span class="token punctuation">:</span> cG9zdGdyZXNxbDovL3VzZXI6cGFzc0BkYi9uYW1l
+  <span class="token key atrule">api-key</span><span class="token punctuation">:</span> c2tfbGl2ZV9hYmMxMjN4eXo3ODk=</code></pre>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># deployment.yaml</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> apps/v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> Deployment
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">template</span><span class="token punctuation">:</span>
+    <span class="token key atrule">spec</span><span class="token punctuation">:</span>
+      <span class="token key atrule">containers</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> app
+        <span class="token key atrule">env</span><span class="token punctuation">:</span>
+        <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> DATABASE_URL
+          <span class="token key atrule">valueFrom</span><span class="token punctuation">:</span>
+            <span class="token key atrule">secretKeyRef</span><span class="token punctuation">:</span>
+              <span class="token key atrule">name</span><span class="token punctuation">:</span> app<span class="token punctuation">-</span>secrets
+              <span class="token key atrule">key</span><span class="token punctuation">:</span> database<span class="token punctuation">-</span>url</code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔐 シークレット管理の利点</p><div class="admonition-content"><p><strong>メリット</strong></p>
+<ul>
+<li>集中型認証情報ストレージ</li>
+<li>自動ローテーション機能</li>
+<li>アクセス制御と監査</li>
+<li>保存時と転送時の暗号化</li>
+<li>クラウドプラットフォームとの統合</li>
+<li>短期認証情報が露出ウィンドウを削減</li>
+</ul>
+<p><strong>使用すべき場合</strong></p>
+<ul>
+<li>本番環境</li>
+<li>マルチサービスアーキテクチャ</li>
+<li>コンプライアンス要件</li>
+<li>自動認証情報ローテーションが必要</li>
+<li>チーム全体での認証情報共有</li>
+</ul>
+</div></div>
+<h3 id="短期認証情報">短期認証情報</h3>
+<p>シークレット管理システムは自動的に期限切れになる短期認証情報を有効にします：</p>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># AWS STS一時認証情報</span>
+<span class="token keyword">import</span> boto3
+
+sts <span class="token operator">=</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">'sts'</span><span class="token punctuation">)</span>
+response <span class="token operator">=</span> sts<span class="token punctuation">.</span>assume_role<span class="token punctuation">(</span>
+    RoleArn<span class="token operator">=</span><span class="token string">'arn:aws:iam::123456789012:role/AppRole'</span><span class="token punctuation">,</span>
+    RoleSessionName<span class="token operator">=</span><span class="token string">'app-session'</span><span class="token punctuation">,</span>
+    DurationSeconds<span class="token operator">=</span><span class="token number">3600</span>  <span class="token comment"># 1時間</span>
+<span class="token punctuation">)</span>
+
+credentials <span class="token operator">=</span> response<span class="token punctuation">[</span><span class="token string">'Credentials'</span><span class="token punctuation">]</span>
+<span class="token comment"># 一時認証情報を使用</span></code></pre>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># Vault動的シークレット</span>
+<span class="token keyword">import</span> hvac
+
+client <span class="token operator">=</span> hvac<span class="token punctuation">.</span>Client<span class="token punctuation">(</span>url<span class="token operator">=</span><span class="token string">'https://vault.example.com'</span><span class="token punctuation">)</span>
+client<span class="token punctuation">.</span>auth<span class="token punctuation">.</span>approle<span class="token punctuation">.</span>login<span class="token punctuation">(</span>
+    role_id<span class="token operator">=</span>os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">'VAULT_ROLE_ID'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    secret_id<span class="token operator">=</span>os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">'VAULT_SECRET_ID'</span><span class="token punctuation">]</span>
+<span class="token punctuation">)</span>
+
+<span class="token comment"># 短期データベース認証情報を生成</span>
+db_creds <span class="token operator">=</span> client<span class="token punctuation">.</span>secrets<span class="token punctuation">.</span>database<span class="token punctuation">.</span>generate_credentials<span class="token punctuation">(</span>
+    name<span class="token operator">=</span><span class="token string">'my-role'</span><span class="token punctuation">,</span>
+    ttl<span class="token operator">=</span><span class="token string">'1h'</span>
+<span class="token punctuation">)</span>
+
+username <span class="token operator">=</span> db_creds<span class="token punctuation">[</span><span class="token string">'data'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'username'</span><span class="token punctuation">]</span>
+password <span class="token operator">=</span> db_creds<span class="token punctuation">[</span><span class="token string">'data'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'password'</span><span class="token punctuation">]</span>
+<span class="token comment"># 認証情報は1時間後に自動的に期限切れ</span></code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 短期認証情報の利点</p><div class="admonition-content"><p><strong>セキュリティ上の利点</strong></p>
+<ul>
+<li>認証情報が自動的に期限切れ</li>
+<li>認証情報侵害のウィンドウを削減</li>
+<li>手動ローテーション不要</li>
+<li>漏洩した認証情報が迅速に無効化</li>
+<li>認証情報露出の影響範囲を制限</li>
+</ul>
+<p><strong>実装パターン</strong></p>
+<ul>
+<li>AWS STSで一時AWS認証情報（15分〜12時間）</li>
+<li>Vaultダイナミックシークレットでデータベース（数分〜数時間）</li>
+<li>短い有効期限のOAuthトークン（数分〜数時間）</li>
+<li>TTL付きサービスアカウントトークン</li>
+<li>短い有効期間の証明書ベース認証</li>
+</ul>
+<p><strong>ベストプラクティス</strong></p>
+<ul>
+<li>認証情報に最短の実用的なTTLを設定</li>
+<li>自動認証情報更新を実装</li>
+<li>認証情報使用パターンを監視</li>
+<li>アプリケーションシャットダウン時に認証情報を取り消し</li>
+<li>リクエストを最小化するために認証情報キャッシュを使用</li>
+</ul>
+</div></div>
+<h2 id="レイヤー6：GitProxyによるプッシュ保護">レイヤー6：GitProxyによるプッシュ保護</h2>
+<p>承認ワークフローが必要な組織向けに、<a target="_blank" rel="noopener" href="https://git-proxy.finos.org/">GitProxy</a>はGit上にカスタムプッシュ保護とポリシーを提供します。</p>
+<h3 id="GitProxyとは？">GitProxyとは？</h3>
+<p>GitProxyは開発者体験を維持しながらプッシュ保護を強制する高度に設定可能なフレームワークです：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🛡️ GitProxy機能</p><div class="admonition-content"><p><strong>開発者ファーストの設計</strong></p>
+<ul>
+<li>リモートリポジトリに到達する前にプッシュを傍受</li>
+<li>CLI/ターミナルで修復手順を提示</li>
+<li>摩擦と採用障壁を最小化</li>
+<li>開発者がコードのコミットに集中できるようにする</li>
+</ul>
+<p><strong>承認ワークフロー</strong></p>
+<ul>
+<li>プッシュを一時停止状態に保持</li>
+<li>アップストリームへのプッシュ前に明示的な承認が必要</li>
+<li>Web UI、REST API、CLIで承認を提供</li>
+<li>プッシュレビュー用の共有可能なリンクを生成</li>
+</ul>
+<p><strong>設定可能なポリシー</strong></p>
+<ul>
+<li>カスタムプッシュ保護ルール</li>
+<li>組織固有のセキュリティ態勢</li>
+<li>リスク選好度の調整</li>
+<li>既存のワークフローとの統合</li>
+</ul>
+</div></div>
+<h3 id="クイックセットアップ">クイックセットアップ</h3>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># GitProxyをインストール</span>
+<span class="token function">npm</span> <span class="token function">install</span> <span class="token parameter variable">-g</span> @finos/git-proxy
+
+<span class="token comment"># 設定を作成</span>
+<span class="token function">cat</span> <span class="token operator">&gt;</span> proxy.config.json <span class="token operator">&lt;&lt;</span> <span class="token string">EOF
+{
+  "authorisedList": [
+    {
+      "project": "your-org",
+      "name": "your-repo",
+      "url": "https://github.com/your-org/your-repo.git"
+    }
+  ]
+}
+EOF</span>
+
+<span class="token comment"># GitProxyを実行</span>
+npx @finos/git-proxy <span class="token parameter variable">--config</span> ./proxy.config.json
+
+<span class="token comment"># リポジトリをGitProxyを使用するように設定</span>
+<span class="token function">git</span> remote set-url origin http://localhost:8000/your-org/your-repo.git</code></pre>
+<h3 id="承認ワークフロー">承認ワークフロー</h3>
+<p>開発者がコードをプッシュすると：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">git</span> push
+remote:
+remote: GitProxy has received your push ✅
+remote:
+remote: 🔗 Shareable Link
+remote: http://localhost:8080/dashboard/push/000000__b12557</code></pre>
+<p>CLIで承認：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># ログイン</span>
+npx @finos/git-proxy-cli login <span class="token parameter variable">--username</span> admin <span class="token parameter variable">--password</span> admin
+
+<span class="token comment"># プッシュを承認</span>
+npx @finos/git-proxy-cli authorise <span class="token parameter variable">--id</span> 000000__b12557
+
+<span class="token comment"># 開発者が再プッシュ</span>
+<span class="token function">git</span> push  <span class="token comment"># 今度は成功</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 GitProxyユースケース</p><div class="admonition-content"><p><strong>GitProxyを使用すべき場合</strong></p>
+<ul>
+<li>承認ワークフローが必要な規制業界</li>
+<li>厳格な変更管理を持つ組織</li>
+<li>本番前にプッシュレビューが必要なチーム</li>
+<li>コード変更のコンプライアンス要件</li>
+<li>プレコミットフックを超える追加レイヤー</li>
+</ul>
+<p><strong>利点</strong></p>
+<ul>
+<li>集中型プッシュ制御</li>
+<li>すべてのプッシュの監査証跡</li>
+<li>組織レベルでのポリシー強制</li>
+<li>開発者がバイパスできない</li>
+<li>プレコミットフックを補完</li>
+</ul>
+</div></div>
+<h2 id="レイヤー7：プラットフォームスキャンと監視">レイヤー7：プラットフォームスキャンと監視</h2>
+<p>継続的な監視のためにプラットフォーム提供のスキャンを活用します。</p>
+<h3 id="GitHubシークレットスキャン">GitHubシークレットスキャン</h3>
+<p>GitHubは公開リポジトリを自動的にスキャンします：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 GitHubシークレットスキャン</p><div class="admonition-content"><p><strong>自動検出</strong></p>
+<ul>
+<li>公開リポジトリのすべてのコミットをスキャン</li>
+<li>100以上の認証情報パターンを検出</li>
+<li>リポジトリ管理者に通知</li>
+<li>認証情報プロバイダーに警告（AWS、Azureなど）</li>
+</ul>
+<p><strong>GitHub Advanced Security</strong></p>
+<ul>
+<li>プライベートリポジトリで利用可能</li>
+<li>カスタムパターンサポート</li>
+<li>プッシュ保護（コミットをブロック）</li>
+<li>セキュリティアドバイザリとの統合</li>
+</ul>
+<p><strong>プッシュ保護を有効化</strong>
+</p><pre class="language-none"><code class="language-none">Settings → Code security and analysis<p></p>
+</code></pre></div></div><code class="language-none">
+
+→ Push protection → Enable</code>
+<h3 id="GitLabシークレット検出">GitLabシークレット検出</h3>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># .gitlab-ci.yml</span>
+<span class="token key atrule">include</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">template</span><span class="token punctuation">:</span> Security/Secret<span class="token punctuation">-</span>Detection.gitlab<span class="token punctuation">-</span>ci.yml
+
+<span class="token key atrule">secret_detection</span><span class="token punctuation">:</span>
+  <span class="token key atrule">variables</span><span class="token punctuation">:</span>
+    <span class="token key atrule">SECRET_DETECTION_HISTORIC_SCAN</span><span class="token punctuation">:</span> <span class="token string">"true"</span></code></pre>
+<h3 id="カスタム監視">カスタム監視</h3>
+<pre class="language-python" data-language="python"><code class="language-python"><span class="token comment"># 新しいコミットを監視</span>
+<span class="token keyword">import</span> requests
+<span class="token keyword">import</span> re
+
+<span class="token keyword">def</span> <span class="token function">check_commit</span><span class="token punctuation">(</span>repo<span class="token punctuation">,</span> commit_sha<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    url <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"https://api.github.com/repos/</span><span class="token interpolation"><span class="token punctuation">{</span>repo<span class="token punctuation">}</span></span><span class="token string">/commits/</span><span class="token interpolation"><span class="token punctuation">{</span>commit_sha<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    response <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span>url<span class="token punctuation">)</span>
+    commit_data <span class="token operator">=</span> response<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    patterns <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token string">r'AKIA[0-9A-Z]{16}'</span><span class="token punctuation">,</span>
+        <span class="token string">r'password\s*=\s*["\'][^"\']+["\']'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    
+    <span class="token keyword">for</span> <span class="token builtin">file</span> <span class="token keyword">in</span> commit_data<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'files'</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        patch <span class="token operator">=</span> <span class="token builtin">file</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'patch'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> pattern <span class="token keyword">in</span> patterns<span class="token punctuation">:</span>
+            <span class="token keyword">if</span> re<span class="token punctuation">.</span>search<span class="token punctuation">(</span>pattern<span class="token punctuation">,</span> patch<span class="token punctuation">)</span><span class="token punctuation">:</span>
+                alert_security_team<span class="token punctuation">(</span>repo<span class="token punctuation">,</span> commit_sha<span class="token punctuation">,</span> pattern<span class="token punctuation">)</span></code></pre>
+<p>継続的な監視は他のレイヤーをすり抜けた認証情報を捕捉します。</p>
+<h2 id="実装戦略">実装戦略</h2>
+<p>OWASP DevSecOps原則に従って段階的に認証情報保護を展開します：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>📋 実装ロードマップ</p><div class="admonition-content"><p><strong>フェーズ1：基礎（第1週）</strong></p>
+<ul>
+<li>包括的な<code>.gitignore</code>パターンを追加</li>
+<li><code>.env.example</code>テンプレートを作成</li>
+<li>環境変数要件を文書化</li>
+<li>既存コードのハードコードされた認証情報を監査</li>
+</ul>
+<p><strong>フェーズ2：プレコミット保護（第2週）</strong></p>
+<ul>
+<li>git-secretsまたはdetect-secretsをインストール</li>
+<li>シークレット検出用のプレコミットフックを設定</li>
+<li>コードリンティングフック（Black、ESLintなど）を追加</li>
+<li>チームにプレコミットワークフローをトレーニング</li>
+<li>コードレビューガイドラインを確立</li>
+</ul>
+<p><strong>フェーズ3：CI/CD統合（第3週）</strong></p>
+<ul>
+<li>CI/CDパイプラインにシークレットスキャンを追加</li>
+<li>ビルドプロセスにリンティングチェックを統合</li>
+<li>自動アラートを設定</li>
+<li>検出された認証情報またはリンティング失敗を含むマージをブロック</li>
+<li>監視ダッシュボードを設定</li>
+</ul>
+<p><strong>フェーズ4：プッシュ保護（第4週）</strong></p>
+<ul>
+<li>承認ワークフロー用のGitProxyを評価</li>
+<li>プッシュポリシーと承認済みリポジトリを設定</li>
+<li>承認プロセス（UI、CLI、API）を設定</li>
+<li>チームに承認ワークフローをトレーニング</li>
+<li>エスカレーション手順を文書化</li>
+</ul>
+<p><strong>フェーズ5：シークレット管理（第5週以降）</strong></p>
+<ul>
+<li>シークレット管理ソリューションを評価</li>
+<li>本番認証情報を移行</li>
+<li>自動ローテーションを実装</li>
+<li>運用手順を文書化</li>
+</ul>
+<p><strong>フェーズ6：継続的改善</strong></p>
+<ul>
+<li>検出パターンをレビューおよび更新</li>
+<li>誤検出率を分析</li>
+<li>チームフィードバックを収集</li>
+<li>チームのニーズに基づいてリンティングルールを改善</li>
+<li>定期的なセキュリティトレーニングを実施</li>
+</ul>
+</div></div>
+<h2 id="誤検出の処理">誤検出の処理</h2>
+<p>すべてのスキャンツールは管理が必要な誤検出を生成します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># git-secrets：特定のパターンを許可</span>
+<span class="token function">git</span> secrets <span class="token parameter variable">--add</span> <span class="token parameter variable">--allowed</span> <span class="token string">'example_password'</span>
+<span class="token function">git</span> secrets <span class="token parameter variable">--add</span> <span class="token parameter variable">--allowed</span> <span class="token string">'test_api_key'</span>
+
+<span class="token comment"># detect-secrets：監査して誤検出をマーク</span>
+detect-secrets audit .secrets.baseline
+<span class="token comment"># インタラクティブ：各発見を真実または誤検出としてマーク</span>
+
+<span class="token comment"># gitleaks：.gitleaksignoreを使用</span>
+<span class="token builtin class-name">echo</span> <span class="token string">"path/to/test/file.py"</span> <span class="token operator">&gt;&gt;</span> .gitleaksignore</code></pre>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># detect-secretsのカスタム設定</span>
+<span class="token comment"># .secrets.baseline</span>
+<span class="token punctuation">{</span>
+  <span class="token key atrule">"exclude"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+    <span class="token key atrule">"files"</span><span class="token punctuation">:</span> <span class="token string">"test/.*|.*\\.example$"</span><span class="token punctuation">,</span>
+    <span class="token key atrule">"lines"</span><span class="token punctuation">:</span> <span class="token string">"password.*=.*example"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 誤検出管理</p><div class="admonition-content"><p><strong>ベストプラクティス</strong></p>
+<ul>
+<li>各誤検出を慎重にレビュー</li>
+<li>パターンが許可される理由を文書化</li>
+<li>広範なパターンではなく特定の許可リストを使用</li>
+<li>許可されたパターンを定期的に監査</li>
+<li>古い許可リストエントリを削除</li>
+</ul>
+</div></div>
+<h2 id="結論">結論</h2>
+<p>Gitへの認証情報の侵入を防ぐには、OWASP DevSecOps原則と一致した多層防御戦略が必要です。単一のツールですべてのミスを捕捉することはできませんが、複数の重複する防御が堅牢な保護システムを作成します。プレコミットフェーズは特に重要です—これは最初で最も効果的な防御線であり、問題が中央リポジトリに到達する前に捕捉します。</p>
+<p><code>.gitignore</code>設定と環境変数から始めて適切なパターンを確立します。シークレットとコード品質の自動ローカルスキャンのためにプレコミットフックを追加します。バイパスされたフックを捕捉するためにCI/CDパイプラインチェックを実装します。承認ワークフローが必要な組織には、GitProxyがバイパスできない追加のプッシュ保護レイヤーを提供します。本番認証情報用にシークレット管理システムを展開し、露出ウィンドウを最小化するために自動的に期限切れになる短期認証情報を優先します。継続的な監視のためにプラットフォームスキャンを有効にします。</p>
+<p>予防への投資は即座に配当をもたらします。防止された各認証情報漏洩は、<a href="/ja/2022/02/Managing-Credentials-Committed-to-Git/">Git履歴の書き換え、認証情報のローテーション、インシデント対応</a>の複雑さを回避します。スキャンツールの維持の運用負担は、認証情報侵害のコストと比較して微々たるものです。</p>
+<p>基本から始めます—適切な<code>.gitignore</code>と環境変数—その後、段階的にレイヤーを追加します。プレコミットフックは次の優先事項であるべきで、包括的な品質強制のためにシークレット検出とコードリンティングを組み合わせます。基本的なプレコミットフックでさえ、ほとんどの偶発的なコミットを捕捉します。規制された環境では、承認ワークフローを強制するためにGitProxyの使用を検討してください。短期認証情報を持つ高度なシークレット管理はゴールドスタンダードを表しますが、チームが基礎をマスターするまで待つことができます。</p>
+<p>覚えておいてください：Gitにコミットされたすべての認証情報は侵害されたものとして扱うべきです。予防はツールだけの問題ではありません—認証情報保護とコード品質が自動的で後付けではない文化を構築することです。短期認証情報は多層防御を体現しています—漏洩しても迅速に期限切れになり、損害を制限します。プレコミットフェーズは、開発者が最も必要とする瞬間に即座のフィードバックと教育を提供します。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2022/03/Preventing-Credentials-in-Git/" data-id="5c114695" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Gitでの認証情報の防止：多層防御戦略",
+        "image": "https://neo01.com/assets/git/thumbnail.png",
+        "keywords": "Credentials DevOps Git Security",
+        "genre": "Development",
+        "datePublished": "2022-03-21",
+        "dateCreated": "2022-03-21",
+        "dateModified": "2025-10-25",
+        "url": "https://neo01.com//ja/2022/03/Preventing-Credentials-in-Git/",
+        "description": "予防は修復に勝る。OWASP DevSecOps原則に従い、プレコミットフック、シークレットスキャン、コードリンティング、自動検出で多層防御を構築。",
+        "wordCount": 4431
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#bb33d6db</div>
+                <img src="/qr/qr-019a07932ced2e6f3b65f84529006527.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#bb33d6db">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

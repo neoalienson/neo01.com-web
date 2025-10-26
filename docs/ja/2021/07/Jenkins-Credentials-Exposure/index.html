@@ -1,0 +1,1701 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>Jenkins 認証情報の漏洩：CI/CD パイプラインに潜むセキュリティリスク | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="DevOps,Jenkins,Security">
+    
+    
+    <meta name="description" content="Jenkins の認証情報は、ビルドログ、スクリプトコンソール、API エンドポイントを通じて漏洩する可能性があります。認証情報がどのように露出するか、そして CI/CD パイプラインを保護する方法を理解しましょう。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jenkins 認証情報の漏洩：CI/CD パイプラインに潜むセキュリティリスク">
+<meta property="og:url" content="https://neo01.com/ja/2021/07/Jenkins-Credentials-Exposure/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Jenkins の認証情報は、ビルドログ、スクリプトコンソール、API エンドポイントを通じて漏洩する可能性があります。認証情報がどのように露出するか、そして CI/CD パイプラインを保護する方法を理解しましょう。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/jenkins/thumbnail.png">
+<meta property="article:published_time" content="2021-06-30T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-23T14:57:12.754Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="Jenkins">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/jenkins/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/ja/2021/07/Jenkins-Credentials-Exposure">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2021/07/Jenkins-Credentials-Exposure/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2021/07/Jenkins-Credentials-Exposure/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2021/07/Jenkins-Credentials-Exposure/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2021/07/Jenkins-Credentials-Exposure-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Jenkins 認証情報の漏洩：CI/CD パイプラインに潜むセキュリティリスク
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2021-06-30T16:00:00.000Z" itemprop="datePublished">2021-07-01</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-23T14:57:12.754Z" itemprop="datePublished">2025-10-23</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/ja/tags/Security/">Security</a> <a class="tag-link" href="/ja/tags/DevOps/">DevOps</a> <a class="tag-link" href="/ja/tags/Jenkins/">Jenkins</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#Jenkins-%E8%AA%8D%E8%A8%BC%E6%83%85%E5%A0%B1%E3%81%AE%E7%90%86%E8%A7%A3"><span class="toc-text">Jenkins 認証情報の理解</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%93%E3%83%AB%E3%83%89%E3%83%AD%E3%82%B0%E6%BC%8F%E6%B4%A9%EF%BC%9A%E6%9C%80%E3%82%82%E4%B8%80%E8%88%AC%E7%9A%84%E3%81%AA%E3%83%9F%E3%82%B9"><span class="toc-text">ビルドログ漏洩：最も一般的なミス</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%97%E3%83%88%E3%82%B3%E3%83%B3%E3%82%BD%E3%83%BC%E3%83%AB%EF%BC%9A%E7%AE%A1%E7%90%86%E3%83%90%E3%83%83%E3%82%AF%E3%83%89%E3%82%A2"><span class="toc-text">スクリプトコンソール：管理バックドア</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#API-%E6%BC%8F%E6%B4%A9%EF%BC%9A%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9E%E3%83%86%E3%82%A3%E3%83%83%E3%82%AF%E3%82%A2%E3%82%AF%E3%82%BB%E3%82%B9"><span class="toc-text">API 漏洩：プログラマティックアクセス</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%97%E3%83%A9%E3%82%B0%E3%82%A4%E3%83%B3%E3%82%A8%E3%82%B3%E3%82%B7%E3%82%B9%E3%83%86%E3%83%A0%EF%BC%9A%E3%82%B5%E3%83%BC%E3%83%89%E3%83%91%E3%83%BC%E3%83%86%E3%82%A3%E3%81%AE%E3%83%AA%E3%82%B9%E3%82%AF"><span class="toc-text">プラグインエコシステム：サードパーティのリスク</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E8%88%AC%E7%9A%84%E3%81%AA%E6%BC%8F%E6%B4%A9%E3%82%B7%E3%83%8A%E3%83%AA%E3%82%AA"><span class="toc-text">一般的な漏洩シナリオ</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E9%9A%9B%E3%81%AE%E3%82%A4%E3%83%B3%E3%82%B7%E3%83%87%E3%83%B3%E3%83%88-%E3%82%A8%E3%83%B3%E3%82%B3%E3%83%BC%E3%83%89%E3%81%95%E3%82%8C%E3%81%9F%E8%AA%8D%E8%A8%BC%E6%83%85%E5%A0%B1%E3%81%AF%E5%AE%89%E5%85%A8%E3%81%A7%E3%81%AF%E3%81%AA%E3%81%84"><span class="toc-text">実際のインシデント:エンコードされた認証情報は安全ではない</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Jenkins-%E8%AA%8D%E8%A8%BC%E6%83%85%E5%A0%B1%E3%81%AE%E4%BF%9D%E8%AD%B7"><span class="toc-text">Jenkins 認証情報の保護</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A4%9C%E5%87%BA%E3%81%A8%E5%AF%BE%E5%BF%9C"><span class="toc-text">検出と対応</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <style>
+img.left-image {
+  float: left;
+  margin-right: 10px;
+  margin-top: 30px;
+  max-height: 80px;
+  width: auto;
+}
+</style>
+<p><a href="javascript:void(0);" class="image-wrapper"><img src="/assets/jenkins/icon.png" alt="" class="left-image"></a><br>
+Jenkins は、世界中の組織でビルド、テスト、デプロイを調整する、無数の CI/CD パイプラインのバックボーンとなっています。その柔軟性と豊富なプラグインエコシステムにより強力ですが、この柔軟性が認証情報漏洩の多くの経路を生み出しています。設定ミスのあるパイプラインや不注意なスクリプト一つで、データベースのパスワード、API キー、クラウド認証情報が、ビルドログにアクセスできる誰にでも漏洩する可能性があります。</p>
+<p>本記事では、ビルドログでシークレットをエコーするような明白なミスから、プラグイン設定や API エンドポイントの微妙な脆弱性まで、Jenkins の認証情報が露出する様々な方法を探ります。Jenkins デプロイメントに潜む隠れたリスクと、CI/CD インフラストラクチャの機密認証情報を保護するための実用的な戦略を明らかにします。</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📝 他の CI/CD システムにも適用</p><div class="admonition-content"><p>本記事は Jenkins に焦点を当てていますが、同じ認証情報漏洩リスクは他の CI/CD システムにも適用されます：</p>
+<p><strong>GitLab CI/CD</strong></p>
+<ul>
+<li>GitLab Runner ログがシークレットを露出する可能性</li>
+<li>CI/CD 変数がジョブログでアクセス可能</li>
+<li>Artifact とテストレポートに認証情報が含まれる可能性</li>
+<li>API エンドポイントがパイプライン設定を露出</li>
+</ul>
+<p><strong>GitHub Actions</strong></p>
+<ul>
+<li>ワークフローログがエコーされたシークレットを露出</li>
+<li>Actions がシークレットにアクセスし漏洩する可能性</li>
+<li>Artifact に埋め込まれた認証情報が含まれる可能性</li>
+<li>デバッグモードが露出リスクを増加</li>
+</ul>
+<p><strong>一般原則</strong></p>
+<ul>
+<li>ビルド/ジョブログが主要な露出ベクター</li>
+<li>Artifact とレポートが認証情報を永続化</li>
+<li>API アクセスが設定を露出</li>
+<li>議論された緩和戦略は普遍的に適用</li>
+</ul>
+</div></div>
+<h2 id="Jenkins-認証情報の理解">Jenkins 認証情報の理解</h2>
+<p>漏洩リスクを深く掘り下げる前に、Jenkins が認証情報をどのように管理しているかを理解することが重要です。Jenkins は、シークレットを安全に保ちながら、パイプラインとジョブがアクセスできるように設計された集中型認証情報ストアを提供します。</p>
+<h3 id="Jenkins-認証情報システム">Jenkins 認証情報システム</h3>
+<p>Jenkins の認証情報には、それぞれ特定の用途に設計されたいくつかのタイプがあります：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔑 Jenkins 認証情報タイプ</p><div class="admonition-content"><p><strong>ユーザー名とパスワード</strong></p>
+<ul>
+<li>基本認証の認証情報</li>
+<li>Git リポジトリ、artifact サーバー、API に使用</li>
+<li>暗号化されたキーバリューペアとして保存</li>
+<li>最も一般的な認証情報タイプ</li>
+</ul>
+<p><strong>シークレットテキスト</strong></p>
+<ul>
+<li>単一のシークレット値（API キー、トークン）</li>
+<li>クラウドプロバイダーの認証情報、webhook シークレットに使用</li>
+<li>Jenkins 認証情報ストアで暗号化</li>
+<li>シンプルだが多機能</li>
+</ul>
+<p><strong>シークレットファイル</strong></p>
+<ul>
+<li>シークレットを含む完全なファイル（証明書、kubeconfig）</li>
+<li>暗号化して保存、ビルド中に一時ファイルとして公開</li>
+<li>SSH キー、TLS 証明書、設定ファイルに使用</li>
+</ul>
+<p><strong>SSH ユーザー名と秘密鍵</strong></p>
+<ul>
+<li>Git とリモートサーバーの SSH 認証</li>
+<li>秘密鍵を暗号化して保存</li>
+<li>パスフレーズ保護をサポート</li>
+</ul>
+<p><strong>証明書</strong></p>
+<ul>
+<li>相互 TLS のクライアント証明書</li>
+<li>PKCS#12 キーストア</li>
+<li>サービス間の安全な通信に使用</li>
+</ul>
+</div></div>
+<p>認証情報ストアは、<code>$JENKINS_HOME/secrets/master.key</code> に保存されたマスターキーを使用してシークレットを暗号化します。この暗号化は静的な認証情報を保護しますが、パイプラインで認証情報が使用されると、様々なチャネルを通じて漏洩しやすくなります。</p>
+<h3 id="認証情報のスコープとアクセス制御">認証情報のスコープとアクセス制御</h3>
+<p>Jenkins の認証情報には、使用できる場所を決定するスコープとアクセス制御があります：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🛡️ 認証情報のスコープ</p><div class="admonition-content"><p><strong>システムスコープ</strong></p>
+<ul>
+<li>Jenkins システム（プラグイン、設定）のみが使用可能</li>
+<li>ジョブやパイプラインからはアクセス不可</li>
+<li>Jenkins 間通信、プラグイン設定に使用</li>
+</ul>
+<p><strong>グローバルスコープ</strong></p>
+<ul>
+<li>すべてのジョブとパイプラインで使用可能</li>
+<li>最も一般的に使用されるスコープ</li>
+<li>ジョブが侵害された場合、漏洩リスクが最も高い</li>
+</ul>
+<p><strong>フォルダースコープ（Folders プラグイン使用時）</strong></p>
+<ul>
+<li>特定のフォルダーに限定された認証情報</li>
+<li>ジョブのサブセットへの露出を制限</li>
+<li>グローバルスコープよりも優れた分離</li>
+</ul>
+<p><strong>アクセス制御</strong></p>
+<ul>
+<li>プラグインによるロールベースアクセス制御（RBAC）</li>
+<li>認証情報の権限とジョブの権限を分離</li>
+<li>ユーザーは認証情報を表示せずに使用可能</li>
+</ul>
+</div></div>
+<p>これらのスコープを理解することは重要です。なぜなら、多くの認証情報漏洩は、そのような広範なアクセス権限を必要としないジョブでグローバル認証情報が使用される場合に発生するからです。</p>
+<h2 id="ビルドログ漏洩：最も一般的なミス">ビルドログ漏洩：最も一般的なミス</h2>
+<p>最も頻繁な認証情報漏洩は、ビルドログを通じて発生します。これは、Jenkins が保存しユーザーに表示するパイプライン実行の詳細な出力です。</p>
+<h3 id="偶発的な-Echo-と-Print-ステートメント">偶発的な Echo と Print ステートメント</h3>
+<p>開発者は変数値を出力してパイプラインをデバッグすることがよくありますが、認証情報も単なる変数であることを忘れています：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// 宣言型パイプライン - 危険</span>
+pipeline <span class="token punctuation">{</span>
+    agent any
+    environment <span class="token punctuation">{</span>
+        DB_PASSWORD <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'database-password'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Debug'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// これはパスワードをビルドログに出力します！</span>
+                sh <span class="token interpolation-string"><span class="token string">"echo Database password is: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">DB_PASSWORD</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+                
+                <span class="token comment">// これも露出させます</span>
+                echo <span class="token interpolation-string"><span class="token string">"Connecting with password: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">DB_PASSWORD</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>ビルドログには以下が含まれます：</p>
+<pre class="language-none"><code class="language-none">[Pipeline] sh
++ echo Database password is: SuperSecret123!
+Database password is: SuperSecret123!
+[Pipeline] echo
+Connecting with password: SuperSecret123!</code></pre>
+<p>ビルドログにアクセスできる人（通常はすべての開発者を含む）は、パスワードを見ることができます。</p>
+<h3 id="環境変数のダンプ">環境変数のダンプ</h3>
+<p>もう一つの一般的なミスは、デバッグのためにすべての環境変数をダンプすることです：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    environment <span class="token punctuation">{</span>
+        AWS_ACCESS_KEY <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'aws-access-key'</span><span class="token punctuation">)</span>
+        AWS_SECRET_KEY <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'aws-secret-key'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Debug Environment'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 認証情報を含むすべての環境変数を露出</span>
+                sh <span class="token string">'env'</span>
+                
+                <span class="token comment">// これも危険</span>
+                sh <span class="token string">'printenv'</span>
+                
+                <span class="token comment">// これも認証情報を漏洩させる可能性</span>
+                sh <span class="token string">'set'</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>出力は環境にロードされたすべての認証情報を明らかにします：</p>
+<pre class="language-none"><code class="language-none">AWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY</code></pre>
+<h3 id="詳細なコマンド出力">詳細なコマンド出力</h3>
+<p>一部のコマンドは認証情報を含む詳細な出力を生成します：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">usernamePassword</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-credentials'</span><span class="token punctuation">,</span>
+                    usernameVariable<span class="token punctuation">:</span> <span class="token string">'API_USER'</span><span class="token punctuation">,</span>
+                    passwordVariable<span class="token punctuation">:</span> <span class="token string">'API_PASS'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// curl の -v フラグはヘッダーで認証情報を露出</span>
+                    sh <span class="token string">'curl -v -u ${API_USER}:${API_PASS} https://api.example.com/deploy'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>詳細な出力には認証情報を含む Authorization ヘッダーが含まれます：</p>
+<pre class="language-none"><code class="language-none">&gt; GET /deploy HTTP/1.1
+&gt; Authorization: Basic QVBJVVNFUjpBUElQQVNT
+&gt; User-Agent: curl/7.68.0</code></pre>
+<p>base64 エンコードされていますが、これは簡単にデコードしてユーザー名とパスワードを明らかにできます。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ ビルドログ漏洩リスク</p><div class="admonition-content"><p><strong>誰がビルドログにアクセスできるか</strong></p>
+<ul>
+<li>ジョブ読み取り権限を持つすべてのユーザー</li>
+<li>通常、開発チーム全体を含む</li>
+<li>デフォルトでログは無期限に保存</li>
+<li>Web UI と API を通じてアクセス可能</li>
+</ul>
+<p><strong>漏洩の永続性</strong></p>
+<ul>
+<li>ログは <code>$JENKINS_HOME/jobs/*/builds/*/log</code> に保存</li>
+<li>認証情報のローテーション後もアクセス可能</li>
+<li>Jenkins バックアップに含まれる</li>
+<li>ログ集約システムに転送される可能性</li>
+</ul>
+<p><strong>影響範囲</strong></p>
+<ul>
+<li>露出した認証情報は本番システムにアクセス可能</li>
+<li>Jenkins 環境を超えたアクセスを許可する可能性</li>
+<li>事後の漏洩検出が困難</li>
+<li>露出したすべての認証情報のローテーションが必要</li>
+</ul>
+</div></div>
+<h2 id="スクリプトコンソール：管理バックドア">スクリプトコンソール：管理バックドア</h2>
+<p>Jenkins は管理タスク用に Groovy スクリプトコンソールを提供していますが、この強力な機能は認証情報を抽出するために悪用される可能性があります。</p>
+<h3 id="直接的な認証情報アクセス">直接的な認証情報アクセス</h3>
+<p>スクリプトコンソールへのアクセス権を持つユーザーは、認証情報ストアに直接クエリできます：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// スクリプトコンソール - すべての認証情報を抽出</span>
+<span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>*
+<span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>domains<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> creds <span class="token operator">=</span> CredentialsProvider<span class="token punctuation">.</span><span class="token function">lookupCredentials</span><span class="token punctuation">(</span>
+    StandardUsernamePasswordCredentials<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span>
+    Jenkins<span class="token punctuation">.</span>instance<span class="token punctuation">,</span>
+    null<span class="token punctuation">,</span>
+    null
+<span class="token punctuation">)</span>
+
+creds<span class="token punctuation">.</span>each <span class="token punctuation">{</span> c <span class="token operator">-&gt;</span>
+    println <span class="token interpolation-string"><span class="token string">"ID: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>id</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Username: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>username</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Password: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>password</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"---"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<p>このスクリプトは、すべてのユーザー名/パスワード認証情報を平文で出力します：</p>
+<pre class="language-none"><code class="language-none">ID: database-credentials
+Username: dbadmin
+Password: SuperSecret123!
+---
+ID: api-credentials
+Username: apiuser
+Password: ApiKey789!
+---</code></pre>
+<h3 id="シークレットテキストの抽出">シークレットテキストの抽出</h3>
+<p>シークレットテキスト認証情報も同様に脆弱です：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>*
+<span class="token keyword">import</span> org<span class="token punctuation">.</span>jenkinsci<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>plaincredentials<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> secrets <span class="token operator">=</span> CredentialsProvider<span class="token punctuation">.</span><span class="token function">lookupCredentials</span><span class="token punctuation">(</span>
+    StringCredentials<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span>
+    Jenkins<span class="token punctuation">.</span>instance<span class="token punctuation">,</span>
+    null<span class="token punctuation">,</span>
+    null
+<span class="token punctuation">)</span>
+
+secrets<span class="token punctuation">.</span>each <span class="token punctuation">{</span> s <span class="token operator">-&gt;</span>
+    println <span class="token interpolation-string"><span class="token string">"ID: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">s<span class="token punctuation">.</span>id</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Secret: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">s<span class="token punctuation">.</span>secret</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"---"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<p>出力：</p>
+<pre class="language-none"><code class="language-none">ID: aws-secret-key
+Secret: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+---
+ID: slack-webhook
+Secret: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX
+---</code></pre>
+<h3 id="SSH-キーの抽出">SSH キーの抽出</h3>
+<p>SSH 秘密鍵も抽出できます：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>jenkins<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>sshcredentials<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> sshCreds <span class="token operator">=</span> CredentialsProvider<span class="token punctuation">.</span><span class="token function">lookupCredentials</span><span class="token punctuation">(</span>
+    SSHUserPrivateKey<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span>
+    Jenkins<span class="token punctuation">.</span>instance<span class="token punctuation">,</span>
+    null<span class="token punctuation">,</span>
+    null
+<span class="token punctuation">)</span>
+
+sshCreds<span class="token punctuation">.</span>each <span class="token punctuation">{</span> c <span class="token operator">-&gt;</span>
+    println <span class="token interpolation-string"><span class="token string">"ID: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>id</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Username: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>username</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Private Key:"</span></span>
+    println c<span class="token punctuation">.</span>privateKey
+    println <span class="token interpolation-string"><span class="token string">"---"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<p>これは PEM 形式で完全な秘密鍵を出力し、不正アクセスに直接使用できます。</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 スクリプトコンソールのリスク</p><div class="admonition-content"><p><strong>アクセス制御の問題</strong></p>
+<ul>
+<li>「Overall/RunScripts」権限が必要</li>
+<li>通常、シニア開発者と DevOps に付与</li>
+<li>基本的な Jenkins にはスクリプト実行の監査証跡がない</li>
+<li>スクリプトは完全な Jenkins 権限で実行</li>
+</ul>
+<p><strong>検出の課題</strong></p>
+<ul>
+<li>スクリプトコンソール使用の組み込みログがない</li>
+<li>認証情報抽出の検出が困難</li>
+<li>疑わしいスクリプト実行のアラートがない</li>
+<li>監査証跡には追加のプラグインが必要</li>
+</ul>
+<p><strong>緩和の複雑さ</strong></p>
+<ul>
+<li>機能を失わずにスクリプトコンソールを無効化できない</li>
+<li>アクセス制限は正当な管理に影響する可能性</li>
+<li>スクリプトアクセス権を持つすべてのユーザーへの信頼が必要</li>
+<li>Script Security プラグインの使用を検討</li>
+</ul>
+</div></div>
+<h2 id="API-漏洩：プログラマティックアクセス">API 漏洩：プログラマティックアクセス</h2>
+<p>Jenkins は広範な REST および CLI API を提供しており、様々なエンドポイントを通じて意図せず認証情報を露出する可能性があります。</p>
+<h3 id="ジョブ設定-XML">ジョブ設定 XML</h3>
+<p>ジョブ設定は API を通じて取得でき、XML に埋め込まれた認証情報を露出する可能性があります：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># ジョブ設定を取得</span>
+<span class="token function">curl</span> <span class="token parameter variable">-u</span> admin:token https://jenkins.example.com/job/my-pipeline/config.xml</code></pre>
+<p>認証情報がジョブ設定にハードコードされている場合（悪い慣行ですが驚くほど一般的）：</p>
+<pre class="language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>project</span><span class="token punctuation">&gt;</span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>builders</span><span class="token punctuation">&gt;</span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>hudson.tasks.Shell</span><span class="token punctuation">&gt;</span></span>
+      <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>command</span><span class="token punctuation">&gt;</span></span>
+        mysql -h db.example.com -u dbuser -pHardcodedPassword123! -e "SELECT * FROM users"
+      <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>command</span><span class="token punctuation">&gt;</span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>hudson.tasks.Shell</span><span class="token punctuation">&gt;</span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>builders</span><span class="token punctuation">&gt;</span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>project</span><span class="token punctuation">&gt;</span></span></code></pre>
+<p>パスワードは XML レスポンスで平文で露出されます。</p>
+<h3 id="ビルド-Artifact-とテストレポート">ビルド Artifact とテストレポート</h3>
+<p>認証情報はアーカイブされた artifact とテストレポートを通じて漏洩する可能性があります：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Build'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">string</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-key'</span><span class="token punctuation">,</span>
+                    variable<span class="token punctuation">:</span> <span class="token string">'API_KEY'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// 認証情報を設定ファイルに書き込む</span>
+                    sh <span class="token string">'echo "api_key: $API_KEY" &gt; config.yaml'</span>
+                    
+                    <span class="token comment">// ファイルをアーカイブ - 認証情報が artifact に！</span>
+                    archiveArtifacts artifacts<span class="token punctuation">:</span> <span class="token string">'config.yaml'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Test'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// テストレポートに環境変数が含まれる</span>
+                sh <span class="token string">'pytest --verbose --capture=no'</span>
+                
+                <span class="token comment">// JUnit レポートに出力で認証情報が含まれる可能性</span>
+                junit <span class="token string">'test-results/*.xml'</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 Artifact とレポートの漏洩</p><div class="admonition-content"><p><strong>アーカイブされた Artifact</strong></p>
+<ul>
+<li>認証情報が埋め込まれた設定ファイル</li>
+<li>シークレットを含むビルド出力</li>
+<li>Web UI と API を通じてアクセス可能</li>
+<li>クリーンアップしない限り無期限に保持</li>
+<li>開発者がデバッグのためにダウンロード</li>
+</ul>
+<p><strong>テストレポート</strong></p>
+<ul>
+<li>JUnit XML レポートが stdout/stderr をキャプチャする可能性</li>
+<li>テスト失敗には通常環境コンテキストが含まれる</li>
+<li>詳細な出力を含む HTML レポート</li>
+<li>ジョブ読み取り権限を持つすべてのユーザーがアクセス可能</li>
+</ul>
+</div></div>
+<h3 id="ビルドパラメータと環境変数">ビルドパラメータと環境変数</h3>
+<p>API エンドポイントはビルドパラメータと環境変数を露出します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># パラメータを含むビルド情報を取得</span>
+<span class="token function">curl</span> <span class="token parameter variable">-u</span> admin:token https://jenkins.example.com/job/my-pipeline/1/api/json?tree<span class="token operator">=</span>actions<span class="token punctuation">[</span>parameters<span class="token punctuation">[</span>*<span class="token punctuation">]</span><span class="token punctuation">]</span></code></pre>
+<p>認証情報がパラメータとして渡された場合、レスポンスに認証情報の値が含まれる可能性があります：</p>
+<pre class="language-json" data-language="json"><code class="language-json"><span class="token punctuation">{</span>
+  <span class="token property">"actions"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">{</span>
+    <span class="token property">"parameters"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">{</span>
+      <span class="token property">"name"</span><span class="token operator">:</span> <span class="token string">"DB_PASSWORD"</span><span class="token punctuation">,</span>
+      <span class="token property">"value"</span><span class="token operator">:</span> <span class="token string">"SuperSecret123!"</span>
+    <span class="token punctuation">}</span><span class="token punctuation">]</span>
+  <span class="token punctuation">}</span><span class="token punctuation">]</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="認証情報プラグイン-API">認証情報プラグイン API</h3>
+<p>一部の認証情報プラグインは情報を漏洩する可能性のある API を露出します：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># すべての認証情報をリスト（一部のプラグインで許可）</span>
+<span class="token function">curl</span> <span class="token parameter variable">-u</span> admin:token https://jenkins.example.com/credentials/api/json</code></pre>
+<p>適切に設定されたプラグインは認証情報の値をマスクしますが、設定ミスやプラグインの脆弱性により露出する可能性があります。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ API 漏洩ベクター</p><div class="admonition-content"><p><strong>設定のエクスポート</strong></p>
+<ul>
+<li>ジョブ設定に埋め込まれたシークレットが含まれる可能性</li>
+<li>Jenkins に保存されたパイプライン定義（SCM ではない）</li>
+<li>API キーを含むプラグイン設定</li>
+<li>システム認証情報を含むグローバル設定</li>
+</ul>
+<p><strong>ビルド Artifact とレポート</strong></p>
+<ul>
+<li>アーカイブされた artifact 内の認証情報</li>
+<li>シークレットを含む設定ファイル</li>
+<li>認証情報出力を含むテストレポート</li>
+<li>artifact としてアーカイブされたログファイル</li>
+<li>artifact API エンドポイントを通じてアクセス可能</li>
+</ul>
+<p><strong>プラグインの脆弱性</strong></p>
+<ul>
+<li>プラグインがカスタム API を通じて認証情報を露出する可能性</li>
+<li>認証情報処理のセキュリティ脆弱性</li>
+<li>プラグインエンドポイントのアクセス制御不足</li>
+<li>既知の問題を持つ古いプラグイン</li>
+</ul>
+</div></div>
+<h2 id="プラグインエコシステム：サードパーティのリスク">プラグインエコシステム：サードパーティのリスク</h2>
+<p>Jenkins の広範なプラグインエコシステムは、プラグイン固有の脆弱性と設定ミスを通じて、追加の認証情報漏洩リスクをもたらします。</p>
+<h3 id="Credential-Binding-プラグインの問題">Credential Binding プラグインの問題</h3>
+<p>Credential Binding プラグインは認証情報を安全に露出するように設計されていますが、悪用される可能性があります：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">string</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-key'</span><span class="token punctuation">,</span>
+                    variable<span class="token punctuation">:</span> <span class="token string">'API_KEY'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// 認証情報をファイルに書き込むと露出</span>
+                    sh <span class="token string">'echo $API_KEY &gt; /tmp/api-key.txt'</span>
+                    
+                    <span class="token comment">// ファイルはビルド後もエージェント上に残る</span>
+                    sh <span class="token string">'curl -H "Authorization: Bearer $API_KEY" https://api.example.com'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>認証情報はエージェント上に永続化されたファイルに書き込まれ、他のジョブやエージェントアクセス権を持つユーザーがアクセスできます。</p>
+<h3 id="Mask-Passwords-プラグイン：軍拡競争">Mask Passwords プラグイン：軍拡競争</h3>
+<p>Mask Passwords や Credentials Binding などの最新の Jenkins プラグインは、base64 エンコードされた値も処理して、ビルドログ内の認証情報を検出しマスクしようとします。しかし、人間の創造性は常に自動検出を打ち負かします：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    options <span class="token punctuation">{</span>
+        <span class="token function">maskPasswords</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    environment <span class="token punctuation">{</span>
+        PASSWORD <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'my-password'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Test'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// ログでマスク：****</span>
+                sh <span class="token string">'echo $PASSWORD'</span>
+                
+                <span class="token comment">// 最新のプラグインはこれを検出してマスク可能</span>
+                sh <span class="token string">'echo $PASSWORD | base64'</span>
+                
+                <span class="token comment">// しかし人間の創造性は回避方法を見つける：</span>
+                
+                <span class="token comment">// 文字ごとの出力</span>
+                sh <span class="token string">'for i in $(seq 0 ${#PASSWORD}); do echo -n "${PASSWORD:$i:1}"; done'</span>
+                
+                <span class="token comment">// 16進数エンコード</span>
+                sh <span class="token string">'echo $PASSWORD | xxd -p'</span>
+                
+                <span class="token comment">// ROT13 または単純な暗号</span>
+                sh <span class="token string">'echo $PASSWORD | tr "A-Za-z" "N-ZA-Mn-za-m"'</span>
+                
+                <span class="token comment">// 文字列の反転</span>
+                sh <span class="token string">'echo $PASSWORD | rev'</span>
+                
+                <span class="token comment">// URL エンコード</span>
+                sh <span class="token string">'python3 -c "import urllib.parse; print(urllib.parse.quote(\"$PASSWORD\"))"'</span>
+                
+                <span class="token comment">// 分割と連結</span>
+                sh <span class="token string">'P1=${PASSWORD:0:5}; P2=${PASSWORD:5}; echo "Part1: $P1, Part2: $P2"'</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 検出の軍拡競争</p><div class="admonition-content"><p><strong>プラグインの能力</strong></p>
+<ul>
+<li>最新のプラグインは正確な認証情報マッチを検出</li>
+<li>base64 エンコードされた認証情報を識別可能</li>
+<li>一般的なエンコードスキームのパターンマッチング</li>
+<li>新しい検出パターンで継続的に更新</li>
+</ul>
+<p><strong>人間の創造性が常に勝つ</strong></p>
+<ul>
+<li>文字列を変換する無限の方法</li>
+<li>カスタムエンコードスキーム</li>
+<li>文字操作と分割</li>
+<li>複数の変換による難読化</li>
+<li>プラグインはすべての可能な変換を予測できない</li>
+</ul>
+<p><strong>根本的な問題</strong></p>
+<ul>
+<li>検出は受動的、創造性は能動的</li>
+<li>新しい検出方法ごとに新しい回避技術が生まれる</li>
+<li>自動マスキングだけに頼ることはできない</li>
+<li>安全な設計による予防が不可欠</li>
+<li>教育とコードレビューが依然として重要</li>
+</ul>
+</div></div>
+<p>検出プラグインと回避技術の間の軍拡競争は、基本的な真実を示しています：認証情報を保護するために自動マスキングに頼ることはできません。唯一の信頼できるアプローチは、最初からビルドログに認証情報を露出させないことです。</p>
+<h3 id="Git-プラグインの認証情報漏洩">Git プラグインの認証情報漏洩</h3>
+<p>Git 操作は様々な方法で認証情報を露出する可能性があります：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Checkout'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 認証情報が URL に埋め込まれる</span>
+                git url<span class="token punctuation">:</span> <span class="token string">'https://user:password@github.com/org/repo.git'</span>
+                
+                <span class="token comment">// ビルドログと git 設定に表示される</span>
+                <span class="token comment">// エージェント上の .git/config に保存される</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>認証情報は以下に表示されます：</p>
+<ul>
+<li>チェックアウト中のビルドログ</li>
+<li>エージェント上の <code>.git/config</code> ファイル</li>
+<li>Git reflog と履歴</li>
+<li>git 操作中のプロセスリスト</li>
+</ul>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 プラグイン関連のリスク</p><div class="admonition-content"><p><strong>プラグインの脆弱性</strong></p>
+<ul>
+<li>プラグインに認証情報処理のバグがある可能性</li>
+<li>セキュリティパッチが常に迅速に適用されるわけではない</li>
+<li>一部のプラグインは認証情報を安全でない方法で保存</li>
+<li>カスタムプラグインはセキュリティレビューが不足している可能性</li>
+</ul>
+<p><strong>設定の複雑さ</strong></p>
+<ul>
+<li>各プラグインには独自の認証情報処理がある</li>
+<li>設定ミスを導入しやすい</li>
+<li>ドキュメントが不完全な場合がある</li>
+<li>セキュリティのベストプラクティスが常に明確ではない</li>
+</ul>
+<p><strong>更新の課題</strong></p>
+<ul>
+<li>プラグインの更新が既存のジョブを壊す可能性</li>
+<li>互換性の懸念によりセキュリティ更新が遅延</li>
+<li>脆弱性の開示が発見に遅れる可能性</li>
+<li>プラグインの自動セキュリティスキャンがない</li>
+</ul>
+</div></div>
+<h2 id="一般的な漏洩シナリオ">一般的な漏洩シナリオ</h2>
+<p>認証情報が通常どのように露出するかを理解することで、組織は自身の Jenkins デプロイメントで同様の脆弱性を特定し防止できます。</p>
+<h3 id="公開アクセス可能な-Jenkins-インスタンス">公開アクセス可能な Jenkins インスタンス</h3>
+<p>適切な認証なしでインターネットに露出された Jenkins インスタンスは、重大な脆弱性を表します：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 公開露出のリスク</p><div class="admonition-content"><p><strong>一般的な設定ミス</strong></p>
+<ul>
+<li>デフォルトのセキュリティ設定が設定されていない</li>
+<li>テスト用の「クイックセットアップ」が本番環境に残っている</li>
+<li>ファイアウォールルールの設定ミスまたは回避</li>
+<li>認証なしでアクセス可能なスクリプトコンソール</li>
+</ul>
+<p><strong>潜在的な影響</strong></p>
+<ul>
+<li>すべての認証情報がスクリプトコンソールを通じて抽出可能</li>
+<li>クラウドプロバイダーの認証情報によりリソースハイジャックが可能</li>
+<li>データベース認証情報が顧客データを露出</li>
+<li>ソースコードリポジトリへのアクセスが侵害</li>
+<li>インフラストラクチャ全体の侵害の可能性</li>
+</ul>
+<p><strong>予防措置</strong></p>
+<ul>
+<li>Jenkins を直接インターネットに露出させない</li>
+<li>すべてのアクセスに認証を要求</li>
+<li>リモートアクセスには VPN または踏み台ホストを使用</li>
+<li>定期的なセキュリティ設定監査</li>
+<li>不正アクセス試行の監視</li>
+</ul>
+</div></div>
+<h3 id="長期的なビルドログ漏洩">長期的なビルドログ漏洩</h3>
+<p>ビルド出力に記録された認証情報は長期間露出される可能性があります：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ ビルドログのリスク</p><div class="admonition-content"><p><strong>発生方法</strong></p>
+<ul>
+<li>デバッグのために詳細ログが有効化</li>
+<li>デバッグステートメントがパイプラインから削除されない</li>
+<li>すべての開発者がログにアクセス可能</li>
+<li>ログがバックアップとログ集約システムに含まれる</li>
+<li>自動認証情報スキャンがない</li>
+</ul>
+<p><strong>漏洩期間</strong></p>
+<ul>
+<li>認証情報が数ヶ月または数年間露出される可能性</li>
+<li>不正な当事者によるアクセスがあったか判断困難</li>
+<li>大規模な認証情報ローテーションが必要</li>
+<li>完全なセキュリティ監査が必要になる可能性</li>
+</ul>
+<p><strong>緩和策</strong></p>
+<ul>
+<li>CI/CD パイプラインの定期的なセキュリティ監査</li>
+<li>ログ内の認証情報の自動スキャン</li>
+<li>セキュリティを考慮したビルドログ保持ポリシー</li>
+<li>ログアクセスの最小権限の原則</li>
+<li>認証情報漏洩を防ぐためのパイプラインコードの定期的なレビュー</li>
+</ul>
+</div></div>
+<h3 id="プラグインの脆弱性">プラグインの脆弱性</h3>
+<p>Jenkins プラグインのセキュリティ脆弱性は、様々なベクターを通じて認証情報を露出する可能性があります：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 プラグインセキュリティリスク</p><div class="admonition-content"><p><strong>一般的な脆弱性パターン</strong></p>
+<ul>
+<li>認証情報を露出する未認証 API エンドポイント</li>
+<li>認証情報取得のアクセス制御不足</li>
+<li>プラグインデータ内の安全でない認証情報保存</li>
+<li>エラーメッセージによる情報漏洩</li>
+</ul>
+<p><strong>組織的課題</strong></p>
+<ul>
+<li>プラグインの更新が既存のジョブを壊す可能性</li>
+<li>互換性テストによりセキュリティパッチが遅延</li>
+<li>使用中の脆弱なプラグインを組織が認識していない</li>
+<li>プラグインの自動脆弱性スキャンがない</li>
+</ul>
+<p><strong>ベストプラクティス</strong></p>
+<ul>
+<li>インストール済みプラグインのインベントリを維持</li>
+<li>Jenkins セキュリティアドバイザリを購読</li>
+<li>迅速なパッチプロセスを実装</li>
+<li>選択基準でプラグインセキュリティを考慮</li>
+<li>Jenkins インスタンスの定期的な脆弱性スキャン</li>
+</ul>
+</div></div>
+<h2 id="実際のインシデント-エンコードされた認証情報は安全ではない">実際のインシデント:エンコードされた認証情報は安全ではない</h2>
+<p>本番環境で認証情報の漏洩を発見すると、理論が現実になります。私は、同僚がシステムのエンコーディングが保護してくれると考えて、Jenkins に認証情報を保存したときに、これを直接経験しました。</p>
+<p>Jenkins ジョブは正常に実行されましたが、ビルドログには彼のエンコードされた認証情報が含まれており、ログにアクセスできる誰もが見ることができました。エンコーディングは誤った安全感を提供しました。base64 や類似のスキームは簡単に逆変換できます。訓練されていない目には、それはランダムな文字列のように見えましたが、実際には彼のユーザー名とパスワードであり、1つのデコードコマンドで平文に戻すことができました。</p>
+<p>漏洩を発見したとき、私の同僚は休暇中でした。認証情報は複数のシステムにわたって広範なアクセス権を持っており、状況は危機的でした。彼の帰りを待つことはできませんでした。1時間ごとに不正アクセスのリスクが増加していました。</p>
+<p>私はすぐに彼のマネージャーにエスカレーションしました。会話は不快でしたが必要でした:「あなたのチームメンバーの認証情報が Jenkins ログに露出しています。今すぐローテーションする必要があります。」彼のマネージャーは深刻さを理解し、迅速に行動し、アカウントをロックしてパスワードリセットを開始しました。セキュリティチームは、漏洩期間中の疑わしい活動についてアクセスログをレビューしました。</p>
+<p>このインシデントは、いくつかの痛ましい真実を浮き彫りにしました:</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚨 実際の漏洩からの教訓</p><div class="admonition-content"><p><strong>エンコーディングは暗号化ではない</strong></p>
+<ul>
+<li>Base64、16進数、URL エンコーディングは可逆変換</li>
+<li>ログアクセス権を持つ誰でも認証情報をデコード可能</li>
+<li>Jenkins 認証情報マスキングはすべてのエンコーディングスキームをキャッチできない</li>
+<li>開発者はしばしば違いを誤解している</li>
+</ul>
+<p><strong>漏洩は発見後も持続</strong></p>
+<ul>
+<li>ログは認証情報ローテーション後もアクセス可能</li>
+<li>漏洩期間中に誰がログにアクセスしたか不明</li>
+<li>バックアップとログ集約システムがコピーを保持</li>
+<li>完全な監査証跡の再構築は通常不可能</li>
+</ul>
+<p><strong>組織への影響</strong></p>
+<ul>
+<li>緊急対応が通常業務を中断</li>
+<li>影響を受けた個人への信頼への影響</li>
+<li>すべてのパイプラインのより広範なセキュリティレビューが必要</li>
+</ul>
+<p><strong>アクセス権がリスクを増幅</strong></p>
+<ul>
+<li>広範な権限を持つ認証情報はより大きな爆発半径を生む</li>
+<li>単一の漏洩が複数のシステムを危険にさらす可能性</li>
+<li>最小権限の原則が重要になる</li>
+<li>サービスアカウントはユーザーアカウントと同じ保護が必要</li>
+</ul>
+</div></div>
+<p>このインシデントにより、Jenkins セキュリティプラクティスの包括的なレビューが強制されました。自動認証情報スキャンを実装し、認証情報の機密性に基づいてログアクセスを制限し、エンコーディングがセキュリティを提供しないことを強調するセキュリティトレーニングを実施しました。最も重要なことは、将来のインシデントのための明確なエスカレーション手順を確立したことです。誰が影響を受けているか、または彼らが利用可能かどうかに関係なく、誰も認証情報漏洩の報告をためらうべきではありません。</p>
+<p>露出した認証情報を発見したら、すぐに行動してください。</p>
+<h2 id="Jenkins-認証情報の保護">Jenkins 認証情報の保護</h2>
+<p>認証情報漏洩を防ぐには、Jenkins 設定、パイプライン設計、運用プラクティス全体にわたる多層防御が必要です。</p>
+<h3 id="安全なパイプラインプラクティス">安全なパイプラインプラクティス</h3>
+<p>認証情報漏洩を最小限に抑えるパイプラインを設計：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">usernamePassword</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-credentials'</span><span class="token punctuation">,</span>
+                    usernameVariable<span class="token punctuation">:</span> <span class="token string">'API_USER'</span><span class="token punctuation">,</span>
+                    passwordVariable<span class="token punctuation">:</span> <span class="token string">'API_PASS'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// エコーせずに認証情報を使用</span>
+                    sh <span class="token string">'''
+                        # コマンドエコーを無効化
+                        set +x
+                        
+                        # コマンドで認証情報を使用
+                        curl -s -u "$API_USER:$API_PASS" https://api.example.com/deploy
+                        
+                        # 後続のコマンドのためにエコーを再有効化
+                        set -x
+                    '''</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>主要なプラクティス：</p>
+<ul>
+<li>認証情報使用時は <code>set +x</code> でコマンドエコーを無効化</li>
+<li>環境変数の出力を避ける</li>
+<li><code>withCredentials</code> ブロックで認証情報のスコープを制限</li>
+<li>認証情報をファイルに書き込まない</li>
+</ul>
+<h3 id="認証情報スコープの制限">認証情報スコープの制限</h3>
+<p>フォルダースコープの認証情報を使用して可用性を制限：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 認証情報スコープのベストプラクティス</p><div class="admonition-content"><p><strong>Folder プラグインの使用</strong></p>
+<ul>
+<li>チームまたはプロジェクトごとにジョブをフォルダーに整理</li>
+<li>特定のフォルダーにスコープされた認証情報を作成</li>
+<li>他のフォルダーのジョブが認証情報にアクセスするのを防ぐ</li>
+<li>侵害されたジョブの爆発半径を削減</li>
+</ul>
+<p><strong>最小権限の原則</strong></p>
+<ul>
+<li>ユースケースごとに個別の認証情報を作成</li>
+<li>複数のジョブで認証情報を再利用しない</li>
+<li>可能な限り読み取り専用認証情報を使用</li>
+<li>定期的に認証情報をローテーション</li>
+</ul>
+<p><strong>認証情報の命名</strong></p>
+<ul>
+<li>スコープと目的を示す説明的な ID を使用</li>
+<li>「password」や「api-key」などの汎用名を避ける</li>
+<li>名前に環境を含める（prod-db-password vs dev-db-password）</li>
+<li>認証情報の目的と承認された使用を文書化</li>
+</ul>
+</div></div>
+<h3 id="アクセス制御と監査">アクセス制御と監査</h3>
+<p>厳格なアクセス制御と監視を実装：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔒 アクセス制御措置</p><div class="admonition-content"><p><strong>ロールベースアクセス制御</strong></p>
+<ul>
+<li>Role Strategy または Folder Authorization プラグインを使用</li>
+<li>認証情報管理とジョブ実行権限を分離</li>
+<li>スクリプトコンソールアクセスを最小限のユーザーに制限</li>
+<li>ユーザー権限の定期的なレビュー</li>
+</ul>
+<p><strong>監査ログ</strong></p>
+<ul>
+<li>認証情報アクセスログのために Audit Trail プラグインを有効化</li>
+<li>スクリプトコンソール使用を監視</li>
+<li>通常パターン外の認証情報取得にアラート</li>
+<li>Jenkins ログを SIEM システムと統合</li>
+</ul>
+<p><strong>ビルドログセキュリティ</strong></p>
+<ul>
+<li>ビルドログ保持期間を制限</li>
+<li>認証情報の機密性に基づいてログアクセスを制限（下記の注意事項参照）</li>
+<li>ログ内の認証情報の自動スキャンを実装</li>
+<li>機密パイプラインのログ暗号化を検討</li>
+</ul>
+<p><strong>ビルドログアクセスの注意事項</strong></p>
+<ul>
+<li>ジョブ所有者は通常、ジョブで使用される認証情報を所有していない</li>
+<li>本番認証情報は通常セキュリティチームが所有</li>
+<li>ログアクセス権を持つジョブ所有者は露出した認証情報を表示可能</li>
+<li>解決策：ジョブ所有者ではなく認証情報所有者にログアクセスを制限</li>
+<li>代替案：自動認証情報マスキング（不完全、前のセクション参照）</li>
+<li>最良のアプローチ：ログ内の認証情報露出を完全に防止</li>
+</ul>
+</div></div>
+<h3 id="認証情報管理とジョブ実行の分離">認証情報管理とジョブ実行の分離</h3>
+<p>重要なセキュリティプラクティスの一つは、誰が認証情報を管理できるかと誰がジョブで使用できるかを分離することです。この分離により、開発者は認証情報の値を表示せずにパイプラインで使用できます。</p>
+<p>権限分離は重要な防御層ですが、完璧ではありません。ジョブを設定できるパイプライン管理者は、認証情報を露出するパイプラインを書くことができます。真の保護は、権限分離を安全なパイプラインプラクティス、コードレビュー、自動認証情報スキャンと組み合わせることから生まれます。</p>
+<h3 id="外部シークレット管理：万能薬ではない">外部シークレット管理：万能薬ではない</h3>
+<p>外部シークレット管理システムはリスクを軽減しますが、漏洩ベクターを排除するものではありません：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// HashiCorp Vault の使用</span>
+pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                script <span class="token punctuation">{</span>
+                    <span class="token comment">// 実行時に Vault からシークレットを取得</span>
+                    <span class="token keyword">def</span> secrets <span class="token operator">=</span> <span class="token function">vault</span><span class="token punctuation">(</span>
+                        path<span class="token punctuation">:</span> <span class="token string">'secret/data/myapp'</span><span class="token punctuation">,</span>
+                        engineVersion<span class="token punctuation">:</span> <span class="token number">2</span>
+                    <span class="token punctuation">)</span>
+                    
+                    <span class="token comment">// ログに記録すればシークレットは依然として露出！</span>
+                    sh <span class="token interpolation-string"><span class="token string">"echo API Key: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">secrets<span class="token punctuation">.</span>api_key</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>  <span class="token comment">// 依然として危険</span>
+                    
+                    <span class="token comment">// シークレットは依然として artifact で露出</span>
+                    sh <span class="token interpolation-string"><span class="token string">"echo 'key: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">secrets<span class="token punctuation">.</span>api_key</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">' &gt; config.yaml"</span></span>
+                    archiveArtifacts <span class="token string">'config.yaml'</span>  <span class="token comment">// 依然として露出</span>
+                    
+                    <span class="token comment">// 正しい使用法 - ログや artifact なし</span>
+                    sh <span class="token interpolation-string"><span class="token string">"""
+                        set +x
+                        curl -H "Authorization: Bearer </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">secrets<span class="token punctuation">.</span>api_key</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">" \
+                             https://api.example.com/deploy
+                    """</span></span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 外部シークレットはすべての漏洩を防げない</p><div class="admonition-content"><p><strong>外部シークレットが解決すること</strong></p>
+<ul>
+<li>認証情報が Jenkins に静的に保存されない</li>
+<li>集中型認証情報管理とローテーション</li>
+<li>シークレットアクセスの監査ログ</li>
+<li>短期間の動的認証情報</li>
+<li>Jenkins が侵害された場合の爆発半径の削減</li>
+</ul>
+<p><strong>外部シークレットが解決しないこと</strong></p>
+<ul>
+<li>ビルドログ漏洩（エコーされればシークレットは依然としてログに記録）</li>
+<li>Artifact 漏洩（ファイルに書き込まれればシークレットは依然としてアーカイブ）</li>
+<li>テストレポート漏洩（シークレットは依然としてテスト出力に）</li>
+<li>スクリプトコンソールアクセス（シークレットはメモリ内で依然としてアクセス可能）</li>
+<li>API 漏洩（シークレットは依然としてビルドパラメータ/環境に）</li>
+</ul>
+<p><strong>根本的な真実</strong></p>
+<ul>
+<li>外部シークレット管理はシークレットが保存される場所を変更</li>
+<li>パイプラインでシークレットがどのように使用されるかは変更しない</li>
+<li>すべての漏洩ベクター（ログ、artifact、レポート）は依然として存在</li>
+<li>安全なパイプラインプラクティスは依然として不可欠</li>
+<li>セキュリティのために外部シークレットだけに頼ることはできない</li>
+</ul>
+</div></div>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 外部シークレット管理の利点</p><div class="admonition-content"><p><strong>安全なプラクティスと組み合わせた場合</strong></p>
+<ul>
+<li>集中制御と監査ログ</li>
+<li>動的で短期間の認証情報</li>
+<li>より簡単なローテーションと取り消し</li>
+<li>関心の分離</li>
+<li>Jenkins 攻撃面の削減</li>
+</ul>
+<p><strong>人気のソリューション</strong></p>
+<ul>
+<li>HashiCorp Vault</li>
+<li>AWS Secrets Manager</li>
+<li>Azure Key Vault</li>
+<li>Google Secret Manager</li>
+<li>CyberArk</li>
+</ul>
+<p><strong>重要な要件</strong></p>
+<ul>
+<li>安全なパイプライン設計と組み合わせる必要がある</li>
+<li>ログ、artifact、レポートの漏洩を排除</li>
+<li>外部シークレットは層であり、完全なソリューションではない</li>
+</ul>
+</div></div>
+<h2 id="検出と対応">検出と対応</h2>
+<p>予防措置があっても、認証情報漏洩の検出と対応は重要です。</p>
+<h3 id="自動認証情報スキャン">自動認証情報スキャン</h3>
+<p>露出した認証情報を検出するための自動スキャンを実装：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔍 スキャン戦略</p><div class="admonition-content"><p><strong>ビルドログスキャン</strong></p>
+<ul>
+<li>一般的な認証情報形式の正規表現パターン</li>
+<li>API キーパターン（AWS、GitHub、Slack など）</li>
+<li>ログ内のパスワードのような文字列</li>
+<li>Base64 エンコードされた認証情報</li>
+</ul>
+<p><strong>設定スキャン</strong></p>
+<ul>
+<li>ハードコードされたシークレットのジョブ設定をスキャン</li>
+<li>Jenkins 内のパイプライン定義をチェック</li>
+<li>プラグイン設定を監査</li>
+<li>グローバル Jenkins 設定をレビュー</li>
+</ul>
+<p><strong>ツールと統合</strong></p>
+<ul>
+<li>リポジトリスキャン用の git-secrets</li>
+<li>認証情報検出用の truffleHog</li>
+<li>Jenkins 固有パターン用のカスタムスクリプト</li>
+<li>自動チェックのための CI/CD パイプラインとの統合</li>
+</ul>
+</div></div>
+<h3 id="インシデント対応手順">インシデント対応手順</h3>
+<p>認証情報漏洩インシデントのための明確な手順を確立：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🚨 インシデント対応ステップ</p><div class="admonition-content"><p><strong>即時アクション</strong></p>
+<ol>
+<li>露出した認証情報とそのスコープを特定</li>
+<li>侵害された認証情報を即座にローテーション</li>
+<li>不正使用のアクセスログをレビュー</li>
+<li>ローテーションが不可能な場合は侵害されたアカウントを無効化</li>
+</ol>
+<p><strong>調査</strong></p>
+<ol>
+<li>漏洩期間とアクセススコープを決定</li>
+<li>露出した認証情報にアクセスできた人を特定</li>
+<li>不正アクセスの兆候をチェック</li>
+<li>タイムラインと影響を文書化</li>
+</ol>
+<p><strong>修復</strong></p>
+<ol>
+<li>漏洩の根本原因を修正</li>
+<li>再発防止のためにパイプラインを更新</li>
+<li>追加の制御を実装</li>
+<li>影響を受けたチームにセキュリティトレーニングを実施</li>
+</ol>
+<p><strong>事後</strong></p>
+<ol>
+<li>学んだ教訓を文書化</li>
+<li>セキュリティ手順を更新</li>
+<li>組織内で知識を共有</li>
+<li>フォローアップレビューをスケジュール</li>
+</ol>
+</div></div>
+<h2 id="結論">結論</h2>
+<p>Jenkins 認証情報漏洩は、現代の CI/CD パイプラインにおける重大なセキュリティリスクを表します。Jenkins を強力にする柔軟性—Groovy スクリプト、広範なプラグイン、詳細なログ—は、認証情報が漏洩する多数の経路も生み出します。ビルドログでパスワードをエコーするような明白なミスから、プラグイン API の微妙な脆弱性まで、攻撃面は広範で常に進化しています。</p>
+<p>最も一般的な漏洩ベクターは依然としてビルドログであり、開発者はデバッグ中または詳細なコマンド出力を通じて意図せず認証情報を出力します。これらのログはデフォルトで無期限に保持され、すべての開発者がアクセスでき、ログ集約システムに転送されることが多く、漏洩を倍増させます。スクリプトコンソールは管理権限を提供しますが、アクセス権を持つ誰でも直接認証情報を抽出できます。API エンドポイントは、ジョブ設定、ビルドパラメータ、プラグイン固有の脆弱性を通じて認証情報を露出する可能性があります。</p>
+<p>一般的な漏洩シナリオは、不十分な認証情報保護の深刻な結果を示しています。デフォルトのセキュリティ設定を持つ公開アクセス可能な Jenkins インスタンスは、インフラストラクチャ全体の侵害につながる可能性があります。長期間認証情報を含むビルドログは、組織を広範な監査を必要とする未知のリスクにさらします。プラグインの脆弱性は数千のインストールに影響を与える可能性があり、多くの組織は互換性の懸念によりパッチの適用が遅れています。</p>
+<p>保護には多層防御が必要です。安全なパイプラインプラクティスは、<code>withCredentials</code> ブロックの慎重な使用、コマンドエコーの無効化、認証情報出力の回避を通じて認証情報漏洩を最小限に抑えます。認証情報スコープは、どのジョブが特定の認証情報にアクセスできるかを制限することで爆発半径を制限します。厳格なアクセス制御と包括的な監査ログにより、疑わしい活動を検出できます。HashiCorp Vault のような外部シークレット管理システムは、動的で短期間の認証情報と集中制御を提供しますが、ログ、artifact、レポートを通じた漏洩は排除できません—シークレットがどこに保存されていても、安全なパイプライン設計は依然として不可欠です。</p>
+<p>検出と対応能力も同様に重要です。ビルドログと設定の自動スキャンにより、攻撃者が発見する前に露出した認証情報を特定できます。明確なインシデント対応手順により、侵害された認証情報の迅速なローテーションと、潜在的な不正アクセスの徹底的な調査が保証されます。Jenkins 設定、プラグイン、パイプラインの定期的なセキュリティ監査は、脆弱性が悪用される前に特定するのに役立ちます。</p>
+<p>「コードとしてのセキュリティ」とインフラストラクチャ自動化のトレンドにより、Jenkins セキュリティはますます重要になっています。組織が CI/CD システムにより多くの認証情報を統合するにつれて、漏洩の影響も増大しています。最小権限の原則は、すべての認証情報の決定を導くべきです：フォルダースコープの認証情報を使用し、ユースケースごとに個別の認証情報を作成し、読み取り専用アクセスを優先し、定期的にローテーションします。</p>
+<p>Jenkins に認証情報を保存する前に、自問してください：この認証情報は Jenkins に必要ですか、それとも外部シークレットマネージャーから取得できますか？誰がこの認証情報にアクセスする必要があり、より狭くスコープできますか？この認証情報が露出した場合、どのように検出しますか？ローテーション戦略は何ですか？これらの質問への答えが、認証情報管理戦略を導き、CI/CD パイプラインでの次の認証情報漏洩インシデントを防ぐのに役立つはずです。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2021/07/Jenkins-Credentials-Exposure/" data-id="1571749f" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Jenkins 認証情報の漏洩：CI/CD パイプラインに潜むセキュリティリスク",
+        "image": "https://neo01.com/assets/jenkins/thumbnail.png",
+        "keywords": "DevOps Jenkins Security",
+        "genre": "Development",
+        "datePublished": "2021-07-01",
+        "dateCreated": "2021-07-01",
+        "dateModified": "2025-10-23",
+        "url": "https://neo01.com//ja/2021/07/Jenkins-Credentials-Exposure/",
+        "description": "Jenkins の認証情報は、ビルドログ、スクリプトコンソール、API エンドポイントを通じて漏洩する可能性があります。認証情報がどのように露出するか、そして CI/CD パイプラインを保護する方法を理解しましょう。",
+        "wordCount": 4804
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#53d34cc3</div>
+                <img src="/qr/qr-2e929c83cead7b6f625740bca6eb5ca0.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#53d34cc3">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

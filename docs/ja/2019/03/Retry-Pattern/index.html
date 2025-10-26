@@ -1,0 +1,1099 @@
+<!DOCTYPE html><html lang="ja"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>再試行パターン：レジリエントなアプリケーションの構築 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="再試行パターンを使用して、アプリケーションが一時的な障害を適切に処理し、分散システムの安定性とユーザーエクスペリエンスを向上させる方法を学びます。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="再試行パターン：レジリエントなアプリケーションの構築">
+<meta property="og:url" content="https://neo01.com/ja/2019/03/Retry-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="再試行パターンを使用して、アプリケーションが一時的な障害を適切に処理し、分散システムの安定性とユーザーエクスペリエンスを向上させる方法を学びます。">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-03-07T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-26T12:22:45.387Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/ja/2019/03/Retry-Pattern">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2019/03/Retry-Pattern/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2019/03/Retry-Pattern/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/zh-CN/2019/03/Retry-Pattern/" class="lang-link">简体中文</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/">ホーム</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/AI/Art-Gallery/">アートギャラリー</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Architecture/">アーキテクチャ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Cybersecurity/">サイバーセキュリティ</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Development/">開発</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/ja/categories/Misc/">その他</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/ja/about-me">このブログについて</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="検索">
+        <button type="submit" title="検索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="入力してください">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '記事',
+            PAGES: 'ページ',
+            CATEGORIES: 'カテゴリー',
+            TAGS: 'タグ',
+            UNTITLED: '（名称未設定）',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'ja',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/03/Retry-Pattern-ja" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        再試行パターン：レジリエントなアプリケーションの構築
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-03-07T16:00:00.000Z" itemprop="datePublished">2019-03-08</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-26T12:22:45.387Z" itemprop="datePublished">2025-10-26</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%B3%E3%83%B3%E3%83%86%E3%82%AD%E3%82%B9%E3%83%88%E3%81%A8%E5%95%8F%E9%A1%8C"><span class="toc-text">コンテキストと問題</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%BD%E3%83%AA%E3%83%A5%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3"><span class="toc-text">ソリューション</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%8D%E8%A9%A6%E8%A1%8C%E6%88%A6%E7%95%A5"><span class="toc-text">再試行戦略</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9F%E8%A3%85%E3%81%AE%E8%80%83%E6%85%AE%E4%BA%8B%E9%A0%85"><span class="toc-text">実装の考慮事項</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%83%86%E3%82%B9%E3%83%88%E3%81%A8%E6%A4%9C%E8%A8%BC"><span class="toc-text">テストと検証</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%81%93%E3%81%AE%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3%E3%82%92%E4%BD%BF%E7%94%A8%E3%81%99%E3%82%8B%E5%A0%B4%E5%90%88"><span class="toc-text">このパターンを使用する場合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E3%82%B5%E3%83%BC%E3%82%AD%E3%83%83%E3%83%88%E3%83%96%E3%83%AC%E3%83%BC%E3%82%AB%E3%83%BC%E3%81%A8%E3%81%AE%E7%B5%84%E3%81%BF%E5%90%88%E3%82%8F%E3%81%9B"><span class="toc-text">サーキットブレーカーとの組み合わせ</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%96%A2%E9%80%A3%E3%83%91%E3%82%BF%E3%83%BC%E3%83%B3"><span class="toc-text">関連パターン</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE"><span class="toc-text">参考文献</span></a></li></ol>
+            <p>アプリケーションがリモートサービス（データベース、API、メッセージキュー）と通信する際、問題が発生する可能性があります。ネットワークの一時的な問題、ビジーなサーバー、または一時的なタイムアウトにより、リクエストが失敗する可能性があります。再試行パターンは、アプリケーションがこれらの一時的な不具合を適切に処理し、潜在的な失敗を成功に変えるのに役立ちます。</p>
+<h2 id="コンテキストと問題">コンテキストと問題</h2>
+<p>分散システムは、定期的に一時的な障害に直面します：</p>
+<ul>
+<li><strong>ネットワーク接続の喪失</strong>：コンポーネント間の短い切断</li>
+<li><strong>サービスの利用不可</strong>：デプロイまたは再起動中の一時的なサービス停止</li>
+<li><strong>タイムアウト</strong>：高負荷下でサービスが応答に時間がかかりすぎる</li>
+<li><strong>スロットリング</strong>：圧倒されたときにサービスがリクエストを拒否する</li>
+</ul>
+<p>これらの障害は通常、自己修正されます。一時的に過負荷になっているデータベースは、今は接続を拒否するかもしれませんが、バックログをクリアした後、1秒後に接続を受け入れる可能性があります。再試行メカニズムがないと、アプリケーションはこれらの一時的な問題を永続的な障害として扱い、不必要にユーザーエクスペリエンスを低下させます。</p>
+<h2 id="ソリューション">ソリューション</h2>
+<p>一時的な障害を予期し、透過的に処理するようにアプリケーションを設計します。再試行パターンは、失敗した操作を自動的に再試行するメカニズムを導入し、ビジネス機能への影響を最小限に抑えます。</p>
+<div class="mermaid">graph LR
+    A["アプリケーション"] --&gt; B["再試行ロジック"]
+    B --&gt; C["リモートサービス"]
+    C --&gt;|"成功"| D["結果を返す"]
+    C --&gt;|"一時的な障害"| E["待機して再試行"]
+    E --&gt; C
+    C --&gt;|"最大再試行回数超過"| F["例外を処理"]
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1e1
+    style D fill:#d3f9d8</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 組み込みの再試行メカニズム</p><div class="admonition-content"><p>多くのモダンなクライアントライブラリとフレームワークには、設定可能な再試行ロジックが含まれています。カスタム再試行コードを実装する前に、ライブラリのドキュメントを確認してください。</p>
+</div></div>
+<p>!!!</p>
+<h2 id="再試行戦略">再試行戦略</h2>
+<p>障害のタイプとアプリケーションの要件に基づいて再試行戦略を選択します：</p>
+<h3 id="1-キャンセル">1. キャンセル</h3>
+<p><strong>使用する場合</strong>：障害が永続的な問題を示しているか、再試行しても成功しない操作。</p>
+<p><strong>例</strong>：</p>
+<ul>
+<li>認証の失敗</li>
+<li>無効なリクエストパラメータ</li>
+<li>リソースが見つからないエラー</li>
+</ul>
+<p><strong>アクション</strong>：操作を直ちにキャンセルし、例外を報告します。</p>
+<h3 id="2-即座に再試行">2. 即座に再試行</h3>
+<p><strong>使用する場合</strong>：障害が異常またはまれである場合（破損したネットワークパケットなど）。</p>
+<p><strong>例</strong>：</p>
+<ul>
+<li>ランダムなネットワーク伝送エラー</li>
+<li>一時的な接続リセット</li>
+</ul>
+<p><strong>アクション</strong>：遅延なしでリクエストを即座に再試行します。</p>
+<h3 id="3-遅延後に再試行">3. 遅延後に再試行</h3>
+<p><strong>使用する場合</strong>：障害が一般的で、接続またはサービス負荷に関連している場合。</p>
+<p><strong>例</strong>：</p>
+<ul>
+<li>接続タイムアウト</li>
+<li>サービスビジー応答</li>
+<li>スロットリングエラー</li>
+</ul>
+<p><strong>アクション</strong>：再試行する前に待機し、次の遅延戦略のいずれかを使用します：</p>
+<p><strong>固定遅延</strong>：各再試行の間に同じ時間待機します。</p>
+<pre class="language-none"><code class="language-none">試行1 → 2秒待機 → 試行2 → 2秒待機 → 試行3</code></pre>
+<p><strong>増分遅延</strong>：待機時間を線形に増やします。</p>
+<pre class="language-none"><code class="language-none">試行1 → 2秒待機 → 試行2 → 4秒待機 → 試行3 → 6秒待機 → 試行4</code></pre>
+<p><strong>指数バックオフ</strong>：各失敗後に待機時間を2倍にします。</p>
+<pre class="language-none"><code class="language-none">試行1 → 1秒待機 → 試行2 → 2秒待機 → 試行3 → 4秒待機 → 試行4 → 8秒待機 → 試行5</code></pre>
+<div id="chart_024b99ad9" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_024b99ad9'));
+        var option = {
+  "title": {
+    "text": "再試行遅延戦略の比較"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["固定 (2秒)", "増分 (2秒)", "指数 (1秒ベース)"]
+  },
+  "xAxis": {
+    "type": "category",
+    "name": "再試行回数",
+    "data": ["1回目", "2回目", "3回目", "4回目", "5回目"]
+  },
+  "yAxis": {
+    "type": "value",
+    "name": "遅延 (秒)"
+  },
+  "series": [
+    {
+      "name": "固定 (2秒)",
+      "type": "line",
+      "data": [2, 2, 2, 2, 2],
+      "itemStyle": {
+        "color": "#1976d2"
+      }
+    },
+    {
+      "name": "増分 (2秒)",
+      "type": "line",
+      "data": [2, 4, 6, 8, 10],
+      "itemStyle": {
+        "color": "#f57c00"
+      }
+    },
+    {
+      "name": "指数 (1秒ベース)",
+      "type": "line",
+      "data": [1, 2, 4, 8, 16],
+      "itemStyle": {
+        "color": "#388e3c"
+      }
+    }
+  ]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<p><strong>ジッターを伴う指数バックオフ</strong>：指数遅延にランダム性を追加して、複数のクライアントが同時に再試行するのを防ぎます（「サンダリングハード」問題）。</p>
+<h2 id="実装の考慮事項">実装の考慮事項</h2>
+<h3 id="ログ戦略">ログ戦略</h3>
+<p>アラート疲労を避けるために、障害を適切にログに記録します：</p>
+<ul>
+<li><strong>初期の障害</strong>：情報エントリとしてログに記録</li>
+<li><strong>成功した再試行</strong>：デバッグレベルでログに記録</li>
+<li><strong>最終的な障害</strong>：すべての再試行が使い果たされた後にのみエラーとしてログに記録</li>
+</ul>
+<p>このアプローチにより、オペレーターは自己修正の問題に対するアラートで溢れることなく可視性を得ることができます。</p>
+<div class="mermaid">graph TB
+    A["リクエスト失敗"] --&gt; B["ログ: INFO - 試行1失敗"]
+    B --&gt; C["待機して再試行"]
+    C --&gt; D["リクエスト再び失敗"]
+    D --&gt; E["ログ: INFO - 試行2失敗"]
+    E --&gt; F["待機して再試行"]
+    F --&gt; G{"成功？"}
+    G --&gt;|"はい"| H["ログ: DEBUG - 試行3で成功"]
+    G --&gt;|"いいえ (最大再試行回数)"| I["ログ: ERROR - すべての再試行が使い果たされました"]
+    
+    style A fill:#ffe1e1
+    style H fill:#d3f9d8
+    style I fill:#ff6b6b</div>
+<h3 id="パフォーマンスへの影響">パフォーマンスへの影響</h3>
+<p>ビジネス要件に合わせて再試行ポリシーを調整します：</p>
+<p><strong>インタラクティブアプリケーション</strong>（Webアプリ、モバイルアプリ）：</p>
+<ul>
+<li>再試行回数を少なくして高速に失敗する</li>
+<li>試行間の短い遅延を使用する</li>
+<li>ユーザーフレンドリーなメッセージを表示する（「後でもう一度お試しください」）</li>
+</ul>
+<p><strong>バッチアプリケーション</strong>（データ処理、ETLジョブ）：</p>
+<ul>
+<li>より多くの再試行回数を使用する</li>
+<li>より長い遅延で指数バックオフを採用する</li>
+<li>速度よりも完了を優先する</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 積極的な再試行を避ける</p><div class="admonition-content"><p>積極的な再試行ポリシー（最小限の遅延で多くの再試行）は、次のことによって状況を悪化させる可能性があります：</p>
+<ul>
+<li>すでに過負荷のサービスをさらに劣化させる</li>
+<li>アプリケーションの応答性を低下させる</li>
+<li>システム全体でカスケード障害を作成する</li>
+</ul>
+<p>失敗したサービスを圧倒するのを防ぐために、再試行と並行してサーキットブレーカーパターンの実装を検討してください。</p>
+</div></div>
+<p>!!!</p>
+<h3 id="冪等性">冪等性</h3>
+<p>再試行を適用する前に、操作が冪等（複数回実行しても安全）であることを確認してください。非冪等操作は、意図しない副作用を引き起こす可能性があります：</p>
+<p><strong>問題のシナリオ</strong>：</p>
+<ol>
+<li>サービスがリクエストを受信し、正常に処理します</li>
+<li>ネットワークの問題により、サービスが応答を送信できません</li>
+<li>クライアントが再試行し、重複処理を引き起こします</li>
+</ol>
+<p><strong>ソリューション</strong>：</p>
+<ul>
+<li>操作を自然に冪等に設計する</li>
+<li>一意のリクエスト識別子を使用して重複を検出する</li>
+<li>サーバー側の重複排除ロジックを実装する</li>
+</ul>
+<h3 id="例外タイプ">例外タイプ</h3>
+<p>異なる例外には異なる再試行戦略が必要です：</p>
+<table>
+<thead>
+<tr>
+<th>例外タイプ</th>
+<th>再試行戦略</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一時的なネットワークエラー</td>
+<td>遅延して再試行</td>
+<td>接続タイムアウト、DNS解決失敗</td>
+</tr>
+<tr>
+<td>サービスビジー/スロットリング</td>
+<td>指数バックオフで再試行</td>
+<td>HTTP 429、HTTP 503</td>
+</tr>
+<tr>
+<td>認証の失敗</td>
+<td>直ちにキャンセル</td>
+<td>無効な資格情報、期限切れのトークン</td>
+</tr>
+<tr>
+<td>無効なリクエスト</td>
+<td>直ちにキャンセル</td>
+<td>HTTP 400、不正なデータ</td>
+</tr>
+<tr>
+<td>リソースが見つからない</td>
+<td>直ちにキャンセル</td>
+<td>HTTP 404</td>
+</tr>
+</tbody>
+</table>
+<h3 id="トランザクションの一貫性">トランザクションの一貫性</h3>
+<p>トランザクション内で操作を再試行する場合：</p>
+<ul>
+<li>成功確率を最大化するために再試行ポリシーを微調整する</li>
+<li>トランザクションステップをロールバックする必要性を最小限に抑える</li>
+<li>分散シナリオの補償トランザクションを検討する</li>
+<li>再試行ロジックがトランザクション分離レベルに違反しないことを確認する</li>
+</ul>
+<h2 id="テストと検証">テストと検証</h2>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🧪 テストチェックリスト</p><div class="admonition-content"><ul>
+<li>さまざまな障害条件（タイムアウト、接続エラー、サービスの利用不可）に対してテストする</li>
+<li>通常および障害シナリオでのパフォーマンスへの影響を確認する</li>
+<li>ダウンストリームサービスへの過度の負荷がないことを確認する</li>
+<li>同時再試行での競合状態を確認する</li>
+<li>さまざまな障害段階でのログ出力を検証する</li>
+<li>トランザクションロールバックシナリオをテストする</li>
+</ul>
+</div></div>
+<p>!!!</p>
+<h3 id="ネストされた再試行ポリシー">ネストされた再試行ポリシー</h3>
+<p>複数の再試行ポリシーを重ねることを避けます：</p>
+<p><strong>問題</strong>：タスクA（再試行ポリシーあり）がタスクB（再試行ポリシーもあり）を呼び出します。これにより、指数的な再試行回数と予測不可能な遅延が発生します。</p>
+<p><strong>ソリューション</strong>：下位レベルのタスクを高速に失敗し、障害を報告するように設定します。上位レベルのタスクが独自のポリシーに基づいて再試行を処理できるようにします。</p>
+<div class="mermaid">graph TB
+    A["タスク A<br>(再試行ポリシー)"] --&gt; B["タスク B<br>(再試行なし)"]
+    B --&gt;|"高速に失敗"| A
+    A --&gt;|"ポリシーに基づいて再試行"| B
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1</div>
+<h2 id="このパターンを使用する場合">このパターンを使用する場合</h2>
+<p><strong>再試行パターンを使用する場合</strong>：</p>
+<ul>
+<li>アプリケーションがリモートサービスまたはリソースと対話する</li>
+<li>障害が一時的で短命であることが予想される</li>
+<li>失敗したリクエストを繰り返すことで成功する可能性が高い</li>
+<li>操作が冪等であるか、冪等にすることができる</li>
+</ul>
+<p><strong>再試行パターンを使用しない場合</strong>：</p>
+<ul>
+<li>障害が長期間続く可能性が高い（代わりにサーキットブレーカーを使用）</li>
+<li>非一時的な障害を処理する（ビジネスロジックエラー、検証失敗）</li>
+<li>スケーラビリティの問題に対処する（代わりにサービスをスケールする）</li>
+<li>操作に重大な副作用があり、冪等ではない</li>
+</ul>
+<h2 id="サーキットブレーカーとの組み合わせ">サーキットブレーカーとの組み合わせ</h2>
+<p>再試行パターンとサーキットブレーカーパターンは互いに補完します：</p>
+<ul>
+<li><strong>再試行</strong>：操作を再度試行することで一時的な障害を処理します</li>
+<li><strong>サーキットブレーカー</strong>：サービスがダウンしていることがわかっている場合に再試行を防ぎます</li>
+</ul>
+<div class="mermaid">stateDiagram-v2
+    [*] --&gt; Closed: 通常動作
+    Closed --&gt; Open: 障害しきい値超過
+    Open --&gt; HalfOpen: タイムアウト経過
+    HalfOpen --&gt; Closed: 成功
+    HalfOpen --&gt; Open: 失敗
+    
+    note right of Closed
+        リクエストが通過
+        失敗時に再試行
+    end note
+    
+    note right of Open
+        リクエストが直ちに失敗
+        再試行は試みられない
+    end note
+    
+    note right of HalfOpen
+        限定的なリクエストが許可
+        サービス回復をテスト
+    end note</div>
+<p>これらのパターンを組み合わせることで、包括的な障害処理が提供されます：</p>
+<ol>
+<li>再試行が一時的な不具合を処理します</li>
+<li>サーキットブレーカーが失敗したサービスを圧倒するのを防ぎます</li>
+<li>長期間の停止中でもシステムが応答性を維持します</li>
+</ol>
+<h2 id="関連パターン">関連パターン</h2>
+<p><strong>サーキットブレーカー</strong>：失敗する可能性が高い操作を繰り返し実行しようとするのを防ぎ、障害が修正されるのを待たずに続行できるようにします。</p>
+<p><strong>スロットリング</strong>：アプリケーションインスタンス、サービス、またはテナントによるリソースの消費を制御します。</p>
+<p><strong>レート制限</strong>：サービスに送信されるリクエストのレートを管理して、圧倒するのを避けます。</p>
+<h2 id="参考文献">参考文献</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/retry">Retry Pattern - Microsoft Learn</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/ja/2019/03/Retry-Pattern/" data-id="55c7e070" class="article-share-link"><i class="fa fa-share"></i>シェア</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "再試行パターン：レジリエントなアプリケーションの構築",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2019-03-08",
+        "dateCreated": "2019-03-08",
+        "dateModified": "2025-10-26",
+        "url": "https://neo01.com//ja/2019/03/Retry-Pattern/",
+        "description": "再試行パターンを使用して、アプリケーションが一時的な障害を適切に処理し、分散システムの安定性とユーザーエクスペリエンスを向上させる方法を学びます。",
+        "wordCount": 746
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>フォロー:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">リンク</h3>
+    <div class="widget">
+        <ul><li><a href="/ja/ai">AI プレイグラウンド</a></li><li><a href="/ja/tools">ツール</a></li><li><a href="/ja/games">ゲーム</a></li><li><a href="/ja/pages/useful-information">役立つ情報</a></li><li><a href="/ja/pages/Hexo-Blogging-Cheatsheet">Hexo ブログチートシート</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="AIを使った学習法：反復的知識構築による個人的な旅" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/How-I-Use-AI-to-Learn/" class="title">AIを使った学習法：反復的知識構築による個人的な旅</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">ツール、ゲーム、そしてブラウザ内蔵AIプレイグラウンド</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/AI/">AI</a></p>
+                            <p class="item-title"><a href="/ja/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">エージェントコーディングの台頭：AI駆動のソフトウェアエンジニアリング</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part2/" class="title">エフェメラルポートを理解する パート2：サーバーアプリケーションが動的ポートを避けるべき理由</a></p>
+                            <p class="item-date"><time datetime="2025-08-30T16:00:00.000Z" itemprop="datePublished">2025-08-31</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="thumbnail">
+        <span style="background-image:url(/assets/ports/thumbnail.png)" alt="エフェメラルポートを理解する：ネットワーク通信の見えない働き手" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/ja/categories/Development/">開発</a></p>
+                            <p class="item-title"><a href="/ja/2025/08/Understanding_Ephemeral_Ports_Part1/" class="title">エフェメラルポートを理解する：ネットワーク通信の見えない働き手</a></p>
+                            <p class="item-date"><time datetime="2025-08-29T16:00:00.000Z" itemprop="datePublished">2025-08-30</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">アーカイブ</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2025/">2025</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/ja/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#2dd05e7e</div>
+                <img src="/qr/qr-8242a58472c96c93ea533c8119711a67.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#2dd05e7e">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/ja/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>

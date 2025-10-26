@@ -1,0 +1,1408 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    
+    <title>证书固定：TLS 安全的双刃剑 | Decoding Digital Anomalies</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <meta name="keywords" content="Certificate,Security,TLS">
+    
+    
+    <meta name="description" content="证书固定承诺增强安全性，但也带来了运营风险。了解固定什么、如何实现，以及为什么它可能会破坏你的应用程序。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="证书固定：TLS 安全的双刃剑">
+<meta property="og:url" content="https://neo01.com/zh-CN/2021/03/Certificate-Pinning-Security-Trade-offs/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="证书固定承诺增强安全性，但也带来了运营风险。了解固定什么、如何实现，以及为什么它可能会破坏你的应用程序。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/cert/pinning_thumbnail.png">
+<meta property="article:published_time" content="2021-03-03T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-26T12:13:30.201Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Certificate">
+<meta property="article:tag" content="Security">
+<meta property="article:tag" content="TLS">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/cert/pinning_thumbnail.png">
+    
+            <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+<!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 7.3.0">  <link rel="canonical" href="https://neo01.com/zh-CN/2021/03/Certificate-Pinning-Security-Trade-offs">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        <header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <a href="/" title="Homepage" class="logo"></a>
+                    </h1>
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                                <a href="/2021/03/Certificate-Pinning-Security-Trade-offs/" class="lang-link">English</a>
+<span class="lang-sep">|</span>                                <a href="/zh-TW/2021/03/Certificate-Pinning-Security-Trade-offs/" class="lang-link">繁體中文</a>
+<span class="lang-sep">|</span>                                <a href="/ja/2021/03/Certificate-Pinning-Security-Trade-offs/" class="lang-link">日本語</a>
+                    </div>
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2021/03/Certificate-Pinning-Security-Trade-offs-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        证书固定：TLS 安全的双刃剑
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2021-03-03T16:00:00.000Z" itemprop="datePublished">2021-03-04</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-26T12:13:30.201Z" itemprop="datePublished">2025-10-26</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/Security/">Security</a> <a class="tag-link" href="/zh-CN/tags/Certificate/">Certificate</a> <a class="tag-link" href="/zh-CN/tags/TLS/">TLS</a>
+    </div>
+
+            </div>
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%90%86%E8%A7%A3%E8%AF%81%E4%B9%A6%E9%93%BE"><span class="toc-text">理解证书链</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B7%A8%E5%B9%B3%E5%8F%B0%E7%9A%84%E8%AF%81%E4%B9%A6%E5%9B%BA%E5%AE%9A"><span class="toc-text">跨平台的证书固定</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%BA%E5%AE%9A%E5%9B%B0%E5%A2%83%EF%BC%9A%E5%9B%BA%E5%AE%9A%E4%BB%80%E4%B9%88"><span class="toc-text">固定困境：固定什么</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AC%E9%92%A5%E5%9B%BA%E5%AE%9A%EF%BC%9A%E6%8E%A8%E8%8D%90%E6%96%B9%E6%B3%95"><span class="toc-text">公钥固定：推荐方法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%80%9A%E7%94%A8%E5%90%8D%E7%A7%B0%E9%99%B7%E9%98%B1%EF%BC%9A%E4%B8%8D%E8%A6%81%E9%80%9A%E8%BF%87-CN-%E5%9B%BA%E5%AE%9A"><span class="toc-text">通用名称陷阱：不要通过 CN 固定</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9C%9F%E5%AE%9E%E4%B8%96%E7%95%8C%E7%9A%84%E5%9B%BA%E5%AE%9A%E5%A4%B1%E8%B4%A5"><span class="toc-text">真实世界的固定失败</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%99%A9%E4%BA%9B%E5%A4%B1%E8%AF%AF%EF%BC%9A%E6%B5%8B%E8%AF%95%E6%8B%AF%E6%95%91%E4%BA%86%E4%B8%80%E5%88%87"><span class="toc-text">险些失误：测试拯救了一切</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%B5%8B%E8%AF%95%E8%AF%81%E4%B9%A6%E5%9B%BA%E5%AE%9A%EF%BC%9A%E4%B8%8D%E8%A6%81%E8%B5%B0%E6%8D%B7%E5%BE%84"><span class="toc-text">测试证书固定：不要走捷径</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%97%B6%E4%BD%BF%E7%94%A8%E8%AF%81%E4%B9%A6%E5%9B%BA%E5%AE%9A"><span class="toc-text">何时使用证书固定</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%AF%81%E4%B9%A6%E5%9B%BA%E5%AE%9A%E7%9A%84%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%A1%88"><span class="toc-text">证书固定的替代方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li></ol>
+            <p>证书固定作为一种安全技术应运而生，用于对抗中间人攻击和流氓证书颁发机构。通过将预期的证书信息硬编码到应用程序中，开发人员可以确保只有在与合法服务器通信时连接才会成功。然而，这种增强的安全性伴随着显著的运营复杂性和风险。配置错误的固定或过期的证书可能会导致应用程序无法使用，需要紧急更新并让用户感到沮丧。</p>
+<p>本文探讨了跨浏览器、移动应用程序和后端服务的证书固定。我们将剖析证书链层次结构，评估要固定的元素，并理解安全性与运营灵活性之间的权衡。通过真实事件和行业实践，我们揭示了为什么证书固定既强大又危险。</p>
+<h2 id="理解证书链">理解证书链</h2>
+<p>在深入研究固定策略之前，理解证书链结构至关重要。TLS 证书不是孤立存在的——它们形成了从服务器证书到受信任根证书颁发机构的分层信任链。</p>
+<h3 id="三层层次结构">三层层次结构</h3>
+<p>TLS 证书链通常由三个级别组成，每个级别都有不同的用途：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔗 证书链结构</p><div class="admonition-content"><p><strong>叶证书（终端实体证书）</strong></p>
+<ul>
+<li>安装在 Web 服务器或应用程序上的证书</li>
+<li>包含你的域名（例如 example.com）</li>
+<li>有效期最短（目前最长 398 天，到 2029 年将缩短至 47 天）</li>
+<li>由中间证书签名</li>
+<li>链中最频繁更换的证书</li>
+</ul>
+<p><strong>中间证书</strong></p>
+<ul>
+<li>由根 CA 颁发用于签署叶证书</li>
+<li>充当根证书和叶证书之间的缓冲</li>
+<li>典型有效期：3-10 年</li>
+<li>可以在不影响根证书信任的情况下被吊销</li>
+<li>链中可能存在多个中间证书</li>
+</ul>
+<p><strong>根证书</strong></p>
+<ul>
+<li>位于链顶部的自签名证书</li>
+<li>嵌入在操作系统和浏览器中</li>
+<li>有效期极长：15-25 年</li>
+<li>由于分发挑战很少更改</li>
+<li>被攻破需要操作系统/浏览器更新才能移除</li>
+</ul>
+</div></div>
+<p>证书链通过加密签名工作。根 CA 签署中间证书，中间证书签署你的叶证书，客户端验证链上的每个签名，直到到达其证书存储中的受信任根证书。</p>
+<h3 id="为什么存在这种层次结构">为什么存在这种层次结构</h3>
+<p>三层结构不是任意的——它提供了关键的运营和安全优势：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🛡️ 层次结构优势</p><div class="admonition-content"><p><strong>根证书保护</strong></p>
+<ul>
+<li>根私钥保存在安全设施的离线环境中</li>
+<li>最大限度地减少被攻破的风险</li>
+<li>减少频繁签名操作带来的运营风险</li>
+</ul>
+<p><strong>运营灵活性</strong></p>
+<ul>
+<li>中间证书可以在不更换根证书的情况下被吊销</li>
+<li>可以在不需要操作系统/浏览器更新的情况下颁发新的中间证书</li>
+<li>允许 CA 分段运营（地理位置、产品线）</li>
+</ul>
+<p><strong>风险隔离</strong></p>
+<ul>
+<li>中间证书被攻破限制了损害范围</li>
+<li>叶证书被攻破只影响特定域名</li>
+<li>分层安全减少了单点故障</li>
+</ul>
+</div></div>
+<p>在决定固定什么时，这种层次结构变得至关重要。每个级别在安全性和运营灵活性之间提供不同的权衡。</p>
+<h2 id="跨平台的证书固定">跨平台的证书固定</h2>
+<p>证书固定的实现在浏览器、移动应用程序和后端服务之间存在显著差异。每个平台都有不同的能力、约束和用例，影响固定策略。</p>
+<h3 id="浏览器固定：有限且衰落">浏览器固定：有限且衰落</h3>
+<p>现代浏览器在很大程度上已经放弃了对 Web 应用程序自定义证书固定的支持：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 浏览器固定现实</p><div class="admonition-content"><p><strong>HTTP 公钥固定（HPKP）- 已弃用</strong></p>
+<ul>
+<li>2015 年引入，允许网站指定固定的证书</li>
+<li>Chrome 在 2017 年弃用，2018 年移除</li>
+<li>Firefox 和其他浏览器也纷纷效仿</li>
+<li>原因：太危险——配置错误可能永久破坏网站</li>
+</ul>
+<p><strong>当前浏览器方法</strong></p>
+<ul>
+<li>浏览器为高价值域名维护自己的固定列表</li>
+<li>Google 固定自己的域名（google.com、gmail.com 等）</li>
+<li>预加载的固定编译到浏览器代码中</li>
+<li>不适用于第三方网站</li>
+</ul>
+<p><strong>HPKP 失败的原因</strong></p>
+<ul>
+<li>配置错误的固定将用户锁定在网站之外</li>
+<li>攻击者可以使用 HPKP 进行勒索攻击</li>
+<li>没有损坏固定的恢复机制</li>
+<li>运营负担超过了安全优势</li>
+</ul>
+</div></div>
+<p>对于 Web 应用程序，证书固定实际上不可用。浏览器依赖标准的 CA 信任模型以及证书透明度等额外保护。</p>
+<h3 id="移动应用程序固定：常见但有风险">移动应用程序固定：常见但有风险</h3>
+<p>移动应用程序代表了当今证书固定的主要用例：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📱 移动固定特征</p><div class="admonition-content"><p><strong>iOS 实现</strong></p>
+<ul>
+<li>通过 NSURLSession 和应用传输安全提供原生支持</li>
+<li>可以固定证书或公钥</li>
+<li>在应用程序代码中实现</li>
+<li>需要应用更新才能更改固定</li>
+</ul>
+<p><strong>Android 实现</strong></p>
+<ul>
+<li>网络安全配置（Android 7.0+）</li>
+<li>声明式 XML 配置</li>
+<li>可以固定证书或公钥</li>
+<li>也需要应用更新才能更改固定</li>
+</ul>
+<p><strong>常见用例</strong></p>
+<ul>
+<li>银行和金融应用程序</li>
+<li>处理敏感数据的医疗保健应用</li>
+<li>具有高安全要求的企业应用程序</li>
+<li>与已知受控服务器通信的应用</li>
+</ul>
+</div></div>
+<p>当你控制客户端和服务器、可以协调更新并且安全优势证明运营复杂性合理时，移动固定是有意义的。</p>
+<h3 id="后端服务固定：受控环境">后端服务固定：受控环境</h3>
+<p>后端服务与其他后端服务通信代表了另一种固定场景：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔧 后端固定优势</p><div class="admonition-content"><p><strong>受控环境</strong></p>
+<ul>
+<li>客户端和服务器都在你的控制之下</li>
+<li>可以协调证书更新</li>
+<li>自动化部署减少更新摩擦</li>
+</ul>
+<p><strong>微服务通信</strong></p>
+<ul>
+<li>服务到服务的身份验证</li>
+<li>带固定的双向 TLS（mTLS）</li>
+<li>零信任架构实现</li>
+</ul>
+<p><strong>API 客户端库</strong></p>
+<ul>
+<li>与特定 API 通信的 SDK</li>
+<li>已知的证书基础设施</li>
+<li>可以将固定与库更新捆绑在一起</li>
+</ul>
+</div></div>
+<p>后端固定的风险低于移动固定，因为更新可以快速部署而无需用户参与。</p>
+<h2 id="固定困境：固定什么">固定困境：固定什么</h2>
+<p>选择固定什么涉及在安全性和运营灵活性之间取得平衡。每个选项——根证书、中间证书或叶证书——都呈现出不同的权衡。</p>
+<h3 id="固定叶证书：最大安全性，最大风险">固定叶证书：最大安全性，最大风险</h3>
+<p>固定服务器的叶证书提供最强的安全性，但会带来重大的运营挑战：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 叶证书固定风险</p><div class="admonition-content"><p><strong>需要频繁轮换</strong></p>
+<ul>
+<li>叶证书在 398 天后过期（很快将缩短至 47 天）</li>
+<li>每次证书续订都需要应用程序更新</li>
+<li>使用 47 天证书：每年至少需要 7-8 次更新</li>
+</ul>
+<p><strong>紧急情况</strong></p>
+<ul>
+<li>私钥被攻破需要立即更换证书</li>
+<li>在部署新证书之前需要应用程序更新</li>
+<li>使用旧应用版本的用户无法连接</li>
+<li>没有优雅的迁移路径</li>
+</ul>
+<p><strong>运营负担</strong></p>
+<ul>
+<li>协调证书更新与应用发布</li>
+<li>在部署前测试固定更新</li>
+<li>管理具有不同固定的多个应用版本</li>
+<li>破坏连接的高风险</li>
+</ul>
+</div></div>
+<p>除非在可以管理运营复杂性的极高安全场景中，否则很少推荐叶证书固定。</p>
+<h3 id="固定中间证书：平衡方法">固定中间证书：平衡方法</h3>
+<p>固定中间证书提供了一个中间地带：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>⚖️ 中间证书权衡</p><div class="admonition-content"><p><strong>优势</strong></p>
+<ul>
+<li>中间证书持续 3-10 年</li>
+<li>需要更少的应用程序更新</li>
+<li>叶证书轮换不影响固定</li>
+<li>相比不固定有合理的安全改进</li>
+</ul>
+<p><strong>劣势</strong></p>
+<ul>
+<li>CA 可以使用相同的中间证书为你的域名颁发证书</li>
+<li>不能防止 CA 被攻破</li>
+<li>中间证书轮换时仍需要更新</li>
+<li>可能存在多个中间证书（需要固定所有）</li>
+</ul>
+<p><strong>最佳实践</strong></p>
+<ul>
+<li>固定当前中间证书加备份中间证书</li>
+<li>监控 CA 关于中间证书更改的公告</li>
+<li>在中间证书过期之前做好更新计划</li>
+<li>首先使用暂存中间证书进行测试</li>
+</ul>
+</div></div>
+<p>中间证书固定是移动应用程序最常见的方法，在安全性和运营可行性之间取得平衡。</p>
+<h3 id="固定根证书：最小安全优势">固定根证书：最小安全优势</h3>
+<p>固定根证书提供的安全改进最少：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 根证书固定限制</p><div class="admonition-content"><p><strong>有限的安全价值</strong></p>
+<ul>
+<li>根 CA 可以为任何域名颁发证书</li>
+<li>不能防止 CA 被攻破攻击</li>
+<li>相比标准信任模型提供最小保护</li>
+<li>只能防止使用不同根 CA 的攻击</li>
+</ul>
+<p><strong>运营优势</strong></p>
+<ul>
+<li>根证书持续 15-25 年</li>
+<li>需要非常不频繁的更新</li>
+<li>叶证书和中间证书轮换不影响固定</li>
+</ul>
+<p><strong>何时有意义</strong></p>
+<ul>
+<li>限制到特定 CA（例如，只信任 DigiCert 根证书）</li>
+<li>减少被攻破的 CA 的攻击面</li>
+<li>符合 CA 限制的合规要求</li>
+</ul>
+</div></div>
+<p>考虑到最小的安全改进，根证书固定很少值得实施。</p>
+<h2 id="公钥固定：推荐方法">公钥固定：推荐方法</h2>
+<p>与其固定整个证书，固定公钥提供了更好的灵活性：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 公钥固定优势</p><div class="admonition-content"><p><strong>证书轮换无需更改固定</strong></p>
+<ul>
+<li>新证书可以使用相同的密钥对</li>
+<li>固定在证书续订期间保持有效</li>
+<li>减少更新频率</li>
+</ul>
+<p><strong>备份密钥支持</strong></p>
+<ul>
+<li>提前生成备份密钥对</li>
+<li>固定当前和备份公钥</li>
+<li>如果主密钥被攻破，切换到备份密钥</li>
+<li>提供紧急恢复路径</li>
+</ul>
+<p><strong>实现</strong></p>
+<ul>
+<li>从证书中提取公钥</li>
+<li>对公钥进行哈希（通常是 SHA-256）</li>
+<li>将哈希存储在应用程序中</li>
+<li>在 TLS 握手期间进行比较</li>
+</ul>
+</div></div>
+<p>公钥固定是行业推荐的方法，在保持运营灵活性的同时提供安全优势。</p>
+<h3 id="实现公钥固定">实现公钥固定</h3>
+<p>技术实现涉及提取和哈希公钥：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 从证书中提取公钥</span>
+openssl x509 <span class="token parameter variable">-in</span> certificate.pem <span class="token parameter variable">-pubkey</span> <span class="token parameter variable">-noout</span> <span class="token operator">&gt;</span> pubkey.pem
+
+<span class="token comment"># 生成公钥的 SHA-256 哈希（SPKI 格式）</span>
+openssl x509 <span class="token parameter variable">-in</span> certificate.pem <span class="token parameter variable">-pubkey</span> <span class="token parameter variable">-noout</span> <span class="token operator">|</span> <span class="token punctuation">\</span>
+  openssl pkey <span class="token parameter variable">-pubin</span> <span class="token parameter variable">-outform</span> der <span class="token operator">|</span> <span class="token punctuation">\</span>
+  openssl dgst <span class="token parameter variable">-sha256</span> <span class="token parameter variable">-binary</span> <span class="token operator">|</span> <span class="token punctuation">\</span>
+  base64</code></pre>
+<p>生成的 base64 编码哈希就是你在应用程序中固定的内容。在 TLS 握手期间，提取服务器的公钥，对其进行哈希，并与你固定的哈希进行比较。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔑 密钥管理最佳实践</p><div class="admonition-content"><p><strong>始终固定多个密钥</strong></p>
+<ul>
+<li>当前生产密钥</li>
+<li>备份密钥（预先生成，安全存储）</li>
+<li>可选：中间 CA 公钥</li>
+</ul>
+<p><strong>密钥轮换策略</strong></p>
+<ul>
+<li>部署新固定时生成备份密钥</li>
+<li>将备份密钥安全地离线存储</li>
+<li>轮换时，备份变为主密钥，生成新备份</li>
+<li>在轮换前更新固定以包含新备份</li>
+</ul>
+<p><strong>紧急程序</strong></p>
+<ul>
+<li>记录密钥被攻破响应程序</li>
+<li>保持快速部署应用更新的能力</li>
+<li>考虑终止开关或远程固定更新机制</li>
+<li>定期测试紧急程序</li>
+</ul>
+</div></div>
+<h2 id="通用名称陷阱：不要通过-CN-固定">通用名称陷阱：不要通过 CN 固定</h2>
+<p>一些开发人员试图通过验证证书的通用名称（CN）或主题备用名称（SAN）来实现固定。这种方法从根本上是有缺陷的：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 为什么 CN 固定失败</p><div class="admonition-content"><p><strong>没有加密绑定</strong></p>
+<ul>
+<li>CN 只是证书中的一个文本字段</li>
+<li>任何 CA 都可以使用你的域名颁发证书</li>
+<li>不验证证书实际上是你的</li>
+<li>不提供任何安全优势</li>
+</ul>
+<p><strong>攻击场景</strong></p>
+<ul>
+<li>攻击者攻破任何受信任的 CA</li>
+<li>为你的域名（victim.com）请求证书</li>
+<li>证书具有正确的 CN 但错误的公钥</li>
+<li>你的 CN 验证通过，攻击者拦截流量</li>
+</ul>
+<p><strong>你实际上在验证什么</strong></p>
+<ul>
+<li>标准 TLS 库已经验证 CN/SAN</li>
+<li>你在重复现有验证</li>
+<li>没有添加任何安全层</li>
+<li>为没有好处创建维护负担</li>
+</ul>
+</div></div>
+<p>CN 验证不是证书固定——它是不提供安全改进的冗余验证。</p>
+<h3 id="什么真正提供安全性">什么真正提供安全性</h3>
+<p>真正的证书固定验证加密属性：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 加密验证</p><div class="admonition-content"><p><strong>公钥固定</strong></p>
+<ul>
+<li>验证实际的加密密钥</li>
+<li>没有私钥访问权限无法伪造</li>
+<li>提供针对 CA 被攻破的真正安全性</li>
+</ul>
+<p><strong>证书固定</strong></p>
+<ul>
+<li>验证包括签名在内的整个证书</li>
+<li>确保精确的证书匹配</li>
+<li>比公钥固定更强但灵活性较差</li>
+</ul>
+<p><strong>证书链固定</strong></p>
+<ul>
+<li>验证中间证书或根证书</li>
+<li>限制哪些 CA 可以颁发有效证书</li>
+<li>平衡安全性和运营灵活性</li>
+</ul>
+</div></div>
+<p>关键见解：固定加密材料（密钥、证书），而不是元数据（CN、组织名称）。</p>
+<h2 id="真实世界的固定失败">真实世界的固定失败</h2>
+<p>证书固定失败导致了高调的中断，说明了运营风险：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 著名的固定事件</p><div class="admonition-content"><p><strong>移动银行应用</strong></p>
+<ul>
+<li>证书续订被遗忘，固定未更新</li>
+<li>在部署新证书之前需要应用更新</li>
+<li>数千用户无法访问银行服务</li>
+<li>紧急应用更新匆忙通过审批流程</li>
+</ul>
+<p><strong>企业应用程序</strong></p>
+<ul>
+<li>CA 轮换了中间证书</li>
+<li>已部署应用程序中的固定未更新</li>
+<li>整个移动劳动力无法连接</li>
+<li>需要紧急证书回滚</li>
+</ul>
+<p><strong>API 客户端库</strong></p>
+<ul>
+<li>固定的叶证书过期</li>
+<li>使用该库的所有应用程序都损坏</li>
+<li>开发人员被迫更新和重新部署</li>
+<li>整个客户群的服务中断</li>
+</ul>
+</div></div>
+<p>这些事件有共同的主题：证书轮换计划不足、缺乏备份固定，以及低估了证书和应用程序更新之间所需的协调。</p>
+<h2 id="险些失误：测试拯救了一切">险些失误：测试拯救了一切</h2>
+<p>我曾经通过严格的轮换前测试——以及在被驳回时的坚持——险些避免了一次灾难性的中断。我们的移动应用程序使用了混合固定方法：它将通用名称映射到特定的公钥固定。虽然从纯安全角度来看并不理想，但这种设计提供了运营灵活性——只要公钥保持固定，我们就可以在不更新应用的情况下使用相同的 CN 轮换证书。</p>
+<p>在一次例行证书轮换期间，我的团队遵循了我们的标准程序：在部署到生产环境之前，在暂存环境中测试新证书。测试失败了。连接被拒绝，应用无法与我们的服务器通信。</p>
+<h3 id="当测试团队说-太难了">当测试团队说"太难了"</h3>
+<p>测试团队报告了失败，但很快就驳回了它。"证书固定很难测试，"他们说。“我们在 UAT 中禁用了固定——这就是我们看到失败的原因。这可能只是一个配置问题。我们已经测试了其他所有内容，它工作正常。”</p>
+<p>这个回应让我深感不安。他们因为"固定失败太常见"而在 UAT 中禁用了证书固定，这意味着他们的测试没有验证实际的生产行为。距离计划的生产发布只剩下两个小时，我决定亲自调查，而不是接受驳回。</p>
+<h3 id="UAT-固定缺口">UAT 固定缺口</h3>
+<p>测试团队的轻视态度揭示了一个危险的做法：他们在 UAT（用户验收测试）环境中禁用了证书固定。他们的理由是务实的但有缺陷的——固定使测试更难，所以他们移除了它。</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 禁用固定陷阱</p><div class="admonition-content"><p><strong>他们为什么在 UAT 中禁用固定</strong></p>
+<ul>
+<li>"证书固定太难测试"</li>
+<li>UAT 证书经常更改或过期</li>
+<li>用于测试的自签名证书</li>
+<li>测试团队缺乏更新固定的权限</li>
+<li>"它减慢了我们的测试周期"</li>
+<li>"我们会在生产监控中捕获真正的问题"</li>
+</ul>
+<p><strong>危险的后果</strong></p>
+<ul>
+<li>UAT 测试没有验证任何关于证书固定的内容</li>
+<li>所有与固定相关的问题只会出现在生产环境中</li>
+<li>"成功"的 UAT 测试带来的虚假信心</li>
+<li>生产环境成为真正的测试环境</li>
+<li>用户会遇到测试从未捕获的失败</li>
+</ul>
+<p><strong>实际发生的情况</strong></p>
+<ul>
+<li>测试团队在 UAT 中运行完整的测试套件</li>
+<li>所有测试都通过了（因为固定被禁用）</li>
+<li>他们报告"准备好生产发布"</li>
+<li>证书轮换会破坏生产环境</li>
+<li>只有我启用固定的暂存测试捕获了问题</li>
+</ul>
+</div></div>
+<p>我坚持维护一个启用证书固定的单独暂存环境，正是为了捕获这些问题。测试团队认为这是多余的和过度谨慎的。这次事件证明了相反的情况。</p>
+<p>我打开代码并开始逐行检查。固定逻辑、CN 映射、公钥验证——每个组件都需要仔细审查。时间在流逝，但在不理解失败的情况下匆忙发布将是鲁莽的。</p>
+<p>经过一个小时的调查，我发现了问题：新证书的通用名称结构与预期不同。</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🔍 发现（发布前 2 小时）</p><div class="admonition-content"><p><strong>我在代码中发现的内容</strong></p>
+<ul>
+<li>证书提供商在续订期间更改了 CN 格式</li>
+<li>旧证书：<code>CN=api.example.com</code></li>
+<li>新证书：<code>CN=*.example.com</code>（通配符）</li>
+<li>应用的 CN 到固定映射逻辑期望精确匹配</li>
+<li>通配符 CN 与硬编码映射不匹配</li>
+<li>所有连接都会被拒绝</li>
+</ul>
+<p><strong>如果部署的影响</strong></p>
+<ul>
+<li>整个移动用户群无法连接</li>
+<li>没有应用更新就没有立即修复</li>
+<li>应用商店审批流程：最少 1-3 天</li>
+<li>潜在的收入损失和声誉损害</li>
+<li>紧急回滚将是唯一选择</li>
+</ul>
+<p><strong>时间线</strong></p>
+<ul>
+<li>测试团队报告失败但驳回了它</li>
+<li>距离计划发布还有 2 小时</li>
+<li>逐行代码调查揭示了根本原因</li>
+<li>发布在剩余 1 小时时被取消</li>
+<li>通过坚持和调查避免了灾难</li>
+</ul>
+</div></div>
+<p>我立即取消了证书轮换，距离计划的发布窗口只剩一个小时。我们与证书提供商合作，颁发了一个具有原始 CN 格式的新证书，保持与已部署应用程序的一致性。轮换被重新安排，并在彻底测试确认 CN 符合我们的期望后成功完成。</p>
+<h3 id="险些失误的教训">险些失误的教训</h3>
+<p>这次经历强化了几个关键原则，特别是关于组织文化以及调查失败而不是驳回失败的重要性：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 测试最佳实践</p><div class="admonition-content"><p><strong>永远不要在 UAT 中禁用固定</strong></p>
+<ul>
+<li>如果生产环境中启用了固定，则必须在 UAT 中启用</li>
+<li>"太难测试"意味着你会在生产环境中发现问题</li>
+<li>UAT 必须完全镜像生产行为</li>
+<li>在 UAT 中使用类似生产的证书</li>
+<li>跨环境维护固定同步</li>
+<li>接受运营负担作为必要的验证</li>
+<li>如果你不能测试它，你就不能安全地部署它</li>
+</ul>
+<p><strong>永远不要驳回测试失败</strong></p>
+<ul>
+<li>证书固定失败是信号，不是噪音</li>
+<li>"太难测试"不是可接受的回应</li>
+<li>调查每个失败到根本原因</li>
+<li>不要假设"它会在生产环境中工作"</li>
+<li>坚持理解为什么测试失败</li>
+</ul>
+<p><strong>在轮换前始终测试</strong></p>
+<ul>
+<li>在暂存环境中测试新证书</li>
+<li>使用实际的应用程序构建，而不是模拟器</li>
+<li>验证所有证书属性：CN、SAN、公钥、链</li>
+<li>如果可能，使用多个应用版本进行测试</li>
+<li>记录预期的证书属性</li>
+<li>如有必要，逐行调查</li>
+</ul>
+<p><strong>为运营灵活性而设计</strong></p>
+<ul>
+<li>CN 到固定映射为密钥轮换提供了灵活性</li>
+<li>可以在不更新应用的情况下更新公钥（在相同 CN 内）</li>
+<li>减少所需应用更新的频率</li>
+<li>平衡安全性与运营现实</li>
+</ul>
+<p><strong>保持协调</strong></p>
+<ul>
+<li>清楚地记录证书要求</li>
+<li>向证书提供商传达要求</li>
+<li>在接受交付之前验证证书属性</li>
+<li>准备好回滚程序</li>
+<li>安排有足够测试时间的轮换</li>
+</ul>
+</div></div>
+<p>混合方法——使用 CN 映射到公钥固定——代表了一种务实的妥协。纯公钥固定会更安全，但每次密钥轮换都需要应用更新。纯 CN 验证不会提供任何安全性。我们的方法允许我们在 CN 保持一致的情况下轮换密钥而无需应用更新，同时仍然通过固定的公钥验证加密属性。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 设计考虑</p><div class="admonition-content"><p><strong>适当的设计降低风险</strong></p>
+<ul>
+<li>将证书身份（CN）与加密验证（公钥）分开</li>
+<li>允许每个 CN 有多个固定以实现优雅轮换</li>
+<li>在初始部署中包含备份固定</li>
+<li>为证书提供商更改而设计</li>
+<li>为紧急情况做计划</li>
+</ul>
+<p><strong>环境配置</strong></p>
+<ul>
+<li>在包括 UAT 在内的所有环境中启用固定</li>
+<li>如果测试团队禁用固定，维护启用它的单独暂存环境</li>
+<li>如有必要，使用特定于环境的固定</li>
+<li>将固定配置与证书基础设施一起维护</li>
+<li>不要为了方便而牺牲测试覆盖率</li>
+<li>接受适当的测试需要努力</li>
+<li>如果你不能在启用固定的情况下测试，你就不能安全地部署</li>
+</ul>
+<p><strong>文档至关重要</strong></p>
+<ul>
+<li>记录固定架构和理由</li>
+<li>维护固定的 CN 和公钥列表</li>
+<li>记录证书提供商要求</li>
+<li>为轮换程序创建运行手册</li>
+<li>在团队成员之间共享知识</li>
+</ul>
+<p><strong>文化考虑</strong></p>
+<ul>
+<li>培养调查而不是驳回测试失败的文化</li>
+<li>授权工程师在发现问题时取消发布</li>
+<li>在发布前分配适当调查的时间</li>
+<li>不要接受"太难测试"作为有效理由</li>
+<li>将证书轮换视为高风险更改</li>
+</ul>
+</div></div>
+<p>这次事件表明，适当的设计和严格的测试不是可选的奢侈品——它们是防止自我造成的中断的基本保障。更重要的是，它暴露了测试团队方法中的关键缺陷：他们因为"太难测试"而在 UAT 中禁用了证书固定，这意味着他们的测试没有验证任何关于生产行为的内容。</p>
+<p>测试团队运行了他们的完整测试套件并报告"准备好生产"。所有测试都通过了——因为固定被禁用了。他们通过不反映现实的测试创造了虚假的安全感。只有我坚持维护启用固定的单独暂存环境才捕获了问题。没有它，证书固定的第一次测试将在生产环境中进行，数千用户无法连接。</p>
+<p>这次事件验证了一个有争议的决定：维护启用固定测试的运营负担。许多组织因为"失败太常见"而在测试环境中禁用固定，但这会创建一个危险的缺口，生产环境成为真正的测试环境。启用固定测试的困难不是一个错误——它是一个功能，强制执行适当的证书管理实践并在问题到达用户之前捕获它们。</p>
+<p>花费两个小时调查节省了数天的危机管理、紧急应用更新和潜在的业务影响。每次证书轮换都应被视为高风险操作，需要与主要代码部署相同的谨慎和验证。每次测试失败都值得调查，而不是驳回——特别是在处理证书固定时，失败的后果是立即和严重的。</p>
+<h2 id="测试证书固定：不要走捷径">测试证书固定：不要走捷径</h2>
+<p>在非生产环境中禁用证书固定的诱惑很强，但它破坏了测试的整个目的：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 适得其反的捷径</p><div class="admonition-content"><p><strong>在 UAT 中禁用固定的常见理由</strong></p>
+<ul>
+<li>"证书固定太难测试"</li>
+<li>"我们在 UAT 中使用自签名证书"</li>
+<li>"固定失败在测试中太常见"</li>
+<li>"它减慢了我们的测试周期"</li>
+<li>"生产证书无论如何都是不同的"</li>
+</ul>
+<p><strong>为什么这些理由失败</strong></p>
+<ul>
+<li>测试应该验证生产行为</li>
+<li>如果难以测试，就难以操作</li>
+<li>常见的失败表明真正的问题</li>
+<li>缓慢的测试优于生产中断</li>
+<li>不同的证书仍应遵循相同的固定规则</li>
+</ul>
+</div></div>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 适当的测试方法</p><div class="admonition-content"><p><strong>在所有环境中维护固定</strong></p>
+<ul>
+<li>在 UAT 中使用类似生产的证书</li>
+<li>跨环境保持固定同步</li>
+<li>首先在 UAT 中测试证书轮换程序</li>
+<li>验证固定逻辑正常工作</li>
+<li>在生产之前捕获配置问题</li>
+</ul>
+<p><strong>接受运营负担</strong></p>
+<ul>
+<li>是的，在 UAT 中管理证书更难</li>
+<li>是的，它需要团队之间的协调</li>
+<li>是的，它减慢了一些测试场景</li>
+<li>但它防止了生产灾难</li>
+<li>困难就是重点——它强制执行适当的实践</li>
+</ul>
+</div></div>
+<p>在 UAT 中禁用固定的组织通常只在生产环境中发现问题，在那里影响是严重的，恢复选项是有限的。在测试环境中维护固定的运营负担远小于影响数千或数百万用户的生产中断的成本。</p>
+<h2 id="何时使用证书固定">何时使用证书固定</h2>
+<p>考虑到风险，证书固定何时有意义？</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>✅ 良好的固定用例</p><div class="admonition-content"><p><strong>高价值移动应用程序</strong></p>
+<ul>
+<li>银行和金融服务</li>
+<li>具有 PHI 的医疗保健应用程序</li>
+<li>政府和国防应用程序</li>
+<li>当安全性证明运营复杂性合理时</li>
+</ul>
+<p><strong>受控环境</strong></p>
+<ul>
+<li>后端服务到服务通信</li>
+<li>具有托管部署的企业应用程序</li>
+<li>具有更新机制的物联网设备</li>
+<li>当客户端和服务器都在你的控制之下时</li>
+</ul>
+<p><strong>威胁模型要求</strong></p>
+<ul>
+<li>防止 CA 被攻破至关重要</li>
+<li>监管合规要求固定</li>
+<li>针对性攻击风险很高</li>
+<li>标准 TLS 信任模型不足</li>
+</ul>
+</div></div>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>❌ 不良固定用例</p><div class="admonition-content"><p><strong>公共网站</strong></p>
+<ul>
+<li>浏览器不支持自定义固定</li>
+<li>HPKP 因风险而被弃用</li>
+<li>证书透明度提供替代保护</li>
+</ul>
+<p><strong>没有更新机制的应用程序</strong></p>
+<ul>
+<li>无法从固定失败中恢复</li>
+<li>永久损坏的风险</li>
+<li>没有优雅的迁移路径</li>
+</ul>
+<p><strong>快速变化的基础设施</strong></p>
+<ul>
+<li>频繁的证书轮换</li>
+<li>多个证书提供商</li>
+<li>动态基础设施（CDN、负载均衡器）</li>
+<li>运营负担太高</li>
+</ul>
+</div></div>
+<p>实施固定的决定应基于仔细的威胁建模和对运营能力的诚实评估。</p>
+<h2 id="证书固定的替代方案">证书固定的替代方案</h2>
+<p>在实施固定之前，考虑替代安全措施：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔒 替代安全措施</p><div class="admonition-content"><p><strong>证书透明度</strong></p>
+<ul>
+<li>所有颁发证书的公共日志</li>
+<li>检测你域名的未授权证书</li>
+<li>监控 CT 日志以查找意外颁发</li>
+<li>应用程序没有运营负担</li>
+</ul>
+<p><strong>CAA DNS 记录</strong></p>
+<ul>
+<li>指定哪些 CA 可以为你的域名颁发证书</li>
+<li>防止未授权的 CA 颁发证书</li>
+<li>简单的 DNS 记录，无需应用程序更改</li>
+<li>所有主要 CA 都支持</li>
+</ul>
+<p><strong>双向 TLS（mTLS）</strong></p>
+<ul>
+<li>用于身份验证的客户端证书</li>
+<li>比固定更强的服务到服务通信</li>
+<li>双方相互认证</li>
+<li>在零信任架构中很常见</li>
+</ul>
+<p><strong>增强监控</strong></p>
+<ul>
+<li>通过 CT 日志监控证书颁发</li>
+<li>对意外的证书更改发出警报</li>
+<li>在没有固定风险的情况下检测攻击</li>
+<li>提供可见性而没有运营负担</li>
+</ul>
+</div></div>
+<p>这些替代方案通常提供比证书固定更好的安全性与复杂性比率。</p>
+<h2 id="结论">结论</h2>
+<p>证书固定代表了一种强大的安全技术，但伴随着重大的运营风险。通过将预期的证书或公钥硬编码到应用程序中，你可以防止 CA 被攻破和中间人攻击。然而，这种保护是以运营灵活性和自我造成的中断风险为代价的。</p>
+<p>证书固定中的关键决策围绕固定什么以及如何管理生命周期。固定叶证书提供最大的安全性，但随着证书轮换需要频繁更新。固定中间证书平衡了安全性和运营可行性，使其成为移动应用程序最常见的方法。固定根证书提供最小的安全优势，很少有理由。公钥固定提供了最佳平衡，允许证书轮换而无需固定更新，同时保持加密验证。</p>
+<p>通用名称陷阱说明了对证书安全性的根本误解。验证 CN 或 SAN 字段不提供安全优势——这些是任何 CA 都可以在证书中包含的元数据。真正的安全来自验证加密属性：公钥、证书签名和链验证。CN 验证与标准 TLS 验证是冗余的，并创造了虚假的安全感。</p>
+<p>真实世界的固定失败展示了运营风险。被遗忘的证书续订破坏的移动银行应用、被 CA 中间证书轮换中断的企业应用程序，以及被过期固定使无用的 API 库都有共同的主题：计划不足、缺乏备份固定，以及低估协调复杂性。这些事件通常造成的损害比固定旨在防止的攻击更大。</p>
+<p>实施固定的决定应基于仔细的威胁建模。受控环境中的高价值移动应用程序和托管部署代表良好的用例。公共网站、没有更新机制的应用程序和快速变化的基础设施是不良候选者。替代安全措施——证书透明度、CAA 记录、双向 TLS 和增强监控——通常提供更好的安全性与复杂性比率。</p>
+<p>证书固定是一把双刃剑。在具有强大运营流程的受控环境中适当使用时，它可以增强针对复杂攻击的安全性。在不适当的场景中粗心使用时，它会创建运营脆弱性和自我造成的中断。行业向更短证书有效期的趋势使固定越来越具有挑战性，强化了公钥固定优于证书固定的重要性以及替代安全措施的价值。</p>
+<p>在实施证书固定之前，问问自己：我的威胁模型是否证明运营复杂性合理？我是否有可靠管理固定更新的流程和工具？你能在包括 UAT 在内的所有环境中保持启用固定吗？是否有提供类似保护但风险较小的替代安全措施？这些问题的答案应该指导你的固定策略——或者你完全避免固定的决定。</p>
+<p>如果你确实实施了固定：永远不要仅仅因为"太难"而在测试环境中禁用它。这种困难是你的早期预警系统，在问题到达生产环境之前捕获它们。接受运营负担作为适当安全验证的代价。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2021/03/Certificate-Pinning-Security-Trade-offs/" data-id="604f7143" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "证书固定：TLS 安全的双刃剑",
+        "image": "https://neo01.com/assets/cert/pinning_thumbnail.png",
+        "keywords": "Certificate Security TLS",
+        "genre": "Development",
+        "datePublished": "2021-03-04",
+        "dateCreated": "2021-03-04",
+        "dateModified": "2025-10-26",
+        "url": "https://neo01.com//zh-CN/2021/03/Certificate-Pinning-Security-Trade-offs/",
+        "description": "证书固定承诺增强安全性，但也带来了运营风险。了解固定什么、如何实现，以及为什么它可能会破坏你的应用程序。",
+        "wordCount": 542
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    <aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+        
+            
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+            
+                
+            
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：中国信息安全法律法规体系" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="title">CISP学习指南：中国信息安全法律法规体系</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Firewall-IDS-Technologies/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：防火墙与入侵检测技术" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Firewall-IDS-Technologies/" class="title">CISP学习指南：防火墙与入侵检测技术</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+            
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">72</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+            
+        
+    </div>
+</aside>
+
+                </div>
+            </div>
+        </div>
+        <!-- disable caching cause each page has different footer from qrcode -->
+        <!-- common/footer, null, {cache: !config.relative_link})  -->
+        <footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#1908439f</div>
+                <img src="/qr/qr-042b44fa49f31caa285c8f373adb88bf.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#1908439f">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+</body></html>
