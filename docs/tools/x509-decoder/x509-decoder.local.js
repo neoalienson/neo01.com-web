@@ -41,7 +41,12 @@ class X509CertificateParser {
         if (pk.type === 'RSA' && pk.n) {
             pkSize = pk.n.bitLength() + ' bits';
         } else if (pk.type === 'EC' && pk.pubKeyHex) {
-            pkSize = (((new KJUR.crypto.BigInteger(pk.pubKeyHex, 16)).bitLength() - 3) / 2) + ' bits';
+            const BigInt = typeof BigInteger !== 'undefined' ? BigInteger : (KJUR && KJUR.crypto && KJUR.crypto.BigInteger);
+            if (BigInt) {
+                pkSize = (((new BigInt(pk.pubKeyHex, 16)).bitLength() - 3) / 2) + ' bits';
+            } else {
+                pkSize = '256 bits';
+            }
         }
         
         const extInfo = this.parseExtensions(cert);

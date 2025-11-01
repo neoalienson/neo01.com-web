@@ -3,12 +3,91 @@ class X509Decoder {
     constructor() {
         this.certInput = document.getElementById('certInput');
         this.output = document.getElementById('output');
+        this.dropZone = document.getElementById('dropZone');
+        this.certFile = document.getElementById('certFile');
+        this.fileInfo = document.getElementById('fileInfo');
         
         this.init();
     }
     
     init() {
         this.certInput.addEventListener('input', () => this.autoDecode());
+        
+        // File input change event
+        this.certFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleFileUpload(e.target.files[0]);
+            }
+        });
+        
+        // Drop zone click event
+        this.dropZone.addEventListener('click', () => {
+            this.certFile.click();
+        });
+        
+        // Drag and drop events
+        this.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            this.dropZone.classList.add('dragover');
+        });
+        
+        this.dropZone.addEventListener('dragleave', () => {
+            this.dropZone.classList.remove('dragover');
+        });
+        
+        this.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            this.dropZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handleFileUpload(files[0]);
+            }
+        });
+    }
+    
+    handleFileUpload(file) {
+        this.showFileInfo(file);
+        
+        const reader = new FileReader();
+        const fileName = file.name.toLowerCase();
+        
+        // Determine if file is binary (DER) or text (PEM)
+        if (fileName.endsWith('.der')) {
+            reader.onload = (e) => {
+                const arrayBuffer = e.target.result;
+                const bytes = new Uint8Array(arrayBuffer);
+                const parser = new X509CertificateParser(bytes);
+                this.certInput.value = parser.pem;
+                this.decodeCertificate(parser.pem);
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            // PEM, CRT, CER - read as text
+            reader.onload = (e) => {
+                const text = e.target.result;
+                this.certInput.value = text;
+                this.decodeCertificate(text);
+            };
+            reader.readAsText(file);
+        }
+    }
+    
+    showFileInfo(file) {
+        const formatBytes = (bytes) => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+        
+        this.fileInfo.innerHTML = `
+            <div><strong>File Name:</strong> ${file.name}</div>
+            <div><strong>File Size:</strong> ${formatBytes(file.size)}</div>
+            <div><strong>Last Modified:</strong> ${new Date(file.lastModified).toLocaleString()}</div>
+        `;
+        this.fileInfo.style.display = 'block';
     }
     
     autoDecode() {
@@ -174,19 +253,24 @@ Extensions:
 
 // Global functions
 function decodeCertificate() {
-    const decoder = new X509Decoder();
-    const cert = document.getElementById('certInput').value;
-    if (cert.trim()) {
-        decoder.decodeCertificate(cert);
-    } else {
-        decoder.showError('Please enter a certificate');
+    if (window.decoderInstance) {
+        const cert = document.getElementById('certInput').value;
+        if (cert.trim()) {
+            window.decoderInstance.decodeCertificate(cert);
+        } else {
+            window.decoderInstance.showError('Please enter a certificate or upload a file');
+        }
     }
 }
 
-function clearInput() {
-    document.getElementById('certInput').value = '';
-    document.getElementById('output').innerHTML = '';
-    document.getElementById('textOutput').style.display = 'none';
+function clearAll() {
+    if (window.decoderInstance) {
+        document.getElementById('certInput').value = '';
+        document.getElementById('certFile').value = '';
+        document.getElementById('output').innerHTML = '';
+        document.getElementById('textOutput').style.display = 'none';
+        document.getElementById('fileInfo').style.display = 'none';
+    }
 }
 
 function copyTextOutput() {
