@@ -68,7 +68,7 @@
 <meta property="og:locale" content="ja_JP">
 <meta property="og:image" content="https://neo01.com/2019/01/Rate-Limiting-Pattern/thumbnail.png">
 <meta property="article:published_time" content="2019-01-27T16:00:00.000Z">
-<meta property="article:modified_time" content="2025-11-15T12:59:10.868Z">
+<meta property="article:modified_time" content="2025-11-15T13:03:51.036Z">
 <meta property="article:author" content="Neo Alienson">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="https://neo01.com/2019/01/Rate-Limiting-Pattern/thumbnail.png">
@@ -529,7 +529,7 @@
         
           Created <time datetime="2019-01-27T16:00:00.000Z" itemprop="datePublished">2019-01-28</time>
           &nbsp;<i class="fa fa-calendar"></i>
-          Updated <time datetime="2025-11-15T12:59:10.868Z" itemprop="datePublished">2025-11-15</time>
+          Updated <time datetime="2025-11-15T13:03:51.036Z" itemprop="datePublished">2025-11-15</time>
         
     </div>
 
@@ -658,36 +658,7 @@
 </ol>
 <p><strong>実装アプローチ：</strong></p>
 <p>ブロブストレージを使用して、論理パーティションごとに1つの小さなファイルを作成します。アプリケーションは、短期間（例：15秒）これらのファイルの排他的リースを取得します。付与された各リースに対して、アプリケーションはそのパーティションの容量を使用できます。</p>
-<div class="mermaid">block-beta
-columns 3
-  block:processes:3
-    columns 3
-    P1["プロセス 1"]
-    P2["プロセス 2"]
-    P3["プロセス 3"]
-  end
-  space:3
-  block:leases:3
-    columns 3
-    L1["リース 1<br>25 req/s"]
-    L2["リース 2<br>25 req/s"]
-    L3["リース 3<br>25 req/s"]
-  end
-  space:3
-  block:service:3
-    S["スロットルされたサービス<br>合計500 req/s"]
-  end
-  
-  P1 --&gt; L1
-  P2 --&gt; L2
-  P3 --&gt; L3
-  L1 --&gt; S
-  L2 --&gt; S
-  L3 --&gt; S
-  
-  style processes fill:#e1f5ff
-  style leases fill:#fff4e1
-  style service fill:#ffe1e1</div>
+<pre class="language-MERMAID_BASE64_86" data-language="MERMAID_BASE64_86"><code class="language-MERMAID_BASE64_86">YmxvY2stYmV0YQpjb2x1bW5zIDMKICBibG9jazpwcm9jZXNzZXM6MwogICAgY29sdW1ucyAzCiAgICBQMVsi44OX44Ot44K744K5IDEiXQogICAgUDJbIuODl+ODreOCu+OCuSAyIl0KICAgIFAzWyLjg5fjg63jgrvjgrkgMyJdCiAgZW5kCiAgc3BhY2U6MwogIGJsb2NrOmxlYXNlczozCiAgICBjb2x1bW5zIDMKICAgIEwxWyLjg6rjg7zjgrkgMTxici8+MjUgcmVxL3MiXQogICAgTDJbIuODquODvOOCuSAyPGJyLz4yNSByZXEvcyJdCiAgICBMM1si44Oq44O844K5IDM8YnIvPjI1IHJlcS9zIl0KICBlbmQKICBzcGFjZTozCiAgYmxvY2s6c2VydmljZTozCiAgICBTWyLjgrnjg63jg4Pjg4jjg6vjgZXjgozjgZ/jgrXjg7zjg5Pjgrk8YnIvPuWQiOioiDUwMCByZXEvcyJdCiAgZW5kCiAgCiAgUDEgLS0+IEwxCiAgUDIgLS0+IEwyCiAgUDMgLS0+IEwzCiAgTDEgLS0+IFMKICBMMiAtLT4gUwogIEwzIC0tPiBTCiAgCiAgc3R5bGUgcHJvY2Vzc2VzIGZpbGw6I2UxZjVmZgogIHN0eWxlIGxlYXNlcyBmaWxsOiNmZmY0ZTEKICBzdHlsZSBzZXJ2aWNlIGZpbGw6I2ZmZTFlMQ==</code></pre>
 <p>レイテンシを削減するために、各プロセスに少量の排他的容量を割り当てます。プロセスは、予約容量を超えた場合にのみ共有容量リースを求めます。</p>
 <p>リース管理の代替技術には、Zookeeper、Consul、etcd、Redis/Redsyncがあります。</p>
 <h2 id="問題と考慮事項">問題と考慮事項</h2>
@@ -707,27 +678,7 @@ columns 3
 <h2 id="アーキテクチャの例">アーキテクチャの例</h2>
 <p>ユーザーがさまざまなタイプのレコードをAPIに送信するアプリケーションを考えてみましょう。各レコードタイプには、検証、エンリッチメント、データベース挿入を実行する固有のジョブプロセッサがあります。</p>
 <p>すべてのコンポーネント（API、ジョブプロセッサ）は、独立してスケールし、直接通信しない別々のプロセスです。</p>
-<div class="mermaid">graph TB
-    U1["ユーザー"] --&gt; API["API"]
-    U2["ユーザー"] --&gt; API
-    
-    API --&gt; QA["キュー A<br>(タイプAレコード)"]
-    API --&gt; QB["キュー B<br>(タイプBレコード)"]
-    
-    QA --&gt; JPA["ジョブプロセッサ A"]
-    QB --&gt; JPB["ジョブプロセッサ B"]
-    
-    JPA --&gt; LS["リースストレージ<br>(ブロブ 0-9)"]
-    JPB --&gt; LS
-    
-    JPA --&gt; DB["データベース<br>(1000 req/s制限)"]
-    JPB --&gt; DB
-    
-    style API fill:#e1f5ff
-    style QA fill:#fff4e1
-    style QB fill:#fff4e1
-    style LS fill:#f0e1ff
-    style DB fill:#ffe1e1</div>
+<pre class="language-MERMAID_BASE64_87" data-language="MERMAID_BASE64_87"><code class="language-MERMAID_BASE64_87">Z3JhcGggVEIKICAgIFUxWyLjg6bjg7zjgrbjg7wiXSAtLT4gQVBJWyJBUEkiXQogICAgVTJbIuODpuODvOOCtuODvCJdIC0tPiBBUEkKICAgIAogICAgQVBJIC0tPiBRQVsi44Kt44Ol44O8IEE8YnIvPijjgr/jgqTjg5dB44Os44Kz44O844OJKSJdCiAgICBBUEkgLS0+IFFCWyLjgq3jg6Xjg7wgQjxici8+KOOCv+OCpOODl0Ljg6zjgrPjg7zjg4kpIl0KICAgIAogICAgUUEgLS0+IEpQQVsi44K444On44OW44OX44Ot44K744OD44K1IEEiXQogICAgUUIgLS0+IEpQQlsi44K444On44OW44OX44Ot44K744OD44K1IEIiXQogICAgCiAgICBKUEEgLS0+IExTWyLjg6rjg7zjgrnjgrnjg4jjg6zjg7zjgrg8YnIvPijjg5bjg63jg5YgMC05KSJdCiAgICBKUEIgLS0+IExTCiAgICAKICAgIEpQQSAtLT4gREJbIuODh+ODvOOCv+ODmeODvOOCuTxici8+KDEwMDAgcmVxL3PliLbpmZApIl0KICAgIEpQQiAtLT4gREIKICAgIAogICAgc3R5bGUgQVBJIGZpbGw6I2UxZjVmZgogICAgc3R5bGUgUUEgZmlsbDojZmZmNGUxCiAgICBzdHlsZSBRQiBmaWxsOiNmZmY0ZTEKICAgIHN0eWxlIExTIGZpbGw6I2YwZTFmZgogICAgc3R5bGUgREIgZmlsbDojZmZlMWUx</code></pre>
 <p><strong>ワークフロー：</strong></p>
 <ol>
 <li>ユーザーがタイプAの10,000件のレコードをAPIに送信します</li>
@@ -844,7 +795,7 @@ columns 3
         "dateModified": "2025-11-15",
         "url": "https://neo01.com//ja/2019/01/Rate-Limiting-Pattern/",
         "description": "レート制限パターンを使用して、使用制限のあるサービスを扱う際にスロットルエラーを回避し、スループットを向上させる方法を学びます。",
-        "wordCount": 305
+        "wordCount": 314
     }
 </script-->
 
