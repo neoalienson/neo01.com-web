@@ -1,0 +1,1443 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Materialized View 模式：通过预先计算的数据优化查询性能 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Architecture,Data Management,Design Patterns">
+    
+    
+    <meta name="description" content="了解 Materialized View 模式如何通过预先计算并以特定查询优化的格式存储数据来提升查询性能，以及它与数据库 materialized view 的差异。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Materialized View 模式：通过预先计算的数据优化查询性能">
+<meta property="og:url" content="https://neo01.com/zh-CN/2019/05/Materialized-View-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="了解 Materialized View 模式如何通过预先计算并以特定查询优化的格式存储数据来提升查询性能，以及它与数据库 materialized view 的差异。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-05-19T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-15T13:03:51.045Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Architecture">
+<meta property="article:tag" content="Data Management">
+<meta property="article:tag" content="Design Patterns">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2019/05/Materialized-View-Pattern/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2019/05/Materialized-View-Pattern/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2019/05/Materialized-View-Pattern/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2019/05/Materialized-View-Pattern/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me/">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/05/Materialized-View-Pattern-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Materialized View 模式：通过预先计算的数据优化查询性能
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-05-19T16:00:00.000Z" itemprop="datePublished">2019-05-20</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-15T13:03:51.045Z" itemprop="datePublished">2025-11-15</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/Design-Patterns/">Design Patterns</a> <a class="tag-link" href="/zh-CN/tags/Architecture/">Architecture</a> <a class="tag-link" href="/zh-CN/tags/Data-Management/">Data Management</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%EF%BC%9A%E5%AD%98%E5%82%A8%E6%A0%BC%E5%BC%8F-vs-%E6%9F%A5%E8%AF%A2%E9%9C%80%E6%B1%82"><span class="toc-text">问题：存储格式 vs. 查询需求</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%EF%BC%9A%E9%A2%84%E5%85%88%E8%AE%A1%E7%AE%97%E5%B9%B6%E5%AD%98%E5%82%A8%E6%9F%A5%E8%AF%A2%E7%BB%93%E6%9E%9C"><span class="toc-text">解决方案：预先计算并存储查询结果</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%95%B0%E6%8D%AE%E5%BA%93-Materialized-View-vs-%E6%AD%A4%E6%A8%A1%E5%BC%8F"><span class="toc-text">数据库 Materialized View vs. 此模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%90%E4%BD%9C%E6%96%B9%E5%BC%8F%EF%BC%9A%E6%A8%A1%E5%BC%8F%E5%AE%9E%E8%B7%B5"><span class="toc-text">运作方式：模式实践</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E7%8E%B0%E8%80%83%E9%87%8F"><span class="toc-text">实现考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%97%B6%E4%BD%BF%E7%94%A8%E6%AD%A4%E6%A8%A1%E5%BC%8F"><span class="toc-text">何时使用此模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E8%B4%A8%E9%87%8F%E5%B1%9E%E6%80%A7"><span class="toc-text">架构质量属性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E5%AE%9E%E7%8E%B0%E7%A4%BA%E4%BE%8B"><span class="toc-text">实际实现示例</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9D%83%E8%A1%A1%E4%B8%8E%E8%80%83%E9%87%8F"><span class="toc-text">权衡与考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%B8%E5%85%B3%E6%A8%A1%E5%BC%8F"><span class="toc-text">相关模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-text">参考资料</span></a></li></ol>
+            <p>当你走进图书馆时，你不会期望图书管理员在每次你询问特定类型的书籍时，都重新整理所有的书。相反，图书馆维护着一个目录——一个预先计算的索引，让找书变得快速且高效。Materialized View 模式将同样的原则应用于数据系统：在问题被提出之前就准备好答案。</p>
+<h2 id="问题：存储格式-vs-查询需求">问题：存储格式 vs. 查询需求</h2>
+<p>当开发人员和数据管理员设计数据存储时，他们通常专注于数据如何被写入和维护，而非如何被读取。这完全合理——存储格式针对以下方面进行优化：</p>
+<ul>
+<li><strong>数据完整性</strong>：确保一致性并避免重复</li>
+<li><strong>写入效率</strong>：快速插入和更新</li>
+<li><strong>存储优化</strong>：最小化空间使用</li>
+<li><strong>关联管理</strong>：维护实体之间的连接</li>
+</ul>
+<p>然而，这种存储优先的方法经常与查询需求产生不匹配。考虑一个电子商务系统，将订单存储在规范化的关系型数据库中，或作为文档聚合存储在 NoSQL 存储中。虽然这种结构对于记录交易运作良好，但当你需要回答以下问题时就会出现问题：</p>
+<ul>
+<li>“本月各产品类别的总销售额是多少？”</li>
+<li>“哪些客户的终身价值最高？”</li>
+<li>“各地区的平均订单处理时间是多少？”</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 查询性能问题</p><div class="admonition-content"><p>要回答这些问题，系统必须扫描数千条记录，执行复杂的联结或聚合，并实时计算数值。这个过程消耗大量资源和时间，特别是随着数据量增长。</p>
+</div></div>
+<h2 id="解决方案：预先计算并存储查询结果">解决方案：预先计算并存储查询结果</h2>
+<p>Materialized View 模式通过生成并存储针对特定查询优化格式的数据来解决这个挑战。系统不再每次查询执行时都计算结果，而是：</p>
+<ol>
+<li><strong>识别常见的查询模式</strong>，这些模式需要复杂的计算</li>
+<li><strong>预先计算结果</strong>，通过转换源数据</li>
+<li><strong>存储结果</strong>，以优化快速检索的格式</li>
+<li><strong>更新视图</strong>，当源数据变更时</li>
+</ol>
+<div class="mermaid">graph LR
+    A[源数据存储] --&gt;|转换与聚合| B[Materialized View]
+    C[应用程序查询] --&gt;|快速读取| B
+    A --&gt;|数据变更| D[更新程序]
+    D --&gt;|刷新| B
+    
+    style B fill:#51cf66,stroke:#2f9e44
+    style A fill:#4dabf7,stroke:#1971c2</div>
+<p>关键洞察：materialized view 是完全可抛弃的。它可以完全从源数据重建，使其成为一种特殊形式的缓存，存储计算结果而非原始数据。</p>
+<h2 id="数据库-Materialized-View-vs-此模式">数据库 Materialized View vs. 此模式</h2>
+<p>在深入探讨之前，让我们厘清一个重要的区别：数据库 materialized view 和 Materialized View 模式是相关但不同的概念。</p>
+<h3 id="数据库-Materialized-View">数据库 Materialized View</h3>
+<p>许多关系型数据库（PostgreSQL、Oracle、SQL Server）提供内置的 materialized view 功能：</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 数据库 materialized view 示例</span>
+<span class="token keyword">CREATE</span> MATERIALIZED <span class="token keyword">VIEW</span> sales_summary <span class="token keyword">AS</span>
+<span class="token keyword">SELECT</span> 
+    product_category<span class="token punctuation">,</span>
+    <span class="token function">SUM</span><span class="token punctuation">(</span>order_total<span class="token punctuation">)</span> <span class="token keyword">as</span> total_sales<span class="token punctuation">,</span>
+    <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token keyword">DISTINCT</span> customer_id<span class="token punctuation">)</span> <span class="token keyword">as</span> customer_count
+<span class="token keyword">FROM</span> orders
+<span class="token keyword">JOIN</span> order_items <span class="token keyword">ON</span> orders<span class="token punctuation">.</span>id <span class="token operator">=</span> order_items<span class="token punctuation">.</span>order_id
+<span class="token keyword">JOIN</span> products <span class="token keyword">ON</span> order_items<span class="token punctuation">.</span>product_id <span class="token operator">=</span> products<span class="token punctuation">.</span>id
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> product_category<span class="token punctuation">;</span>
+
+<span class="token comment">-- 刷新视图</span>
+REFRESH MATERIALIZED <span class="token keyword">VIEW</span> sales_summary<span class="token punctuation">;</span></code></pre>
+<p><strong>特性：</strong></p>
+<ul>
+<li>由数据库引擎管理</li>
+<li>存储在同一个数据库内</li>
+<li>使用数据库特定的刷新机制</li>
+<li>通常支持增量更新</li>
+<li>限于单一数据库范围</li>
+</ul>
+<h3 id="Materialized-View-模式">Materialized View 模式</h3>
+<p>架构模式将这个概念扩展到数据库边界之外：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 模式实现示例</span>
+<span class="token keyword">class</span> <span class="token class-name">MaterializedViewService</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">updateSalesSummary</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 从多个源读取</span>
+    <span class="token keyword">const</span> orders <span class="token operator">=</span> <span class="token keyword">await</span> orderDatabase<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token string">'SELECT * FROM orders'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> customers <span class="token operator">=</span> <span class="token keyword">await</span> customerDatabase<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token string">'SELECT * FROM customers'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> products <span class="token operator">=</span> <span class="token keyword">await</span> productCatalog<span class="token punctuation">.</span><span class="token function">getAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 转换和聚合</span>
+    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">computeSummary</span><span class="token punctuation">(</span>orders<span class="token punctuation">,</span> customers<span class="token punctuation">,</span> products<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 以优化格式存储</span>
+    <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">,</span> summary<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getSalesSummary</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>特性：</strong></p>
+<ul>
+<li>应用程序管理的逻辑</li>
+<li>可以聚合来自多个源的数据</li>
+<li>存储在任何数据存储中（与源不同）</li>
+<li>灵活的更新策略</li>
+<li>跨分布式系统运作</li>
+</ul>
+<h3 id="主要差异">主要差异</h3>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>数据库 Materialized View</th>
+<th>Materialized View 模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>范围</strong></td>
+<td>单一数据库</td>
+<td>多个数据源</td>
+</tr>
+<tr>
+<td><strong>管理</strong></td>
+<td>数据库引擎</td>
+<td>应用程序代码</td>
+</tr>
+<tr>
+<td><strong>存储</strong></td>
+<td>同一个数据库</td>
+<td>任何数据存储</td>
+</tr>
+<tr>
+<td><strong>技术</strong></td>
+<td>数据库特定</td>
+<td>技术无关</td>
+</tr>
+<tr>
+<td><strong>使用案例</strong></td>
+<td>数据库内查询优化</td>
+<td>跨系统数据聚合</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📊 何时使用哪一种</p><div class="admonition-content"><p><strong>使用数据库 materialized view</strong>，当在单一数据库系统内优化查询时。</p>
+<p><strong>使用 Materialized View 模式</strong>，当跨多个系统、微服务或异构数据存储聚合数据时。</p>
+</div></div>
+<h2 id="运作方式：模式实践">运作方式：模式实践</h2>
+<p>让我们探索一个具体示例：一个需要显示产品销售摘要的电子商务平台。</p>
+<h3 id="源数据结构">源数据结构</h3>
+<p>系统将数据存储在针对不同目的优化的独立位置：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 订单存储在事务数据库</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">orderId</span><span class="token operator">:</span> <span class="token string">"ORD-12345"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">customerId</span><span class="token operator">:</span> <span class="token string">"CUST-789"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">orderDate</span><span class="token operator">:</span> <span class="token string">"2019-05-15"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">items</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token literal-property property">price</span><span class="token operator">:</span> <span class="token number">29.99</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-002"</span><span class="token punctuation">,</span> <span class="token literal-property property">quantity</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token literal-property property">price</span><span class="token operator">:</span> <span class="token number">49.99</span> <span class="token punctuation">}</span>
+  <span class="token punctuation">]</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 产品存储在目录服务</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"无线鼠标"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"电子产品"</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 客户存储在 CRM 系统</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">customerId</span><span class="token operator">:</span> <span class="token string">"CUST-789"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"张三"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">segment</span><span class="token operator">:</span> <span class="token string">"高级会员"</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="Materialized-View-结构">Materialized View 结构</h3>
+<p>视图将这些数据组合并转换为查询优化格式：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 销售摘要的 materialized view</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"电子产品"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">109.97</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">orderCount</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">customerCount</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">topProducts</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-002"</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"键盘"</span><span class="token punctuation">,</span> <span class="token literal-property property">sales</span><span class="token operator">:</span> <span class="token number">49.99</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span> <span class="token literal-property property">productId</span><span class="token operator">:</span> <span class="token string">"PROD-001"</span><span class="token punctuation">,</span> <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"无线鼠标"</span><span class="token punctuation">,</span> <span class="token literal-property property">sales</span><span class="token operator">:</span> <span class="token number">59.98</span> <span class="token punctuation">}</span>
+  <span class="token punctuation">]</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">lastUpdated</span><span class="token operator">:</span> <span class="token string">"2019-05-15T14:30:00Z"</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="更新策略">更新策略</h3>
+<p>此模式支持多种更新方法：</p>
+<h4 id="1-事件驱动更新">1. 事件驱动更新</h4>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 当源数据变更时更新视图</span>
+orderService<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'orderCreated'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">updateSalesSummary</span><span class="token punctuation">(</span>order<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+productService<span class="token punctuation">.</span><span class="token function">on</span><span class="token punctuation">(</span><span class="token string">'productUpdated'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">product</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">refreshProductViews</span><span class="token punctuation">(</span>product<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h4 id="2-定时更新">2. 定时更新</h4>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 定期刷新</span>
+cron<span class="token punctuation">.</span><span class="token function">schedule</span><span class="token punctuation">(</span><span class="token string">'0 * * * *'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">rebuildAllViews</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h4 id="3-按需更新">3. 按需更新</h4>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 需要时手动刷新</span>
+app<span class="token punctuation">.</span><span class="token function">post</span><span class="token punctuation">(</span><span class="token string">'/admin/refresh-views'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> materializedViewService<span class="token punctuation">.</span><span class="token function">rebuildAllViews</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'Views refreshed'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h2 id="实现考量">实现考量</h2>
+<h3 id="1-更新时机与频率">1. 更新时机与频率</h3>
+<p>根据你的需求选择更新策略：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔄 更新策略选择</p><div class="admonition-content"><p><strong>实时（事件驱动）</strong>：最适合新鲜度至关重要的关键数据。注意如果源数据快速变更可能产生过多开销。</p>
+<p><strong>定时（批处理）</strong>：适合报表和分析，可接受轻微的过时性。减少系统负载并简化实现。</p>
+<p><strong>按需（手动）</strong>：适合不常访问的视图，或当你需要明确控制刷新时机时。</p>
+</div></div>
+<h3 id="2-数据一致性权衡">2. 数据一致性权衡</h3>
+<p>Materialized view 引入最终一致性：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 示例：处理一致性窗口</span>
+<span class="token keyword">class</span> <span class="token class-name">MaterializedViewReader</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">getSalesSummary</span><span class="token punctuation">(</span><span class="token parameter">options <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> view <span class="token operator">=</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>options<span class="token punctuation">.</span>requireFresh<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> age <span class="token operator">=</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> view<span class="token punctuation">.</span>lastUpdated<span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>age <span class="token operator">&gt;</span> options<span class="token punctuation">.</span>maxAge<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 触发刷新并等待</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">refreshView</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_summary'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> view<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 一致性考量</p><div class="admonition-content"><p>在视图更新期间，数据可能暂时与源系统不一致。设计你的应用程序以优雅地处理这种情况：</p>
+<ul>
+<li>显示最后更新时间戳</li>
+<li>为关键操作提供手动刷新选项</li>
+<li>使用版本控制来检测过时数据</li>
+</ul>
+</div></div>
+<h3 id="3-存储位置策略">3. 存储位置策略</h3>
+<p>视图不需要与源数据位于同一个存储中：</p>
+<div class="mermaid">graph TD
+    A[事务数据库] --&gt;|提取| D[视图构建器]
+    B[文档存储] --&gt;|提取| D
+    C[外部 API] --&gt;|提取| D
+    D --&gt;|存储| E[缓存层]
+    D --&gt;|存储| F[搜索引擎]
+    D --&gt;|存储| G[分析数据库]
+    
+    style D fill:#ffd43b,stroke:#fab005
+    style E fill:#51cf66,stroke:#2f9e44
+    style F fill:#51cf66,stroke:#2f9e44
+    style G fill:#51cf66,stroke:#2f9e44</div>
+<p><strong>存储选项：</strong></p>
+<ul>
+<li><strong>内存缓存</strong>（Redis、Memcached）：超快速访问，易失性</li>
+<li><strong>搜索引擎</strong>（Elasticsearch）：全文搜索能力</li>
+<li><strong>分析数据库</strong>（ClickHouse、TimescaleDB）：针对聚合优化</li>
+<li><strong>对象存储</strong>：大型、不常访问视图的成本效益选择</li>
+</ul>
+<h3 id="4-视图优化技术">4. 视图优化技术</h3>
+<p>通过策略性设计最大化视图价值：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 包含计算值</span>
+<span class="token punctuation">{</span>
+  <span class="token literal-property property">category</span><span class="token operator">:</span> <span class="token string">"电子产品"</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">109.97</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">averageOrderValue</span><span class="token operator">:</span> <span class="token number">54.99</span><span class="token punctuation">,</span>  <span class="token comment">// 预先计算</span>
+  <span class="token literal-property property">growthRate</span><span class="token operator">:</span> <span class="token number">0.15</span><span class="token punctuation">,</span>           <span class="token comment">// 预先计算 vs. 前期</span>
+  <span class="token literal-property property">topProducts</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token operator">...</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+  <span class="token comment">// 包含经常联结的数据</span>
+  <span class="token literal-property property">categoryMetadata</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">name</span><span class="token operator">:</span> <span class="token string">"电子产品"</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">description</span><span class="token operator">:</span> <span class="token string">"电子设备和配件"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>优化策略：</strong></p>
+<ul>
+<li>为 materialized view 添加索引以加快查询</li>
+<li>包含计算列以避免运行时计算</li>
+<li>反规范化经常联结的数据</li>
+<li>以查询友好的格式存储数据（例如，文档查询使用 JSON）</li>
+</ul>
+<h2 id="何时使用此模式">何时使用此模式</h2>
+<h3 id="理想场景">理想场景</h3>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 完美使用案例</p><div class="admonition-content"><p><strong>复杂查询需求</strong>：当查询需要多个联结、聚合或转换，且实时计算成本高昂时。</p>
+<p><strong>跨系统聚合</strong>：当组合来自多个数据库、微服务或外部系统的数据时。</p>
+<p><strong>报表和分析</strong>：当生成仪表板、报表或分析，且不需要实时准确性时。</p>
+<p><strong>Event Sourcing 系统</strong>：当查询当前状态的唯一方法是重放所有事件时。</p>
+</div></div>
+<h3 id="次要优势">次要优势</h3>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📋 额外优势</p><div class="admonition-content"><p><strong>简化查询</strong>：以不需要深入了解源系统的格式公开复杂数据。</p>
+<p><strong>安全性与隐私</strong>：提供过滤视图，排除敏感数据同时维持查询能力。</p>
+<p><strong>离线场景</strong>：为离线访问或偶尔连接的系统在本地缓存视图。</p>
+<p><strong>性能隔离</strong>：防止繁重的分析查询影响事务系统。</p>
+</div></div>
+<h3 id="何时避免">何时避免</h3>
+<div class="admonition danger"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>❌ 不适合的情况</p><div class="admonition-content"><p><strong>简单数据结构</strong>：源数据已经是容易查询的格式。</p>
+<p><strong>高一致性需求</strong>：应用程序无法容忍任何数据过时性。</p>
+<p><strong>快速变更的数据</strong>：源数据变更如此频繁，以至于视图总是过时的。</p>
+<p><strong>有限的查询模式</strong>：只需要少数简单查询，使开销不合理。</p>
+</div></div>
+<h2 id="架构质量属性">架构质量属性</h2>
+<h3 id="性能效率">性能效率</h3>
+<p>此模式大幅改善查询性能：</p>
+<div id="chart_b7421856a" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_b7421856a'));
+        var option = {
+  "title": {
+    "text": "查询响应时间比较"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["直接查询", "Materialized View"]
+  },
+  "xAxis": {
+    "type": "category",
+    "data": ["简单", "中等", "复杂", "非常复杂"]
+  },
+  "yAxis": {
+    "type": "value",
+    "name": "响应时间 (ms)"
+  },
+  "series": [
+    {
+      "name": "直接查询",
+      "type": "bar",
+      "data": [50, 250, 1500, 5000],
+      "itemStyle": {
+        "color": "#fa5252"
+      }
+    },
+    {
+      "name": "Materialized View",
+      "type": "bar",
+      "data": [10, 15, 20, 25],
+      "itemStyle": {
+        "color": "#51cf66"
+      }
+    }
+  ]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<p><strong>优势：</strong></p>
+<ul>
+<li>在查询时消除昂贵的联结和聚合</li>
+<li>通过提供预先计算的结果减少数据库负载</li>
+<li>无论数据量如何都能实现可预测的查询性能</li>
+</ul>
+<h3 id="可扩展性">可扩展性</h3>
+<p>Materialized view 支持水平扩展：</p>
+<ul>
+<li><strong>读取扩展</strong>：跨多个节点复制视图</li>
+<li><strong>写入隔离</strong>：将读取密集的分析与写入密集的事务分离</li>
+<li><strong>资源优化</strong>：为不同的访问模式使用专门的存储</li>
+</ul>
+<h3 id="成本优化">成本优化</h3>
+<p>虽然需要额外的存储，但此模式可以降低整体成本：</p>
+<ul>
+<li><strong>减少计算</strong>：查询处理所需的 CPU 周期更少</li>
+<li><strong>降低数据库负载</strong>：减少对昂贵数据库实例的需求</li>
+<li><strong>分层存储</strong>：为不常访问的视图使用具成本效益的存储</li>
+</ul>
+<h2 id="实际实现示例">实际实现示例</h2>
+<p>这是一个销售分析系统的完整实现：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">SalesAnalyticsView</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token parameter">orderDb<span class="token punctuation">,</span> productDb<span class="token punctuation">,</span> customerDb<span class="token punctuation">,</span> viewStore</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>orderDb <span class="token operator">=</span> orderDb<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>productDb <span class="token operator">=</span> productDb<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>customerDb <span class="token operator">=</span> customerDb<span class="token punctuation">;</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>viewStore <span class="token operator">=</span> viewStore<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">rebuildView</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 从多个源提取数据</span>
+    <span class="token keyword">const</span> orders <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>orderDb<span class="token punctuation">.</span><span class="token function">getOrders</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> products <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>productDb<span class="token punctuation">.</span><span class="token function">getProducts</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> customers <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>customerDb<span class="token punctuation">.</span><span class="token function">getCustomers</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 转换和聚合</span>
+    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">computeSummary</span><span class="token punctuation">(</span>orders<span class="token punctuation">,</span> products<span class="token punctuation">,</span> customers<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 以元数据存储</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>viewStore<span class="token punctuation">.</span><span class="token function">save</span><span class="token punctuation">(</span><span class="token string">'sales_analytics'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">data</span><span class="token operator">:</span> summary<span class="token punctuation">,</span>
+      <span class="token literal-property property">lastUpdated</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">version</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">generateVersion</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">computeSummary</span><span class="token punctuation">(</span><span class="token parameter">orders<span class="token punctuation">,</span> products<span class="token punctuation">,</span> customers</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> productMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span>products<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">p</span> <span class="token operator">=&gt;</span> <span class="token punctuation">[</span>p<span class="token punctuation">.</span>id<span class="token punctuation">,</span> p<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> customerMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span>customers<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">c</span> <span class="token operator">=&gt;</span> <span class="token punctuation">[</span>c<span class="token punctuation">.</span>id<span class="token punctuation">,</span> c<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> summary <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> order <span class="token keyword">of</span> orders<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> item <span class="token keyword">of</span> order<span class="token punctuation">.</span>items<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> product <span class="token operator">=</span> productMap<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>item<span class="token punctuation">.</span>productId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">const</span> category <span class="token operator">=</span> product<span class="token punctuation">.</span>category<span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+            <span class="token literal-property property">totalSales</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token literal-property property">orderCount</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token literal-property property">customers</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+          <span class="token punctuation">}</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        
+        summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">.</span>totalSales <span class="token operator">+=</span> item<span class="token punctuation">.</span>quantity <span class="token operator">*</span> item<span class="token punctuation">.</span>price<span class="token punctuation">;</span>
+        summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">.</span>orderCount<span class="token operator">++</span><span class="token punctuation">;</span>
+        summary<span class="token punctuation">[</span>category<span class="token punctuation">]</span><span class="token punctuation">.</span>customers<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>customerId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">// 转换为最终格式</span>
+    <span class="token keyword">return</span> Object<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span>summary<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>category<span class="token punctuation">,</span> data<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">(</span><span class="token punctuation">{</span>
+      category<span class="token punctuation">,</span>
+      <span class="token literal-property property">totalSales</span><span class="token operator">:</span> data<span class="token punctuation">.</span>totalSales<span class="token punctuation">,</span>
+      <span class="token literal-property property">orderCount</span><span class="token operator">:</span> data<span class="token punctuation">.</span>orderCount<span class="token punctuation">,</span>
+      <span class="token literal-property property">customerCount</span><span class="token operator">:</span> data<span class="token punctuation">.</span>customers<span class="token punctuation">.</span>size
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getView</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>viewStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'sales_analytics'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="权衡与考量">权衡与考量</h2>
+<p>像任何架构模式一样，materialized view 涉及权衡：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 需要解决的挑战</p><div class="admonition-content"><p><strong>存储开销</strong>：视图消耗额外的存储空间，可能重复数据。</p>
+<p><strong>更新复杂性</strong>：管理视图更新增加操作复杂性和潜在的失败点。</p>
+<p><strong>一致性窗口</strong>：应用程序必须处理视图不反映最新源数据的期间。</p>
+<p><strong>维护负担</strong>：视图需要监控、版本控制和偶尔的重建。</p>
+</div></div>
+<p><strong>缓解策略：</strong></p>
+<ul>
+<li>实现视图版本控制以处理架构变更</li>
+<li>监控视图新鲜度并在数据过时时发出警报</li>
+<li>自动化视图重建和验证</li>
+<li>记录每个视图的一致性保证</li>
+</ul>
+<h2 id="相关模式">相关模式</h2>
+<p>Materialized View 模式与其他架构模式配合良好：</p>
+<ul>
+<li><strong>CQRS（命令查询责任分离）</strong>：使用 materialized view 作为查询端，并为写入使用独立的命令模型</li>
+<li><strong>Event Sourcing</strong>：通过处理事件流来构建 materialized view 以衍生当前状态</li>
+<li><strong>Index Table 模式</strong>：在 materialized view 上创建次要索引以支持额外的查询模式</li>
+<li><strong>Cache-Aside</strong>：将 materialized view 视为具有明确刷新逻辑的特殊缓存</li>
+</ul>
+<h2 id="结论">结论</h2>
+<p>Materialized View 模式解决了数据密集系统中的一个基本挑战：数据存储方式与查询需求之间的不匹配。通过预先计算并存储查询结果，它提供：</p>
+<ul>
+<li>复杂查询的<strong>显著性能改善</strong></li>
+<li><strong>减少源系统的负载</strong></li>
+<li>跨多个源聚合数据的<strong>灵活性</strong></li>
+<li>为应用程序开发人员<strong>简化查询</strong></li>
+</ul>
+<p>虽然它在一致性和存储开销方面引入了权衡，但这些成本通常被它提供的性能提升和架构灵活性所证明是合理的。当你的系统在复杂查询上遇到困难、需要跨多个源聚合数据，或需要高性能分析而不影响事务工作负载时，请考虑此模式。</p>
+<p>成功的关键：将 materialized view 视为可抛弃的、自动化的产物，可以随时从源数据重建。这种心态让你可以自由地实验不同的视图结构和更新策略，直到找到最适合你特定需求的平衡。</p>
+<h2 id="参考资料">参考资料</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://www.enterpriseintegrationpatterns.com/">Enterprise Integration Patterns: Materialized View</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/materialized-view">Microsoft Learn: Materialized View Pattern</a></li>
+<li><a target="_blank" rel="noopener" href="https://martinfowler.com/bliki/CQRS.html">Martin Fowler: CQRS</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2019/05/Materialized-View-Pattern/" data-id="6e030e5a" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Materialized View 模式：通过预先计算的数据优化查询性能",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "Architecture Data Management Design Patterns",
+        "genre": "Architecture",
+        "datePublished": "2019-05-20",
+        "dateCreated": "2019-05-20",
+        "dateModified": "2025-11-15",
+        "url": "https://neo01.com//zh-CN/2019/05/Materialized-View-Pattern/",
+        "description": "了解 Materialized View 模式如何通过预先计算并以特定查询优化的格式存储数据来提升查询性能，以及它与数据库 materialized view 的差异。",
+        "wordCount": 2797
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">系列文章</h3>
+        <div class="widget-series">
+            <ul>
+<li>🏗️ <strong>Architecture Pattern Series</strong>
+<ul>
+<li><a href="/2020/05/Architecture-Patterns-Quick-Reference/" class="active">Architecture Patterns Quick Reference</a></li>
+<li><a href="/2019/01/Rate-Limiting-Pattern/">Rate Limiting Pattern</a></li>
+<li><a href="/2019/02/Anti-Corruption-Layer-Pattern/">Anti-Corruption Layer Pattern</a></li>
+<li><a href="/2019/03/Retry-Pattern/">Retry Pattern</a></li>
+<li><a href="/2019/04/Claim-Check-Pattern/">Claim Check Pattern</a></li>
+<li><a href="/2019/05/Materialized-View-Pattern/">Materialized View Pattern</a></li>
+<li><a href="/2019/06/Strangler-Fig-Pattern/">Strangler Fig Pattern</a></li>
+<li><a href="/2019/07/Sidecar-Pattern/">Sidecar Pattern</a></li>
+<li><a href="/2019/08/Sharding-Pattern/">Sharding Pattern</a></li>
+<li><a href="/2019/09/Gateway-Aggregation-Pattern/">Gateway Aggregation Pattern</a></li>
+<li><a href="/2019/10/Publisher-Subscriber-Pattern/">Publisher-Subscriber Pattern</a></li>
+<li><a href="/2019/11/Health-Endpoint-Monitoring-Pattern/">Health Endpoint Monitoring Pattern</a></li>
+<li><a href="/2019/12/Federated-Identity-Pattern/">Federated Identity Pattern</a></li>
+<li><a href="/2020/01/Circuit-Breaker-Pattern/">Circuit Breaker Pattern</a></li>
+<li><a href="/2020/03/Bulkhead-Pattern/">Bulkhead Pattern</a></li>
+<li><a href="/2020/04/Asynchronous-Request-Reply-Pattern/">Asynchronous Request-Reply Pattern</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    </div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock 服务器：通过模拟加速开发" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock 服务器：通过模拟加速开发</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中启用 i18n：多语言博客完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中启用 i18n：多语言博客完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#ec58401f</div>
+                <img src="/qr/qr-b7593f152066b9ef166f9f13ccec7cb1.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#ec58401f">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

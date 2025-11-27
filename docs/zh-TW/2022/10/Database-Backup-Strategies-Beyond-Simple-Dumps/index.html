@@ -1,0 +1,1187 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>資料庫備份策略：超越簡單轉儲 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Backup,Database,MySQL">
+    
+    
+    <meta name="description" content="深入探討資料庫備份的專業技術：交易一致性、時間點復原、跨資料庫協調，以及為什麼簡單的mysqldump可能不夠用。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="資料庫備份策略：超越簡單轉儲">
+<meta property="og:url" content="https://neo01.com/zh-TW/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="深入探討資料庫備份的專業技術：交易一致性、時間點復原、跨資料庫協調，以及為什麼簡單的mysqldump可能不夠用。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/database/backup_thumbnail.jpeg">
+<meta property="article:published_time" content="2022-10-10T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-26T18:36:57.970Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Backup">
+<meta property="article:tag" content="Database">
+<meta property="article:tag" content="MySQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/database/backup_thumbnail.jpeg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-TW';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me/">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        資料庫備份策略：超越簡單轉儲
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2022-10-10T16:00:00.000Z" itemprop="datePublished">2022-10-11</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-26T18:36:57.970Z" itemprop="datePublished">2025-11-27</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/Database/">Database</a> <a class="tag-link" href="/zh-TW/tags/Backup/">Backup</a> <a class="tag-link" href="/zh-TW/tags/MySQL/">MySQL</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B3%87%E6%96%99%E5%BA%AB%E5%82%99%E4%BB%BD%E9%A1%9E%E5%9E%8B"><span class="toc-text">資料庫備份類型</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B3%87%E6%96%99%E5%BA%AB%E5%82%99%E4%BB%BD%E5%B8%B8%E8%A6%8B%E8%BF%B7%E6%80%9D"><span class="toc-text">資料庫備份常見迷思</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%80%B2%E9%9A%8E%E8%B3%87%E6%96%99%E5%BA%AB%E5%82%99%E4%BB%BD%E6%8A%80%E8%A1%93"><span class="toc-text">進階資料庫備份技術</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B3%87%E6%96%99%E5%BA%AB%E5%82%99%E4%BB%BD%E5%AF%A6%E6%96%BD%E6%B8%85%E5%96%AE"><span class="toc-text">資料庫備份實施清單</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B3%87%E6%96%99%E5%BA%AB%E5%82%99%E4%BB%BD-vs-%E9%80%9A%E7%94%A8%E8%B3%87%E6%96%99%E5%82%99%E4%BB%BD"><span class="toc-text">資料庫備份 vs 通用資料備份</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%B3%87%E6%96%99%E5%BA%AB%E7%89%B9%E5%AE%9A%E8%80%83%E9%87%8F%E5%9B%A0%E7%B4%A0"><span class="toc-text">資料庫特定考量因素</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%81%9A%E5%87%BA%E9%81%B8%E6%93%87"><span class="toc-text">做出選擇</span></a></li></ol>
+            <p>資料庫不僅僅是檔案——它們是活躍的、交易性的系統，需要專門的備份方法來保持資料完整性。雖然通用備份策略為我們提供了基礎框架，但資料庫備份涉及獨特的技術挑戰：ACID合規性、參照完整性和交易一致性。</p>
+<p>本文深入探討資料庫特定的備份技術，超越基本的轉儲操作，涵蓋進階策略如時間點復原、跨資料庫一致性和效能優化的備份方法。</p>
+<p><em>如需全面的資料價值評估和通用備份策略，請參閱<a href="/zh-TW/2022/09/Data-Backup-Strategies-From-Planning-to-Recovery/">資料備份策略 - 從規劃到復原</a>。</em></p>
+<h2 id="資料庫備份類型">資料庫備份類型</h2>
+<h3 id="邏輯備份-vs-實體備份">邏輯備份 vs 實體備份</h3>
+<p><strong>邏輯備份</strong>：匯出資料庫結構和資料為SQL語句或特定格式。</p>
+<p>優點：</p>
+<ul>
+<li>可攜性強，可在不同資料庫版本間使用</li>
+<li>人類可讀，便於除錯和部分復原</li>
+<li>壓縮效果好</li>
+<li>可選擇性備份特定表格或資料</li>
+</ul>
+<p>缺點：</p>
+<ul>
+<li>復原速度較慢，特別是大型資料庫</li>
+<li>需要更多CPU資源進行匯出/匯入</li>
+<li>可能無法捕獲所有資料庫物件（如預存程序、觸發器）</li>
+</ul>
+<p><strong>實體備份</strong>：複製實際的資料庫檔案和日誌。</p>
+<p>優點：</p>
+<ul>
+<li>復原速度快</li>
+<li>完整備份，包含所有資料庫物件</li>
+<li>支援增量和差異備份</li>
+<li>適合大型資料庫</li>
+</ul>
+<p>缺點：</p>
+<ul>
+<li>平台相依性強</li>
+<li>檔案大小通常更大</li>
+<li>需要資料庫停機或特殊工具確保一致性</li>
+</ul>
+<h3 id="完整備份-vs-增量備份">完整備份 vs 增量備份</h3>
+<table>
+<thead>
+<tr>
+<th>備份類型</th>
+<th>資料量</th>
+<th>復原時間</th>
+<th>儲存需求</th>
+<th>複雜性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完整備份</td>
+<td>全部資料</td>
+<td>快速</td>
+<td>高</td>
+<td>低</td>
+</tr>
+<tr>
+<td>增量備份</td>
+<td>僅變更</td>
+<td>中等（需要多個檔案）</td>
+<td>低</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>差異備份</td>
+<td>自上次完整備份的變更</td>
+<td>中等</td>
+<td>中等</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>交易日誌備份</td>
+<td>交易記錄</td>
+<td>最快（時間點復原）</td>
+<td>最低</td>
+<td>高</td>
+</tr>
+</tbody>
+</table>
+<h2 id="資料庫備份常見迷思">資料庫備份常見迷思</h2>
+<div class="admonition danger"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🔄 vMotion/即時遷移就是備份</p><div class="admonition-content"><p><strong>現實情況</strong>：VM遷移技術移動執行中的系統，但不會建立復原點。</p>
+<p><strong>為什麼錯誤</strong>：vMotion在主機間移動VM以進行維護或負載平衡。它不會建立備份、防止資料損毀或提供時間點復原。如果資料庫損毀，vMotion只是將損毀的資料庫移到另一個主機。</p>
+<p><strong>正確方法</strong>：使用vMotion實現高可用性和維護，使用適當的資料庫備份方法進行資料保護。</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>📁 檔案系統備份保護資料庫</p><div class="admonition-content"><p><strong>現實情況</strong>：在資料庫執行時複製資料庫檔案可能建立損毀、無法使用的備份。</p>
+<p><strong>為什麼錯誤</strong>：資料庫檔案持續被修改。在活躍操作期間進行檔案層級備份可能捕獲不一致的狀態，其中某些變更已寫入但其他變更尚未寫入，違反ACID屬性。</p>
+<p><strong>正確方法</strong>：使用資料庫感知的備份方法，確保交易一致性。</p>
+</div></div>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🔄 複寫就是備份</p><div class="admonition-content"><p><strong>現實情況</strong>：複寫提供高可用性，但不能防止邏輯損毀或使用者錯誤。</p>
+<p><strong>為什麼錯誤</strong>：如果有人刪除表格或損毀資料，損毀會複寫到所有副本。複寫不提供時間點復原或防止應用程式錯誤導致的資料損毀。</p>
+<p><strong>正確方法</strong>：使用複寫實現可用性，使用備份進行資料保護和復原。</p>
+</div></div>
+<div class="admonition failure"><p class="admonition-title"><span class="mdi mdi-close-octagon-outline admonition-icon"></span>📊 讀取副本不需要備份</p><div class="admonition-content"><p><strong>現實情況</strong>：讀取副本可能損毀、延遲或獨立於主要資料庫發生故障。</p>
+<p><strong>為什麼錯誤</strong>：讀取副本不是備份——它們是可能遇到自身故障的即時副本。副本延遲可能導致資料遺失，副本損毀可能使其無法用於復原。</p>
+<p><strong>正確方法</strong>：獨立備份讀取副本並定期驗證其一致性。</p>
+</div></div>
+<div class="admonition question"><p class="admonition-title"><span class="mdi mdi-comment-question-outline admonition-icon"></span>⏰ 計劃停機消除備份需求</p><div class="admonition-content"><p><strong>現實情況</strong>：即使在維護視窗期間，資料庫也可能遇到損毀或人為錯誤。</p>
+<p><strong>為什麼有限</strong>：計劃維護不能防止硬體故障、軟體錯誤或人為失誤。損毀可能隨時發生，擁有最新備份對快速復原至關重要。</p>
+<p><strong>正確方法</strong>：無論維護視窗如何，都要保持定期備份計劃。</p>
+</div></div>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>🏥 災難復原就是資料庫備份</p><div class="admonition-content"><p><strong>現實情況</strong>：災難復原（DR）是綜合的業務連續性策略，而資料庫備份是資料保護的一個組成部分。</p>
+<p><strong>為什麼不同</strong>：DR包括故障轉移系統、備用站點、網路冗餘和業務流程連續性。資料庫備份專門關注資料復原。DR系統可能使用即時複寫，這不提供時間點復原或防止邏輯損毀的保護。</p>
+<p><strong>正確方法</strong>：使用DR實現業務連續性和高可用性，使用資料庫備份進行資料保護和時間點復原。它們相互補充但服務於不同目的。</p>
+</div></div>
+<h2 id="進階資料庫備份技術">進階資料庫備份技術</h2>
+<h3 id="時間點復原-PITR">時間點復原 (PITR)</h3>
+<p>使用基礎備份和交易日誌將資料庫復原到任何特定時刻。</p>
+<p><strong>實作方法</strong>：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># PostgreSQL PITR 設定</span>
+<span class="token comment"># 1. 建立基礎備份</span>
+pg_basebackup <span class="token parameter variable">-D</span> /backup/base <span class="token parameter variable">-Ft</span> <span class="token parameter variable">-z</span> <span class="token parameter variable">-P</span>
+
+<span class="token comment"># 2. 配置連續歸檔</span>
+<span class="token comment"># 在 postgresql.conf 中：</span>
+<span class="token comment"># archive_mode = on</span>
+<span class="token comment"># archive_command = 'cp %p /backup/wal/%f'</span>
+
+<span class="token comment"># 3. 復原到特定時間</span>
+<span class="token function">cat</span> <span class="token operator">&gt;</span> recovery.conf <span class="token operator">&lt;&lt;</span> <span class="token string">EOF
+restore_command = 'cp /backup/wal/%f %p'
+recovery_target_time = '2022-10-11 15:45:00'
+recovery_target_action = 'promote'
+EOF</span></code></pre>
+<h3 id="跨資料庫一致性">跨資料庫一致性</h3>
+<p>在備份過程中確保多個相關資料庫的一致性。</p>
+<p><strong>協調備份</strong>：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token shebang important">#!/bin/bash</span>
+<span class="token comment"># 多個資料庫的協調備份</span>
+
+<span class="token comment"># 在所有資料庫上開始交易</span>
+mysql db1 <span class="token parameter variable">-e</span> <span class="token string">"START TRANSACTION WITH CONSISTENT SNAPSHOT;"</span>
+mysql db2 <span class="token parameter variable">-e</span> <span class="token string">"START TRANSACTION WITH CONSISTENT SNAPSHOT;"</span>
+
+<span class="token comment"># 記錄 LSN/位置以保證一致性</span>
+mysql db1 <span class="token parameter variable">-e</span> <span class="token string">"SHOW MASTER STATUS;"</span> <span class="token operator">&gt;</span> backup_position.txt
+mysql db2 <span class="token parameter variable">-e</span> <span class="token string">"SHOW MASTER STATUS;"</span> <span class="token operator">&gt;&gt;</span> backup_position.txt
+
+<span class="token comment"># 執行備份</span>
+mysqldump --single-transaction db1 <span class="token operator">&gt;</span> db1_backup.sql <span class="token operator">&amp;</span>
+mysqldump --single-transaction db2 <span class="token operator">&gt;</span> db2_backup.sql <span class="token operator">&amp;</span>
+
+<span class="token function">wait</span>  <span class="token comment"># 等待所有備份完成</span>
+
+<span class="token comment"># 提交交易</span>
+mysql db1 <span class="token parameter variable">-e</span> <span class="token string">"COMMIT;"</span>
+mysql db2 <span class="token parameter variable">-e</span> <span class="token string">"COMMIT;"</span></code></pre>
+<h3 id="備份壓縮和加密">備份壓縮和加密</h3>
+<p>降低儲存成本並保護敏感資料。</p>
+<p><strong>壓縮加密備份</strong>：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token comment"># MySQL 帶壓縮和加密的備份</span>
+mysqldump --single-transaction <span class="token parameter variable">--routines</span> <span class="token parameter variable">--triggers</span> database_name <span class="token operator">|</span> <span class="token punctuation">\</span>
+  <span class="token function">gzip</span> <span class="token parameter variable">-9</span> <span class="token operator">|</span> <span class="token punctuation">\</span>
+  gpg <span class="token parameter variable">--symmetric</span> --cipher-algo AES256 <span class="token punctuation">\</span>
+  <span class="token operator">&gt;</span> backup_<span class="token variable"><span class="token variable">$(</span><span class="token function">date</span> +%Y%m%d_%H%M%S<span class="token variable">)</span></span>.sql.gz.gpg
+
+<span class="token comment"># PostgreSQL 帶內建壓縮的備份</span>
+pg_dump <span class="token parameter variable">--format</span><span class="token operator">=</span>custom <span class="token parameter variable">--compress</span><span class="token operator">=</span><span class="token number">9</span> database_name <span class="token operator">|</span> <span class="token punctuation">\</span>
+  gpg <span class="token parameter variable">--symmetric</span> --cipher-algo AES256 <span class="token punctuation">\</span>
+  <span class="token operator">&gt;</span> backup_<span class="token variable"><span class="token variable">$(</span><span class="token function">date</span> +%Y%m%d_%H%M%S<span class="token variable">)</span></span>.dump.gpg</code></pre>
+<h3 id="備份驗證和測試">備份驗證和測試</h3>
+<p>確保備份有效且可復原。</p>
+<p><strong>自動化備份測試</strong>：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash"><span class="token shebang important">#!/bin/bash</span>
+<span class="token comment"># 自動化備份驗證指令程式</span>
+
+<span class="token assign-left variable">BACKUP_FILE</span><span class="token operator">=</span><span class="token string">"<span class="token variable">$1</span>"</span>
+<span class="token assign-left variable">TEST_DB</span><span class="token operator">=</span><span class="token string">"backup_test_<span class="token variable"><span class="token variable">$(</span><span class="token function">date</span> +%s<span class="token variable">)</span></span>"</span>
+
+<span class="token comment"># 建立測試資料庫</span>
+mysql <span class="token parameter variable">-e</span> <span class="token string">"CREATE DATABASE <span class="token variable">$TEST_DB</span>;"</span>
+
+<span class="token comment"># 將備份復原到測試資料庫</span>
+<span class="token keyword">if</span> mysql <span class="token variable">$TEST_DB</span> <span class="token operator">&lt;</span> <span class="token variable">$BACKUP_FILE</span><span class="token punctuation">;</span> <span class="token keyword">then</span>
+    <span class="token builtin class-name">echo</span> <span class="token string">"成功：備份復原成功"</span>
+    
+    <span class="token comment"># 執行一致性檢查</span>
+    mysqlcheck <span class="token parameter variable">--check</span> --all-databases <span class="token variable">$TEST_DB</span>
+    
+    <span class="token comment"># 驗證列數是否符合預期值</span>
+    <span class="token assign-left variable">EXPECTED_ROWS</span><span class="token operator">=</span><span class="token variable"><span class="token variable">$(</span>mysql <span class="token parameter variable">-sN</span> <span class="token parameter variable">-e</span> <span class="token string">"SELECT COUNT(*) FROM production.users;"</span><span class="token variable">)</span></span>
+    <span class="token assign-left variable">ACTUAL_ROWS</span><span class="token operator">=</span><span class="token variable"><span class="token variable">$(</span>mysql <span class="token parameter variable">-sN</span> <span class="token parameter variable">-e</span> <span class="token string">"SELECT COUNT(*) FROM <span class="token variable">$TEST_DB</span>.users;"</span><span class="token variable">)</span></span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">[</span> <span class="token string">"<span class="token variable">$EXPECTED_ROWS</span>"</span> <span class="token parameter variable">-eq</span> <span class="token string">"<span class="token variable">$ACTUAL_ROWS</span>"</span> <span class="token punctuation">]</span><span class="token punctuation">;</span> <span class="token keyword">then</span>
+        <span class="token builtin class-name">echo</span> <span class="token string">"成功：列數驗證通過"</span>
+    <span class="token keyword">else</span>
+        <span class="token builtin class-name">echo</span> <span class="token string">"錯誤：列數不匹配 - 預期：<span class="token variable">$EXPECTED_ROWS</span>，實際：<span class="token variable">$ACTUAL_ROWS</span>"</span>
+    <span class="token keyword">fi</span>
+<span class="token keyword">else</span>
+    <span class="token builtin class-name">echo</span> <span class="token string">"錯誤：備份復原失敗"</span>
+<span class="token keyword">fi</span>
+
+<span class="token comment"># 清理測試資料庫</span>
+mysql <span class="token parameter variable">-e</span> <span class="token string">"DROP DATABASE <span class="token variable">$TEST_DB</span>;"</span></code></pre>
+<h2 id="資料庫備份實施清單">資料庫備份實施清單</h2>
+<p><strong>備份策略</strong>：</p>
+<ul>
+<li>✅ 定義資料庫特定的RPO和RTO要求</li>
+<li>✅ 選擇適當的備份方法（邏輯、實體、交易日誌）</li>
+<li>✅ 實作時間點復原功能</li>
+<li>✅ 設計跨資料庫一致性策略</li>
+</ul>
+<p><strong>一致性和完整性</strong>：</p>
+<ul>
+<li>✅ 使用交易一致的備份方法</li>
+<li>✅ 復原後驗證參照完整性</li>
+<li>✅ 定期測試備份和復原程序</li>
+<li>✅ 監控備份完成情況和成功率</li>
+</ul>
+<p><strong>效能和可用性</strong>：</p>
+<ul>
+<li>✅ 最小化備份對生產系統的影響</li>
+<li>✅ 盡可能使用讀取副本進行備份操作</li>
+<li>✅ 實作並行備份和復原過程</li>
+<li>✅ 在低活動期間安排備份</li>
+</ul>
+<p><strong>安全和合規</strong>：</p>
+<ul>
+<li>✅ 加密敏感資料庫備份</li>
+<li>✅ 實施安全的備份儲存和存取控制</li>
+<li>✅ 維護備份和復原操作的稽核日誌</li>
+<li>✅ 滿足監管資料保留要求</li>
+</ul>
+<p><strong>監控和警報</strong>：</p>
+<ul>
+<li>✅ 監控備份作業完成情況和持續時間</li>
+<li>✅ 對備份失敗或異常進行警報</li>
+<li>✅ 追蹤備份儲存使用情況和成長</li>
+<li>✅ 自動驗證備份完整性</li>
+</ul>
+<h2 id="資料庫備份-vs-通用資料備份">資料庫備份 vs 通用資料備份</h2>
+<p><strong>資料庫備份</strong>：尊重ACID屬性和交易一致性的專業化備份方法。</p>
+<p><strong>通用資料備份</strong>：適用於文件、配置和靜態資料的檔案級備份。</p>
+<p><strong>主要區別</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>資料庫備份</th>
+<th>通用資料備份</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一致性</td>
+<td>交易性</td>
+<td>檔案級</td>
+</tr>
+<tr>
+<td>方法</td>
+<td>邏輯、實體、WAL</td>
+<td>完整、增量、差異</td>
+</tr>
+<tr>
+<td>複雜性</td>
+<td>高</td>
+<td>中等</td>
+</tr>
+<tr>
+<td>復原</td>
+<td>時間點</td>
+<td>檔案還原</td>
+</tr>
+<tr>
+<td>效能影響</td>
+<td>資料庫感知</td>
+<td>儲存級</td>
+</tr>
+<tr>
+<td>驗證</td>
+<td>ACID合規</td>
+<td>檔案完整性</td>
+</tr>
+</tbody>
+</table>
+<h2 id="資料庫特定考量因素">資料庫特定考量因素</h2>
+<p>資料庫備份決策涉及超越通用資料保護的獨特技術和業務考量：</p>
+<p><strong>技術複雜性</strong>：</p>
+<ul>
+<li><strong>ACID合規</strong>：在備份過程中確保交易一致性</li>
+<li><strong>參照完整性</strong>：維護外鍵關係</li>
+<li><strong>效能影響</strong>：最小化對生產系統的干擾</li>
+<li><strong>復原粒度</strong>：時間點 vs 完整資料庫還原</li>
+</ul>
+<p><strong>業務因素</strong>：</p>
+<ul>
+<li><strong>資料關鍵性</strong>：客戶記錄 vs 日誌資料 vs 使用者生成內容</li>
+<li><strong>合規要求</strong>：金融或醫療資料的監管要求</li>
+<li><strong>復原時間目標</strong>：資料庫必須多快復原？</li>
+<li><strong>一致性要求</strong>：是否可以容忍一些資料遺失或不一致？</li>
+</ul>
+<p><strong>SaaS資料庫考量</strong>：<br>
+使用託管資料庫服務時，評估：</p>
+<ul>
+<li>提供商的備份功能和SLA</li>
+<li>您匯出/匯入資料的能力</li>
+<li>供應商鎖定風險和資料可移植性</li>
+<li>實施額外備份層的成本</li>
+</ul>
+<p><em>有關全面的資料價值評估框架，請參閱<a href="/zh-TW/2022/09/Data-Backup-Strategies-From-Planning-to-Recovery/">資料備份策略 - 從規劃到復原</a>。</em></p>
+<h2 id="做出選擇">做出選擇</h2>
+<p>資料庫備份不僅僅是另一個備份任務——它是一個專業學科，需要理解資料庫內部機制、交易處理和一致性要求。但更重要的是，它是關於風險、價值和資源分配的業務決策。</p>
+<p>首先理解您資料庫的特定備份功能和要求。但首先，要理解您資料的業務價值以及遺失成本與保護成本的對比。實施適合您資料庫平台和業務需求的交易一致性備份方法。</p>
+<p>記住：資料庫備份是您關鍵資料業務連續性的保證。正確實施時，它們提供信心，讓您最寶貴的資產——您的資料——能夠度過任何災難。實施不當時，它們提供虛假的安全感。對於低價值資料完全跳過時，它們代表明智的資源分配。</p>
+<p>設計您的資料庫備份策略時，要像設計資料庫一樣精心，但始終通過業務價值和風險管理的視角。您未來的自己——和您的業務——會感謝您。</p>
+<p><em>有關資料庫以外的更全面備份策略，請參閱<a href="/zh-TW/2022/09/Data-Backup-Strategies-From-Planning-to-Recovery/">資料備份策略 - 從規劃到復原</a>。</em></p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/" data-id="10843f35" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "資料庫備份策略：超越簡單轉儲",
+        "image": "https://neo01.com/assets/database/backup_thumbnail.jpeg",
+        "keywords": "Backup Database MySQL",
+        "genre": "Development",
+        "datePublished": "2022-10-11",
+        "dateCreated": "2022-10-11",
+        "dateModified": "2025-11-27",
+        "url": "https://neo01.com//zh-TW/2022/10/Database-Backup-Strategies-Beyond-Simple-Dumps/",
+        "description": "深入探討資料庫備份的專業技術：交易一致性、時間點復原、跨資料庫協調，以及為什麼簡單的mysqldump可能不夠用。",
+        "wordCount": 718
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock 伺服器：透過模擬加速開發" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock 伺服器：透過模擬加速開發</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中啟用 i18n：多語言部落格完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中啟用 i18n：多語言部落格完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="我如何使用 AI 學習：透過迭代知識建構的個人旅程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/How-I-Use-AI-to-Learn/" class="title">我如何使用 AI 學習：透過迭代知識建構的個人旅程</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="工具、遊戲與瀏覽器內建 AI 遊樂場" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">工具、遊戲與瀏覽器內建 AI 遊樂場</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="代理式編碼的崛起：AI 驅動的軟體工程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">代理式編碼的崛起：AI 驅動的軟體工程</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#2579117c</div>
+                <img src="/qr/qr-7f7889c1bf37b81cd407c8e7127d40b2.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#2579117c">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

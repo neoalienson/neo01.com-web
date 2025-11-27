@@ -1,0 +1,1513 @@
+<!DOCTYPE html><html lang="en"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>The Sharding Pattern: Scaling Data Stores Horizontally | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="Divide your data store into horizontal partitions to improve scalability and performance. Learn how sharding distributes data across multiple servers to handle massive volumes.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The Sharding Pattern: Scaling Data Stores Horizontally">
+<meta property="og:url" content="https://neo01.com/2019/08/Sharding-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Divide your data store into horizontal partitions to improve scalability and performance. Learn how sharding distributes data across multiple servers to handle massive volumes.">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2019-08-16T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-15T13:03:51.054Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2019/08/Sharding-Pattern/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2019/08/Sharding-Pattern/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2019/08/Sharding-Pattern/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2019/08/Sharding-Pattern/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><script id="echarts-scripts" src="/cache/echarts.min.local.js"></script><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'en';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/">Home</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/Art-Gallery/">Art Gallery</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Architecture/">Architecture</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Cybersecurity/">Cybersecurity</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Development/">Development</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Misc/">Misc</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/about-me/">About</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="Search">
+        <button type="submit" title="Search" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="Type something...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'en',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2019/08/Sharding-Pattern" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        The Sharding Pattern: Scaling Data Stores Horizontally
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2019-08-16T16:00:00.000Z" itemprop="datePublished">2019-08-17</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-15T13:03:51.054Z" itemprop="datePublished">2025-11-15</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#The-Library-Analogy"><span class="toc-text">The Library Analogy</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#The-Problem-Single-Server-Limitations"><span class="toc-text">The Problem: Single Server Limitations</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#The-Solution-Horizontal-Partitioning-Sharding"><span class="toc-text">The Solution: Horizontal Partitioning (Sharding)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Sharding-Strategies"><span class="toc-text">Sharding Strategies</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Strategy-Comparison"><span class="toc-text">Strategy Comparison</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Practical-Implementation-Example"><span class="toc-text">Practical Implementation Example</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Key-Considerations"><span class="toc-text">Key Considerations</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#When-to-Use-Sharding"><span class="toc-text">When to Use Sharding</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Benefits-Summary"><span class="toc-text">Benefits Summary</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Challenges-Summary"><span class="toc-text">Challenges Summary</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#References"><span class="toc-text">References</span></a></li></ol>
+            <p>Imagine a library that has grown so large that a single building can no longer hold all the books. Instead of building one impossibly large structure, you create multiple library branches—each holding books organized by a specific category or range. Patrons know which branch to visit based on what they’re looking for. This is the essence of sharding: dividing data across multiple stores to overcome the limitations of a single server.</p>
+<h2 id="The-Library-Analogy">The Library Analogy</h2>
+<p>Just as a library system with multiple branches:</p>
+<ul>
+<li>Distributes books across locations</li>
+<li>Allows parallel access by many patrons</li>
+<li>Reduces crowding at any single location</li>
+<li>Enables geographic proximity to users</li>
+</ul>
+<p>A sharded data store:</p>
+<ul>
+<li>Distributes data across multiple servers</li>
+<li>Allows parallel queries and writes</li>
+<li>Reduces contention on any single database</li>
+<li>Enables data locality for better performance</li>
+</ul>
+<div class="mermaid">graph TB
+    A[Application] --&gt; B[Sharding Logic]
+    B --&gt; C[Shard 1<br>Users A-H]
+    B --&gt; D[Shard 2<br>Users I-P]
+    B --&gt; E[Shard 3<br>Users Q-Z]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style C fill:#51cf66,stroke:#2f9e44
+    style D fill:#51cf66,stroke:#2f9e44
+    style E fill:#51cf66,stroke:#2f9e44</div>
+<h2 id="The-Problem-Single-Server-Limitations">The Problem: Single Server Limitations</h2>
+<p>A data store hosted on a single server faces inevitable constraints:</p>
+<h3 id="Storage-Space-Limitations">Storage Space Limitations</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// As data grows, a single server runs out of space</span>
+<span class="token keyword">class</span> <span class="token class-name">UserDatabase</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>storage <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">DiskStorage</span><span class="token punctuation">(</span><span class="token string">'/data'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// What happens when we reach 10TB? 100TB? 1PB?</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">addUser</span><span class="token punctuation">(</span><span class="token parameter">user</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>storage<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>user<span class="token punctuation">.</span>id<span class="token punctuation">,</span> user<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>error<span class="token punctuation">.</span>code <span class="token operator">===</span> <span class="token string">'ENOSPC'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Disk full - now what?</span>
+        <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Storage capacity exceeded'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="Computing-Resource-Constraints">Computing Resource Constraints</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// Single server handling millions of concurrent users</span>
+<span class="token keyword">class</span> <span class="token class-name">OrderDatabase</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">processQuery</span><span class="token punctuation">(</span><span class="token parameter">query</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// CPU maxed out processing queries</span>
+    <span class="token comment">// Memory exhausted caching results</span>
+    <span class="token comment">// Queries start timing out</span>
+    <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">executeQuery</span><span class="token punctuation">(</span>query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="Network-Bandwidth-Bottlenecks">Network Bandwidth Bottlenecks</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// All traffic flows through one network interface</span>
+<span class="token keyword">class</span> <span class="token class-name">DataStore</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">handleRequest</span><span class="token punctuation">(</span><span class="token parameter">request</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Network interface saturated at 10Gbps</span>
+    <span class="token comment">// Requests start getting dropped</span>
+    <span class="token comment">// Response times increase dramatically</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">processRequest</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="Geographic-Distribution-Challenges">Geographic Distribution Challenges</h3>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// Users worldwide accessing a single data center</span>
+<span class="token keyword">class</span> <span class="token class-name">GlobalApplication</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">getUserData</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// User in Tokyo accessing data in Virginia</span>
+    <span class="token comment">// 200ms latency just for network round trip</span>
+    <span class="token comment">// Compliance issues storing EU data in US</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>database<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token punctuation">{</span> userId <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Vertical Scaling Limitations</p><div class="admonition-content"><p><strong>Temporary Solution</strong>: Adding more CPU, memory, or disk to a single server</p>
+<p><strong>Physical Limits</strong>: Eventually you can't add more resources</p>
+<p><strong>Cost Inefficiency</strong>: High-end servers become exponentially expensive</p>
+<p><strong>Single Point of Failure</strong>: One server failure affects all users</p>
+</div></div>
+<h2 id="The-Solution-Horizontal-Partitioning-Sharding">The Solution: Horizontal Partitioning (Sharding)</h2>
+<p>Divide the data store into horizontal partitions called shards. Each shard:</p>
+<ul>
+<li>Has the same schema</li>
+<li>Contains a distinct subset of data</li>
+<li>Runs on a separate storage node</li>
+<li>Operates independently</li>
+</ul>
+<div class="mermaid">graph TB
+    A[Application Layer] --&gt; B[Shard Map/Router]
+    B --&gt; C[Shard A<br>Orders 0-999]
+    B --&gt; D[Shard B<br>Orders 1000-1999]
+    B --&gt; E[Shard C<br>Orders 2000-2999]
+    B --&gt; F[Shard D<br>Orders 3000+]
+    
+    C --&gt; C1[(Database<br>Server 1)]
+    D --&gt; D1[(Database<br>Server 2)]
+    E --&gt; E1[(Database<br>Server 3)]
+    F --&gt; F1[(Database<br>Server 4)]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style C fill:#51cf66,stroke:#2f9e44
+    style D fill:#51cf66,stroke:#2f9e44
+    style E fill:#51cf66,stroke:#2f9e44
+    style F fill:#51cf66,stroke:#2f9e44</div>
+<h2 id="Sharding-Strategies">Sharding Strategies</h2>
+<h3 id="1-Lookup-Strategy">1. Lookup Strategy</h3>
+<p>Use a mapping table to route requests to the appropriate shard:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">LookupShardRouter</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Shard map stored in fast cache or database</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shardMap <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-1'</span><span class="token punctuation">,</span> <span class="token string">'shard-a'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-2'</span><span class="token punctuation">,</span> <span class="token string">'shard-a'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-3'</span><span class="token punctuation">,</span> <span class="token string">'shard-b'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">'tenant-4'</span><span class="token punctuation">,</span> <span class="token string">'shard-c'</span><span class="token punctuation">]</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shardConnections <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token string-property property">'shard-a'</span><span class="token operator">:</span> <span class="token string">'db1.neo01.com'</span><span class="token punctuation">,</span>
+      <span class="token string-property property">'shard-b'</span><span class="token operator">:</span> <span class="token string">'db2.neo01.com'</span><span class="token punctuation">,</span>
+      <span class="token string-property property">'shard-c'</span><span class="token operator">:</span> <span class="token string">'db3.neo01.com'</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForTenant</span><span class="token punctuation">(</span><span class="token parameter">tenantId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shardKey <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardMap<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>tenantId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardConnections<span class="token punctuation">[</span>shardKey<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">queryTenantData</span><span class="token punctuation">(</span><span class="token parameter">tenantId<span class="token punctuation">,</span> query</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shardUrl <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForTenant</span><span class="token punctuation">(</span>tenantId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span>shardUrl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="mermaid">graph LR
+    A[Request:<br>Tenant-3] --&gt; B[Lookup<br>Shard Map]
+    B --&gt; C{Tenant-3<br>→ Shard B}
+    C --&gt; D[(Shard B<br>Database)]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style D fill:#51cf66,stroke:#2f9e44</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 Lookup Strategy Benefits</p><div class="admonition-content"><p><strong>Flexibility</strong>: Easy to rebalance by updating the map</p>
+<p><strong>Virtual Shards</strong>: Map logical shards to fewer physical servers</p>
+<p><strong>Control</strong>: Assign high-value tenants to dedicated shards</p>
+</div></div>
+<h3 id="2-Range-Strategy">2. Range Strategy</h3>
+<p>Group related items together based on sequential shard keys:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">RangeShardRouter</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shardRanges <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-01-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-03-31'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q1-2019.neo01.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-04-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-06-30'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q2-2019.neo01.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-07-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-09-30'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q3-2019.neo01.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">min</span><span class="token operator">:</span> <span class="token string">'2019-10-01'</span><span class="token punctuation">,</span> <span class="token literal-property property">max</span><span class="token operator">:</span> <span class="token string">'2019-12-31'</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> <span class="token string">'db-q4-2019.neo01.com'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForDate</span><span class="token punctuation">(</span><span class="token parameter">date</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> range <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardRanges<span class="token punctuation">.</span><span class="token function">find</span><span class="token punctuation">(</span><span class="token parameter">r</span> <span class="token operator">=&gt;</span> 
+      date <span class="token operator">&gt;=</span> r<span class="token punctuation">.</span>min <span class="token operator">&amp;&amp;</span> date <span class="token operator">&lt;=</span> r<span class="token punctuation">.</span>max
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> range <span class="token operator">?</span> range<span class="token punctuation">.</span>shard <span class="token operator">:</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">queryOrdersByDateRange</span><span class="token punctuation">(</span><span class="token parameter">startDate<span class="token punctuation">,</span> endDate</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Efficient: Query only relevant shards</span>
+    <span class="token keyword">const</span> relevantShards <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shardRanges
+      <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token parameter">r</span> <span class="token operator">=&gt;</span> r<span class="token punctuation">.</span>max <span class="token operator">&gt;=</span> startDate <span class="token operator">&amp;&amp;</span> r<span class="token punctuation">.</span>min <span class="token operator">&lt;=</span> endDate<span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">r</span> <span class="token operator">=&gt;</span> r<span class="token punctuation">.</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// Parallel queries to multiple shards</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>
+      relevantShards<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">shard</span> <span class="token operator">=&gt;</span> 
+        <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShardByDateRange</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> startDate<span class="token punctuation">,</span> endDate<span class="token punctuation">)</span>
+      <span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> results<span class="token punctuation">.</span><span class="token function">flat</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="mermaid">graph TB
+    A[Query:<br>Orders in Q2 2019] --&gt; B[Range Router]
+    B --&gt; C[Shard Q2<br>Apr-Jun 2019]
+    
+    D[Query:<br>Orders Apr-Jul 2019] --&gt; B
+    B --&gt; C
+    B --&gt; E[Shard Q3<br>Jul-Sep 2019]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style D fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style C fill:#51cf66,stroke:#2f9e44
+    style E fill:#51cf66,stroke:#2f9e44</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 Range Strategy Benefits</p><div class="admonition-content"><p><strong>Range Queries</strong>: Efficiently retrieve sequential data</p>
+<p><strong>Natural Ordering</strong>: Data stored in logical order</p>
+<p><strong>Time-Based Archival</strong>: Easy to archive old shards</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Range Strategy Risks</p><div class="admonition-content"><p><strong>Hotspots</strong>: Recent data often accessed more frequently</p>
+<p><strong>Uneven Distribution</strong>: Some ranges may grow larger than others</p>
+</div></div>
+<h3 id="3-Hash-Strategy">3. Hash Strategy</h3>
+<p>Distribute data evenly using a hash function:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">HashShardRouter</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shards <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token string">'db-shard-0.neo01.com'</span><span class="token punctuation">,</span>
+      <span class="token string">'db-shard-1.neo01.com'</span><span class="token punctuation">,</span>
+      <span class="token string">'db-shard-2.neo01.com'</span><span class="token punctuation">,</span>
+      <span class="token string">'db-shard-3.neo01.com'</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">hashUserId</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Simple hash function (use better hash in production)</span>
+    <span class="token keyword">let</span> hash <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> userId<span class="token punctuation">.</span>length<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      hash <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>hash <span class="token operator">&lt;&lt;</span> <span class="token number">5</span><span class="token punctuation">)</span> <span class="token operator">-</span> hash<span class="token punctuation">)</span> <span class="token operator">+</span> userId<span class="token punctuation">.</span><span class="token function">charCodeAt</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      hash <span class="token operator">=</span> hash <span class="token operator">&amp;</span> hash<span class="token punctuation">;</span> <span class="token comment">// Convert to 32-bit integer</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>hash<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> hash <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">hashUserId</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> shardIndex <span class="token operator">=</span> hash <span class="token operator">%</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">[</span>shardIndex<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getUserData</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connect</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span><span class="token punctuation">{</span> userId <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// Example distribution</span>
+<span class="token keyword">const</span> router <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">HashShardRouter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>router<span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token string">'user-123'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// db-shard-2</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>router<span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token string">'user-124'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// db-shard-0</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span>router<span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span><span class="token string">'user-125'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// db-shard-3</span>
+<span class="token comment">// Users distributed across shards</span></code></pre>
+<div class="mermaid">graph TB
+    A[User IDs] --&gt; B[Hash Function]
+    B --&gt; C[user-55 → Hash: 2]
+    B --&gt; D[user-56 → Hash: 0]
+    B --&gt; E[user-57 → Hash: 1]
+    
+    C --&gt; F[(Shard 2)]
+    D --&gt; G[(Shard 0)]
+    E --&gt; H[(Shard 1)]
+    
+    style A fill:#4dabf7,stroke:#1971c2
+    style B fill:#ffd43b,stroke:#fab005
+    style F fill:#51cf66,stroke:#2f9e44
+    style G fill:#51cf66,stroke:#2f9e44
+    style H fill:#51cf66,stroke:#2f9e44</div>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 Hash Strategy Benefits</p><div class="admonition-content"><p><strong>Even Distribution</strong>: Prevents hotspots</p>
+<p><strong>No Lookup Table</strong>: Direct computation of shard location</p>
+<p><strong>Scalable</strong>: Works well with many shards</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Hash Strategy Challenges</p><div class="admonition-content"><p><strong>Range Queries</strong>: Difficult to query ranges efficiently</p>
+<p><strong>Rebalancing</strong>: Adding shards requires rehashing data</p>
+</div></div>
+<h2 id="Strategy-Comparison">Strategy Comparison</h2>
+<div id="chart_7804a94ed" class="echarts" style="width: 800px; height: 600px;"></div>
+<script>
+(function() {
+    if (typeof echarts !== 'undefined') {
+        var chart = echarts.init(document.getElementById('chart_7804a94ed'));
+        var option = {
+  "title": {
+    "text": "Sharding Strategy Trade-offs"
+  },
+  "tooltip": {
+    "trigger": "axis"
+  },
+  "legend": {
+    "data": ["Lookup", "Range", "Hash"]
+  },
+  "radar": {
+    "indicator": [
+      { "name": "Flexibility", "max": 10 },
+      { "name": "Even Distribution", "max": 10 },
+      { "name": "Range Query Performance", "max": 10 },
+      { "name": "Simplicity", "max": 10 },
+      { "name": "Rebalancing Ease", "max": 10 }
+    ]
+  },
+  "series": [{
+    "type": "radar",
+    "data": [
+      {
+        "value": [9, 6, 5, 6, 9],
+        "name": "Lookup"
+      },
+      {
+        "value": [5, 4, 10, 8, 3],
+        "name": "Range"
+      },
+      {
+        "value": [6, 10, 3, 9, 4],
+        "name": "Hash"
+      }
+    ]
+  }]
+};
+        chart.setOption(option);
+    }
+})();
+</script>
+<h2 id="Practical-Implementation-Example">Practical Implementation Example</h2>
+<p>Here’s a complete sharding implementation for an e-commerce platform:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ShardedOrderDatabase</span> <span class="token punctuation">{</span>
+  <span class="token function">constructor</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Use hash strategy for even distribution</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shards <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-0.neo01.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-1.neo01.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-2.neo01.com'</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token punctuation">{</span> <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token literal-property property">connection</span><span class="token operator">:</span> <span class="token string">'orders-db-3.neo01.com'</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">getShardForOrder</span><span class="token punctuation">(</span><span class="token parameter">orderId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Extract numeric part from order ID</span>
+    <span class="token keyword">const</span> numericId <span class="token operator">=</span> <span class="token function">parseInt</span><span class="token punctuation">(</span>orderId<span class="token punctuation">.</span><span class="token function">replace</span><span class="token punctuation">(</span><span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">\D</span><span class="token regex-delimiter">/</span><span class="token regex-flags">g</span></span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> shardIndex <span class="token operator">=</span> numericId <span class="token operator">%</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">[</span>shardIndex<span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">createOrder</span><span class="token punctuation">(</span><span class="token parameter">order</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForOrder</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+        <span class="token string">'INSERT INTO orders (id, user_id, total, items) VALUES (?, ?, ?, ?)'</span><span class="token punctuation">,</span>
+        <span class="token punctuation">[</span>order<span class="token punctuation">.</span>id<span class="token punctuation">,</span> order<span class="token punctuation">.</span>userId<span class="token punctuation">,</span> order<span class="token punctuation">.</span>total<span class="token punctuation">,</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span>order<span class="token punctuation">.</span>items<span class="token punctuation">)</span><span class="token punctuation">]</span>
+      <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">success</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token literal-property property">shard</span><span class="token operator">:</span> shard<span class="token punctuation">.</span>id <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      console<span class="token punctuation">.</span><span class="token function">error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">Failed to create order on shard </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>shard<span class="token punctuation">.</span>id<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">:</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getOrder</span><span class="token punctuation">(</span><span class="token parameter">orderId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForOrder</span><span class="token punctuation">(</span>orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+      <span class="token string">'SELECT * FROM orders WHERE id = ?'</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span>orderId<span class="token punctuation">]</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> result<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getUserOrders</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// User orders spread across shards - need fan-out query</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">shard</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>
+          <span class="token string">'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC'</span><span class="token punctuation">,</span>
+          <span class="token punctuation">[</span>userId<span class="token punctuation">]</span>
+        <span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// Merge and sort results from all shards</span>
+    <span class="token keyword">return</span> results
+      <span class="token punctuation">.</span><span class="token function">flat</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> b<span class="token punctuation">.</span>created_at <span class="token operator">-</span> a<span class="token punctuation">.</span>created_at<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">connectToShard</span><span class="token punctuation">(</span><span class="token parameter">shard</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Connection pooling per shard</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>connections <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">createDatabaseConnection</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>connection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>id<span class="token punctuation">,</span> connection<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> <span class="token keyword">this</span><span class="token punctuation">.</span>connections<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="Key-Considerations">Key Considerations</h2>
+<h3 id="1-Choosing-the-Shard-Key">1. Choosing the Shard Key</h3>
+<p>The shard key determines data distribution and query performance:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// Good: Static, evenly distributed</span>
+<span class="token keyword">const</span> shardKey <span class="token operator">=</span> user<span class="token punctuation">.</span>id<span class="token punctuation">;</span> <span class="token comment">// UUID, never changes</span>
+
+<span class="token comment">// Bad: Can change over time</span>
+<span class="token keyword">const</span> shardKey <span class="token operator">=</span> user<span class="token punctuation">.</span>email<span class="token punctuation">;</span> <span class="token comment">// User might change email</span>
+
+<span class="token comment">// Bad: Uneven distribution</span>
+<span class="token keyword">const</span> shardKey <span class="token operator">=</span> user<span class="token punctuation">.</span>country<span class="token punctuation">;</span> <span class="token comment">// Some countries have many more users</span></code></pre>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📝 Shard Key Best Practices</p><div class="admonition-content"><p><strong>Immutable</strong>: Choose keys that never change</p>
+<p><strong>High Cardinality</strong>: Many unique values for even distribution</p>
+<p><strong>Query Aligned</strong>: Support your most common query patterns</p>
+<p><strong>Avoid Hotspots</strong>: Prevent sequential keys if using hash strategy</p>
+</div></div>
+<h3 id="2-Cross-Shard-Queries">2. Cross-Shard Queries</h3>
+<p>Minimize queries that span multiple shards:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">OptimizedShardedDatabase</span> <span class="token punctuation">{</span>
+  <span class="token comment">// Good: Single shard query</span>
+  <span class="token keyword">async</span> <span class="token function">getOrderById</span><span class="token punctuation">(</span><span class="token parameter">orderId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> shard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForOrder</span><span class="token punctuation">(</span>orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShardById</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> orderId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token comment">// Acceptable: Fan-out with caching</span>
+  <span class="token keyword">async</span> <span class="token function">getUserOrderCount</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Cache the result to avoid repeated fan-out queries</span>
+    <span class="token keyword">const</span> cached <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">order_count:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>userId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cached<span class="token punctuation">)</span> <span class="token keyword">return</span> cached<span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> counts <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span>
+      <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token parameter">shard</span> <span class="token operator">=&gt;</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">countUserOrders</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> userId<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">const</span> total <span class="token operator">=</span> counts<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">sum<span class="token punctuation">,</span> count</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> sum <span class="token operator">+</span> count<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span>cache<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">order_count:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>userId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> total<span class="token punctuation">,</span> <span class="token number">300</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 5 min TTL</span>
+    <span class="token keyword">return</span> total<span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token comment">// Better: Denormalize to avoid cross-shard queries</span>
+  <span class="token keyword">async</span> <span class="token function">getUserOrderCountOptimized</span><span class="token punctuation">(</span><span class="token parameter">userId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Store count in user shard</span>
+    <span class="token keyword">const</span> userShard <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">getShardForUser</span><span class="token punctuation">(</span>userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryUserOrderCount</span><span class="token punctuation">(</span>userShard<span class="token punctuation">,</span> userId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="3-Rebalancing-Shards">3. Rebalancing Shards</h3>
+<p>Plan for growth and rebalancing:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">RebalancingShardManager</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">addNewShard</span><span class="token punctuation">(</span><span class="token parameter">newShardConnection</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Add new shard to configuration</span>
+    <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">id</span><span class="token operator">:</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">connection</span><span class="token operator">:</span> newShardConnection
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 2. Gradually migrate data</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">migrateDataToNewShard</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 3. Update shard map</span>
+    <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateShardMap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">migrateDataToNewShard</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Use virtual shards for easier rebalancing</span>
+    <span class="token keyword">const</span> virtualShards <span class="token operator">=</span> <span class="token number">1000</span><span class="token punctuation">;</span> <span class="token comment">// Many virtual shards</span>
+    <span class="token keyword">const</span> physicalShards <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>shards<span class="token punctuation">.</span>length<span class="token punctuation">;</span>
+    
+    <span class="token comment">// Remap virtual shards to physical shards</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> virtualShards<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> newPhysicalShard <span class="token operator">=</span> i <span class="token operator">%</span> physicalShards<span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">remapVirtualShard</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> newPhysicalShard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="4-Handling-Failures">4. Handling Failures</h3>
+<p>Implement resilience strategies:</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token keyword">class</span> <span class="token class-name">ResilientShardedDatabase</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">queryWithRetry</span><span class="token punctuation">(</span><span class="token parameter">shard<span class="token punctuation">,</span> query<span class="token punctuation">,</span> maxRetries <span class="token operator">=</span> <span class="token number">3</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> attempt <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span> attempt <span class="token operator">&lt;=</span> maxRetries<span class="token punctuation">;</span> attempt<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">try</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>attempt <span class="token operator">===</span> maxRetries<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          <span class="token comment">// Try replica if available</span>
+          <span class="token keyword">if</span> <span class="token punctuation">(</span>shard<span class="token punctuation">.</span>replica<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">queryShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">.</span>replica<span class="token punctuation">,</span> query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+          <span class="token punctuation">}</span>
+          <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        
+        <span class="token comment">// Exponential backoff</span>
+        <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">sleep</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">pow</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> attempt<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">queryShard</span><span class="token punctuation">(</span><span class="token parameter">shard<span class="token punctuation">,</span> query</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> connection <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">connectToShard</span><span class="token punctuation">(</span>shard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token keyword">await</span> connection<span class="token punctuation">.</span><span class="token function">query</span><span class="token punctuation">(</span>query<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token function">sleep</span><span class="token punctuation">(</span><span class="token parameter">ms</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token parameter">resolve</span> <span class="token operator">=&gt;</span> <span class="token function">setTimeout</span><span class="token punctuation">(</span>resolve<span class="token punctuation">,</span> ms<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="When-to-Use-Sharding">When to Use Sharding</h2>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ Use Sharding When</p><div class="admonition-content"><p><strong>Massive Scale</strong>: Data volume exceeds single server capacity</p>
+<p><strong>High Throughput</strong>: Need to handle millions of concurrent operations</p>
+<p><strong>Geographic Distribution</strong>: Users spread across multiple regions</p>
+<p><strong>Cost Optimization</strong>: Multiple commodity servers cheaper than one high-end server</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Avoid Sharding When</p><div class="admonition-content"><p><strong>Small Scale</strong>: Data fits comfortably on one server</p>
+<p><strong>Complex Joins</strong>: Application relies heavily on cross-table joins</p>
+<p><strong>Limited Resources</strong>: Team lacks expertise to manage distributed systems</p>
+<p><strong>Premature Optimization</strong>: Vertical scaling still viable</p>
+</div></div>
+<h2 id="Benefits-Summary">Benefits Summary</h2>
+<ul>
+<li><strong>Scalability</strong>: Add more shards as data grows</li>
+<li><strong>Performance</strong>: Parallel processing across shards</li>
+<li><strong>Cost Efficiency</strong>: Use commodity hardware instead of expensive servers</li>
+<li><strong>Geographic Proximity</strong>: Place data close to users</li>
+<li><strong>Fault Isolation</strong>: Failure in one shard doesn’t affect others</li>
+</ul>
+<h2 id="Challenges-Summary">Challenges Summary</h2>
+<ul>
+<li><strong>Complexity</strong>: More moving parts to manage</li>
+<li><strong>Cross-Shard Queries</strong>: Expensive fan-out operations</li>
+<li><strong>Rebalancing</strong>: Difficult to redistribute data</li>
+<li><strong>Referential Integrity</strong>: Hard to maintain across shards</li>
+<li><strong>Operational Overhead</strong>: Monitoring, backup, and maintenance multiply</li>
+</ul>
+<h2 id="References">References</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/best-practices/data-partitioning">Data Partitioning Guidance</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/sharding">Sharding Pattern</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/2019/08/Sharding-Pattern/" data-id="6bb9284a" class="article-share-link"><i class="fa fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "The Sharding Pattern: Scaling Data Stores Horizontally",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2019-08-17",
+        "dateCreated": "2019-08-17",
+        "dateModified": "2025-11-15",
+        "url": "https://neo01.com/2019/08/Sharding-Pattern/",
+        "description": "Divide your data store into horizontal partitions to improve scalability and performance. Learn how sharding distributes data across multiple servers to handle massive volumes.",
+        "wordCount": 5526
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>follow:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">links</h3>
+    <div class="widget">
+        <ul><li><a href="/ai">AI Playground</a></li><li><a href="/tools">Tools</a></li><li><a href="/games">Games</a></li><li><a href="/pages/useful-information">Useful Information</a></li><li><a href="/pages/Hexo-Blogging-Cheatsheet">Hexo Blogging Cheatsheet</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">Series</h3>
+        <div class="widget-series">
+            <ul>
+<li>🏗️ <strong>Architecture Pattern Series</strong>
+<ul>
+<li><a href="/2020/05/Architecture-Patterns-Quick-Reference/" class="active">Architecture Patterns Quick Reference</a></li>
+<li><a href="/2019/01/Rate-Limiting-Pattern/">Rate Limiting Pattern</a></li>
+<li><a href="/2019/02/Anti-Corruption-Layer-Pattern/">Anti-Corruption Layer Pattern</a></li>
+<li><a href="/2019/03/Retry-Pattern/">Retry Pattern</a></li>
+<li><a href="/2019/04/Claim-Check-Pattern/">Claim Check Pattern</a></li>
+<li><a href="/2019/05/Materialized-View-Pattern/">Materialized View Pattern</a></li>
+<li><a href="/2019/06/Strangler-Fig-Pattern/">Strangler Fig Pattern</a></li>
+<li><a href="/2019/07/Sidecar-Pattern/">Sidecar Pattern</a></li>
+<li><a href="/2019/08/Sharding-Pattern/">Sharding Pattern</a></li>
+<li><a href="/2019/09/Gateway-Aggregation-Pattern/">Gateway Aggregation Pattern</a></li>
+<li><a href="/2019/10/Publisher-Subscriber-Pattern/">Publisher-Subscriber Pattern</a></li>
+<li><a href="/2019/11/Health-Endpoint-Monitoring-Pattern/">Health Endpoint Monitoring Pattern</a></li>
+<li><a href="/2019/12/Federated-Identity-Pattern/">Federated Identity Pattern</a></li>
+<li><a href="/2020/01/Circuit-Breaker-Pattern/">Circuit Breaker Pattern</a></li>
+<li><a href="/2020/03/Bulkhead-Pattern/">Bulkhead Pattern</a></li>
+<li><a href="/2020/04/Asynchronous-Request-Reply-Pattern/">Asynchronous Request-Reply Pattern</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    </div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">recents</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock Servers: Accelerating Development Through Simulation" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock Servers: Accelerating Development Through Simulation</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="Enabling i18n in Hexo: A Complete Guide to Multilingual Blogging" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2025/10/Enabling-i18n-in-Hexo/" class="title">Enabling i18n in Hexo: A Complete Guide to Multilingual Blogging</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="How I Use AI to Learn: A Personal Journey Through Iterative Knowledge Building" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">AI</a></p>
+                            <p class="item-title"><a href="/2025/10/How-I-Use-AI-to-Learn/" class="title">How I Use AI to Learn: A Personal Journey Through Iterative Knowledge Building</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="Tools, Games and Browser Built-in AI Playground" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">AI</a></p>
+                            <p class="item-title"><a href="/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">Tools, Games and Browser Built-in AI Playground</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="The Rise of Agentic Coding: AI-Powered Software Engineering" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">AI</a></p>
+                            <p class="item-title"><a href="/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">The Rise of Agentic Coding: AI-Powered Software Engineering</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#6e743bab</div>
+                <img src="/qr/qr-1cd7617af9b11b28521097de437c96e5.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#6e743bab">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. All rights reserved.
+                  <a href="/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

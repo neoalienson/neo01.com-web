@@ -1,0 +1,1623 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>OpenID Connect：現代身份驗證詳解 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Authentication,OIDC,Security">
+    
+    
+    <meta name="description" content="OpenID Connect 基於 OAuth 2.0 建構，為現代應用程式提供標準化的身份驗證。了解 OIDC 如何統一身份驗證和授權、何時使用它而不是 SAML，以及如何安全實作。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OpenID Connect：現代身份驗證詳解">
+<meta property="og:url" content="https://neo01.com/zh-TW/2014/11/OpenID-Connect-Modern-Authentication-Explained/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="OpenID Connect 基於 OAuth 2.0 建構，為現代應用程式提供標準化的身份驗證。了解 OIDC 如何統一身份驗證和授權、何時使用它而不是 SAML，以及如何安全實作。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/security/lock.png">
+<meta property="article:published_time" content="2014-11-10T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-26T15:16:54.571Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Authentication">
+<meta property="article:tag" content="OIDC">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/security/lock.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2014/11/OpenID-Connect-Modern-Authentication-Explained/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2014/11/OpenID-Connect-Modern-Authentication-Explained/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2014/11/OpenID-Connect-Modern-Authentication-Explained/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2014/11/OpenID-Connect-Modern-Authentication-Explained/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-TW';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me/">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Cybersecurity/">Cybersecurity</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2014/11/OpenID-Connect-Modern-Authentication-Explained-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        OpenID Connect：現代身份驗證詳解
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2014-11-10T16:00:00.000Z" itemprop="datePublished">2014-11-11</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-26T15:16:54.571Z" itemprop="datePublished">2025-11-26</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/Security/">Security</a> <a class="tag-link" href="/zh-TW/tags/Authentication/">Authentication</a> <a class="tag-link" href="/zh-TW/tags/OIDC/">OIDC</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#OIDC-%E5%9F%BA%E7%A4%8E"><span class="toc-text">OIDC 基礎</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OIDC-%E6%9E%B6%E6%A7%8B"><span class="toc-text">OIDC 架構</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BA%AB%E4%BB%BD%E9%A9%97%E8%AD%89%E6%B5%81%E7%A8%8B"><span class="toc-text">身份驗證流程</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ID-%E6%AC%8A%E6%9D%96%E6%B7%B1%E5%85%A5%E6%8E%A2%E8%A8%8E"><span class="toc-text">ID 權杖深入探討</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%BF%E7%94%A8%E8%80%85%E8%B3%87%E8%A8%8A%E7%AB%AF%E9%BB%9E"><span class="toc-text">使用者資訊端點</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%8E%A2%E7%B4%A2%E5%92%8C%E4%B8%AD%E7%B9%BC%E8%B3%87%E6%96%99"><span class="toc-text">探索和中繼資料</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OIDC-%E5%AF%A6%E5%8B%99"><span class="toc-text">OIDC 實務</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%89%E5%85%A8%E6%80%A7%E8%80%83%E9%87%8F"><span class="toc-text">安全性考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OIDC-vs-SAML"><span class="toc-text">OIDC vs SAML</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B8%B8%E8%A6%8B%E9%8C%AF%E8%AA%A4"><span class="toc-text">常見錯誤</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B5%90%E8%AB%96"><span class="toc-text">結論</span></a></li></ol>
+            <p>OAuth 2.0 革新了 API 授權，但開發人員誤用它進行身份驗證，造成了安全漏洞。OpenID Connect（OIDC）於 2014 年出現，透過在 OAuth 2.0 之上新增標準化的身分層來解決這個問題。OIDC 提供了開發人員真正需要的：一個在統一流程中處理身份驗證（你是誰）和授權（你可以存取什麼）的現代協定。</p>
+<p>這種混淆是可以理解的。開發人員看到 OAuth 在「使用 Google 登入」中的成功，並假設 OAuth 是一個身份驗證協定。他們會取得存取權杖並將其視為身分證明。這造成了安全問題——存取權杖不是為證明身分而設計的，它們授予對資源的存取權限。不同的提供者以不同的方式實作使用者資訊端點，導致實作不一致且不安全。</p>
+<p>OIDC 透過引入 ID 權杖解決了這個問題——一個專門設計用於證明使用者身分的 JWT。當你使用 OIDC 進行身份驗證時，你會同時收到 ID 權杖（證明你是誰）和存取權杖（授予 API 存取權限）。這種明確的分離消除了混淆並提供了安全的身份驗證和標準化的使用者資訊。</p>
+<p>本文涵蓋 OIDC 基礎、架構、身份驗證流程、實際實作、安全性考量，以及何時選擇 OIDC 而不是 SAML 等替代方案。</p>
+<h2 id="OIDC-基礎">OIDC 基礎</h2>
+<p>OpenID Connect 透過身分層擴展 OAuth 2.0，提供標準化的身份驗證。</p>
+<h3 id="核心概念">核心概念</h3>
+<p>OIDC 建立在 OAuth 2.0 的基礎之上：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🆔 OIDC 核心概念</p><div class="admonition-content"><p><strong>基於 OAuth 2.0</strong></p>
+<ul>
+<li>使用 OAuth 流程</li>
+<li>新增 ID 權杖</li>
+<li>標準化使用者資訊</li>
+<li>結合身份驗證和授權</li>
+</ul>
+<p><strong>ID 權杖</strong></p>
+<ul>
+<li>JWT（JSON Web Token）</li>
+<li>包含使用者身分宣告</li>
+<li>數位簽章</li>
+<li>可由客戶端驗證</li>
+</ul>
+<p><strong>標準端點</strong></p>
+<ul>
+<li>授權端點</li>
+<li>權杖端點</li>
+<li>使用者資訊端點</li>
+<li>探索端點</li>
+</ul>
+</div></div>
+<p>ID 權杖是 OIDC 的關鍵創新。它是一個包含使用者 ID、電子郵件和姓名等身分宣告的 JWT。權杖由授權伺服器數位簽章，允許客戶端驗證其真實性而無需回呼伺服器。這提供了安全、高效的身份驗證。</p>
+<h3 id="OIDC-vs-OAuth">OIDC vs OAuth</h3>
+<p>理解 OIDC 和 OAuth 之間的區別至關重要：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 OIDC vs OAuth</p><div class="admonition-content"><p><strong>OAuth 2.0</strong></p>
+<ul>
+<li>授權協定</li>
+<li>授予對資源的存取權限</li>
+<li>API 的存取權杖</li>
+<li>不證明身分</li>
+</ul>
+<p><strong>OpenID Connect</strong></p>
+<ul>
+<li>身份驗證協定</li>
+<li>證明使用者身分</li>
+<li>身份驗證的 ID 權杖</li>
+<li>基於 OAuth 2.0</li>
+</ul>
+<p><strong>關鍵區別</strong></p>
+<ul>
+<li>OAuth：「你可以存取什麼？」</li>
+<li>OIDC：「你是誰？」 + 「你可以存取什麼？」</li>
+</ul>
+</div></div>
+<p>OAuth 回答「你可以存取什麼？」OIDC 回答「你是誰？」和「你可以存取什麼？」如果你需要身份驗證，使用 OIDC。如果你只需要 API 授權而不需要使用者身分，使用 OAuth。</p>
+<h2 id="OIDC-架構">OIDC 架構</h2>
+<p>OIDC 定義了實體及其互動：</p>
+<h3 id="實體">實體</h3>
+<p>OIDC 涉及四個主要實體：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🏗️ OIDC 實體</p><div class="admonition-content"><p><strong>最終使用者</strong></p>
+<ul>
+<li>進行身份驗證的人</li>
+<li>擁有資源</li>
+<li>授予權限</li>
+</ul>
+<p><strong>依賴方（RP）</strong></p>
+<ul>
+<li>客戶端應用程式</li>
+<li>請求身份驗證</li>
+<li>使用 ID 權杖</li>
+<li>Web 應用、行動應用或 SPA</li>
+</ul>
+<p><strong>OpenID 提供者（OP）</strong></p>
+<ul>
+<li>授權伺服器</li>
+<li>驗證使用者身分</li>
+<li>頒發 ID 權杖和存取權杖</li>
+<li>範例：Auth0、Okta、Azure AD</li>
+</ul>
+<p><strong>資源伺服器</strong></p>
+<ul>
+<li>託管受保護的 API</li>
+<li>驗證存取權杖</li>
+<li>傳回受保護的資源</li>
+</ul>
+</div></div>
+<p>依賴方（RP）是請求身份驗證的應用程式——你的 Web 應用、行動應用或單頁應用程式。OpenID 提供者（OP）是驗證使用者身分並頒發權杖的授權伺服器。資源伺服器託管接受存取權杖的 API。</p>
+<h3 id="架構圖">架構圖</h3>
+<div class="mermaid">---
+title: OpenID Connect 架構
+---
+flowchart TD
+    User([使用者])
+    Client[客戶端應用程式<br>Web/行動]
+    AuthServer[授權伺服器<br>Auth0/Okta]
+    API1[資源伺服器<br>使用者 API]
+    API2[資源伺服器<br>支付 API]
+    API3[資源伺服器<br>資料 API]
+    
+    User --&gt;|登入| Client
+    Client &lt;--&gt;|1. 身份驗證請求<br>2. ID 權杖 + 存取權杖| AuthServer
+    Client --&gt;|存取權杖| API1
+    Client --&gt;|存取權杖| API2
+    Client --&gt;|存取權杖| API3
+    API1 -.-&gt;|驗證權杖| AuthServer
+    API2 -.-&gt;|驗證權杖| AuthServer
+    API3 -.-&gt;|驗證權杖| AuthServer
+    
+    style AuthServer fill:#f96,stroke:#333,stroke-width:3px
+    style Client fill:#9cf,stroke:#333,stroke-width:2px</div>
+<p>客戶端透過授權伺服器驗證使用者身分，接收 ID 權杖和存取權杖。客戶端使用 ID 權杖建立使用者身分。資源伺服器驗證存取權杖以授權 API 請求。</p>
+<h2 id="身份驗證流程">身份驗證流程</h2>
+<p>OIDC 支援多種身份驗證流程以適應不同場景。</p>
+<h3 id="授權碼流程">授權碼流程</h3>
+<p>授權碼流程是最安全且推薦的流程：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔄 授權碼流程</p><div class="admonition-content"><p><strong>使用案例</strong></p>
+<ul>
+<li>帶後端的 Web 應用程式</li>
+<li>行動應用程式</li>
+<li>最安全的選項</li>
+<li>建議用於所有機密客戶端</li>
+</ul>
+<p><strong>流程步驟</strong></p>
+<ol>
+<li>使用者點選「登入」</li>
+<li>客戶端重新導向到授權端點</li>
+<li>使用者在 OP 進行身份驗證</li>
+<li>OP 重新導向回授權碼</li>
+<li>客戶端交換碼以取得權杖（後端）</li>
+<li>客戶端接收 ID 權杖和存取權杖</li>
+<li>客戶端驗證 ID 權杖</li>
+<li>客戶端提取使用者身分</li>
+<li>客戶端使用存取權杖進行 API 呼叫</li>
+</ol>
+<p><strong>安全特性</strong></p>
+<ul>
+<li>權杖永不暴露給瀏覽器</li>
+<li>客戶端密鑰保護權杖交換</li>
+<li>授權碼是一次性的</li>
+<li>短期碼</li>
+</ul>
+</div></div>
+<p>此流程透過在後端使用客戶端密鑰將授權碼交換為權杖來保持權杖安全。授權碼透過瀏覽器傳遞，但權杖不會，從而保護它們免受基於瀏覽器的攻擊。</p>
+<div class="mermaid">---
+title: OpenID Connect 身份驗證流程
+---
+sequenceDiagram
+    participant User as 使用者
+    participant Client as 客戶端
+    participant AuthServer as 授權伺服器
+    participant API as 資源伺服器
+    
+    User-&gt;&gt;Client: 點選「登入」
+    Client-&gt;&gt;AuthServer: 授權請求
+    AuthServer-&gt;&gt;User: 登入頁面
+    User-&gt;&gt;AuthServer: 憑證
+    AuthServer-&gt;&gt;Client: 授權碼
+    Client-&gt;&gt;AuthServer: 交換碼 + 客戶端密鑰
+    AuthServer-&gt;&gt;Client: ID 權杖 + 存取權杖
+    Note over Client: 驗證 ID 權杖簽章
+    Client-&gt;&gt;Client: 提取使用者身分
+    Client-&gt;&gt;API: API 請求 + 存取權杖
+    API-&gt;&gt;API: 驗證存取權杖
+    API-&gt;&gt;Client: 受保護的資源</div>
+<h3 id="帶-PKCE-的授權碼流程">帶 PKCE 的授權碼流程</h3>
+<p>PKCE（代碼交換證明金鑰）為公共客戶端增加了安全性：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔐 PKCE 擴充</p><div class="admonition-content"><p><strong>目的</strong></p>
+<ul>
+<li>保護公共客戶端</li>
+<li>行動應用</li>
+<li>單頁應用程式</li>
+<li>無客戶端密鑰</li>
+</ul>
+<p><strong>運作原理</strong></p>
+<ol>
+<li>客戶端產生代碼驗證器（隨機字串）</li>
+<li>客戶端建立代碼挑戰（驗證器的雜湊）</li>
+<li>客戶端在身份驗證請求中傳送代碼挑戰</li>
+<li>OP 儲存代碼挑戰</li>
+<li>客戶端交換碼 + 代碼驗證器以取得權杖</li>
+<li>OP 驗證驗證器與挑戰符合</li>
+</ol>
+<p><strong>安全優勢</strong></p>
+<ul>
+<li>防止授權碼攔截</li>
+<li>無需客戶端密鑰即可運作</li>
+<li>行動裝置和 SPA 必需</li>
+</ul>
+</div></div>
+<p>PKCE 防止授權碼攔截攻擊。即使攻擊者攔截了授權碼，他們也無法在沒有代碼驗證器的情況下將其交換為權杖，而代碼驗證器永遠不會離開客戶端。</p>
+<h3 id="隱式流程（已棄用）">隱式流程（已棄用）</h3>
+<p>隱式流程是為基於瀏覽器的應用設計的，但現在已棄用：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 隱式流程 - 已棄用</p><div class="admonition-content"><p><strong>為何存在</strong></p>
+<ul>
+<li>基於瀏覽器的應用</li>
+<li>無後端伺服器</li>
+<li>URL 片段中的權杖</li>
+</ul>
+<p><strong>為何棄用</strong></p>
+<ul>
+<li>權杖在瀏覽器中暴露</li>
+<li>URL 片段洩漏風險</li>
+<li>無重新整理權杖</li>
+<li>安全漏洞</li>
+</ul>
+<p><strong>改用</strong></p>
+<ul>
+<li>帶 PKCE 的授權碼流程</li>
+<li>提供更好的安全性</li>
+<li>適用於 SPA</li>
+</ul>
+</div></div>
+<p>不要在新應用程式中使用隱式流程。即使對於單頁應用程式，也使用帶 PKCE 的授權碼流程。現代瀏覽器和函式庫安全地支援這一點。</p>
+<h3 id="客戶端憑證流程">客戶端憑證流程</h3>
+<p>用於機器對機器身份驗證：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🤖 客戶端憑證流程</p><div class="admonition-content"><p><strong>使用案例</strong></p>
+<ul>
+<li>後端服務</li>
+<li>微服務</li>
+<li>排程作業</li>
+<li>無使用者互動</li>
+</ul>
+<p><strong>流程</strong></p>
+<ol>
+<li>服務使用客戶端 ID 和密鑰進行身份驗證</li>
+<li>OP 頒發存取權杖</li>
+<li>服務使用權杖進行 API 呼叫</li>
+</ol>
+<p><strong>特徵</strong></p>
+<ul>
+<li>不涉及使用者</li>
+<li>服務帳戶身份驗證</li>
+<li>無 ID 權杖（無使用者身分）</li>
+<li>僅存取權杖</li>
+</ul>
+</div></div>
+<p>此流程用於不涉及使用者的服務對服務身份驗證。後端服務使用其憑證進行身份驗證並接收存取權杖以呼叫 API。</p>
+<h2 id="ID-權杖深入探討">ID 權杖深入探討</h2>
+<p>ID 權杖是 OIDC 的核心創新。</p>
+<h3 id="ID-權杖結構">ID 權杖結構</h3>
+<p>ID 權杖是具有三個部分的 JWT：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🎫 ID 權杖結構</p><div class="admonition-content"><p><strong>標頭</strong></p>
+<ul>
+<li>權杖類型（JWT）</li>
+<li>簽章演算法（RS256 等）</li>
+<li>驗證的金鑰 ID</li>
+</ul>
+<p><strong>承載（宣告）</strong></p>
+<ul>
+<li>iss：頒發者（OP URL）</li>
+<li>sub：主體（使用者 ID）</li>
+<li>aud：受眾（客戶端 ID）</li>
+<li>exp：過期時間</li>
+<li>iat：頒發時間</li>
+<li>nonce：重播保護</li>
+<li>email、name 等：使用者屬性</li>
+</ul>
+<p><strong>簽章</strong></p>
+<ul>
+<li>數位簽章</li>
+<li>驗證權杖真實性</li>
+<li>防止竄改</li>
+</ul>
+</div></div>
+<p>範例 ID 權杖承載：</p>
+<pre><code>{
+  "iss": "https://auth.example.com",
+  "sub": "user123",
+  "aud": "client_abc",
+  "exp": 1699999999,
+  "iat": 1699996399,
+  "nonce": "random_nonce",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "email_verified": true
+}
+</code></pre>
+<h3 id="ID-權杖驗證">ID 權杖驗證</h3>
+<p>客戶端必須正確驗證 ID 權杖：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ ID 權杖驗證要求</p><div class="admonition-content"><p><strong>必需檢查</strong></p>
+<ol>
+<li>使用 OP 的公開金鑰驗證簽章</li>
+<li>檢查頒發者（iss）與預期 OP 符合</li>
+<li>檢查受眾（aud）與客戶端 ID 符合</li>
+<li>檢查過期時間（exp）未過期</li>
+<li>驗證 nonce 與請求符合</li>
+<li>檢查頒發時間（iat）合理</li>
+</ol>
+<p><strong>安全影響</strong></p>
+<ul>
+<li>跳過驗證會造成漏洞</li>
+<li>攻擊者可以偽造權杖</li>
+<li>權杖替換攻擊</li>
+<li>始終完全驗證</li>
+</ul>
+</div></div>
+<p>永遠不要跳過 ID 權杖驗證。每個檢查都防止特定的攻擊。簽章驗證防止偽造。受眾檢查防止權杖替換。過期檢查防止重播攻擊。</p>
+<h3 id="標準宣告">標準宣告</h3>
+<p>OIDC 為使用者資訊定義了標準宣告：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📋 標準宣告</p><div class="admonition-content"><p><strong>個人資料宣告</strong></p>
+<ul>
+<li>name：全名</li>
+<li>given_name：名字</li>
+<li>family_name：姓氏</li>
+<li>middle_name：中間名</li>
+<li>nickname：暱稱</li>
+<li>picture：個人資料照片 URL</li>
+<li>website：網頁 URL</li>
+</ul>
+<p><strong>聯絡宣告</strong></p>
+<ul>
+<li>email：電子郵件地址</li>
+<li>email_verified：電子郵件驗證狀態</li>
+<li>phone_number：電話號碼</li>
+<li>phone_number_verified：電話驗證狀態</li>
+</ul>
+<p><strong>地址宣告</strong></p>
+<ul>
+<li>address：結構化地址物件</li>
+</ul>
+<p><strong>其他宣告</strong></p>
+<ul>
+<li>birthdate：出生日期</li>
+<li>gender：性別</li>
+<li>locale：區域設定/語言</li>
+<li>zoneinfo：時區</li>
+</ul>
+</div></div>
+<p>客戶端使用範圍請求特定宣告。openid 範圍是必需的。profile、email 和 phone 等附加範圍請求附加宣告。</p>
+<h2 id="使用者資訊端點">使用者資訊端點</h2>
+<p>使用者資訊端點提供額外的使用者資訊。</p>
+<h3 id="目的和用法">目的和用法</h3>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>ℹ️ 使用者資訊端點</p><div class="admonition-content"><p><strong>目的</strong></p>
+<ul>
+<li>擷取額外的使用者屬性</li>
+<li>補充 ID 權杖宣告</li>
+<li>標準化端點</li>
+</ul>
+<p><strong>用法</strong></p>
+<ol>
+<li>客戶端取得存取權杖</li>
+<li>客戶端使用權杖呼叫使用者資訊端點</li>
+<li>OP 以 JSON 形式傳回使用者宣告</li>
+</ol>
+<p><strong>何時使用</strong></p>
+<ul>
+<li>需要比 ID 權杖包含的更多宣告</li>
+<li>ID 權杖大小限制</li>
+<li>動態使用者資訊</li>
+</ul>
+</div></div>
+<p>使用者資訊端點以 JSON 格式傳回使用者宣告。它使用存取權杖呼叫，並根據權杖的範圍傳回宣告。</p>
+<p>範例使用者資訊回應：</p>
+<pre><code>{
+  "sub": "user123",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "picture": "https://example.com/photo.jpg",
+  "email_verified": true
+}
+</code></pre>
+<h2 id="探索和中繼資料">探索和中繼資料</h2>
+<p>OIDC 提供自動設定探索。</p>
+<h3 id="探索端點">探索端點</h3>
+<p>探索端點傳回 OP 設定：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 OIDC 探索</p><div class="admonition-content"><p><strong>端點</strong></p>
+<ul>
+<li><code>/.well-known/openid-configuration</code></li>
+<li>傳回 JSON 中繼資料</li>
+<li>自動設定</li>
+</ul>
+<p><strong>中繼資料包括</strong></p>
+<ul>
+<li>授權端點 URL</li>
+<li>權杖端點 URL</li>
+<li>使用者資訊端點 URL</li>
+<li>支援的範圍</li>
+<li>支援的回應類型</li>
+<li>簽章演算法</li>
+<li>JWKS URI（公開金鑰）</li>
+</ul>
+</div></div>
+<p>範例探索 URL：<code>https://auth.example.com/.well-known/openid-configuration</code></p>
+<p>這使得客戶端可以自動設定。客戶端擷取探索文件並自行設定，無需手動端點設定。</p>
+<h2 id="OIDC-實務">OIDC 實務</h2>
+<p>實際 OIDC 實作考量。</p>
+<h3 id="提供者選擇">提供者選擇</h3>
+<p>選擇 OIDC 提供者：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 OIDC 提供者選擇</p><div class="admonition-content"><p><strong>託管提供者</strong></p>
+<ul>
+<li>Auth0：開發者友善，功能廣泛</li>
+<li>Okta：企業重點，強大支援</li>
+<li>Azure AD：Microsoft 生態系統整合</li>
+<li>Google Identity：消費者和企業</li>
+<li>AWS Cognito：AWS 生態系統整合</li>
+</ul>
+<p><strong>自託管</strong></p>
+<ul>
+<li>Keycloak：開源，功能豐富</li>
+<li>ORY Hydra：雲原生，輕量級</li>
+<li>Authelia：自託管，注重隱私</li>
+</ul>
+<p><strong>考量因素</strong></p>
+<ul>
+<li>合規要求</li>
+<li>可擴展性需求</li>
+<li>成本結構</li>
+<li>開發者體驗</li>
+<li>支援要求</li>
+</ul>
+</div></div>
+<p>託管提供者提供更簡單的設定和維護。自託管選項提供更多控制和資料隱私。根據你的要求、團隊能力和預算進行選擇。</p>
+<h3 id="整合函式庫">整合函式庫</h3>
+<p>使用標準函式庫進行 OIDC 整合：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ OIDC 函式庫</p><div class="admonition-content"><p><strong>JavaScript/Node.js</strong></p>
+<ul>
+<li>oidc-client-ts：瀏覽器和 Node.js</li>
+<li>passport-openidconnect：Node.js 中介軟體</li>
+<li>next-auth：Next.js 整合</li>
+</ul>
+<p><strong>Python</strong></p>
+<ul>
+<li>authlib：全面的 OAuth/OIDC</li>
+<li>python-jose：JWT 處理</li>
+<li>flask-oidc：Flask 整合</li>
+</ul>
+<p><strong>Java</strong></p>
+<ul>
+<li>Spring Security OAuth：Spring 整合</li>
+<li>pac4j：多協定支援</li>
+</ul>
+<p><strong>C#/.NET</strong></p>
+<ul>
+<li>IdentityModel：OIDC 客戶端函式庫</li>
+<li>Microsoft.Identity.Web：ASP.NET Core</li>
+</ul>
+<p><strong>行動裝置</strong></p>
+<ul>
+<li>AppAuth：iOS 和 Android</li>
+<li>React Native AppAuth：React Native</li>
+</ul>
+</div></div>
+<p>不要從頭實作 OIDC。使用維護良好的函式庫來處理協定細節、權杖驗證和安全最佳實務。</p>
+<h3 id="實作範例">實作範例</h3>
+<p>基本 OIDC 流程實作：</p>
+<pre><code>// 1. 重新導向到授權端點
+const authUrl = `${issuer}/authorize?` +
+  `response_type=code&amp;` +
+  `client_id=${clientId}&amp;` +
+  `redirect_uri=${redirectUri}&amp;` +
+  `scope=openid profile email&amp;` +
+  `state=${state}&amp;` +
+  `nonce=${nonce}`;
+
+window.location.href = authUrl;
+
+// 2. 處理回呼（後端）
+const tokenResponse = await fetch(`${issuer}/token`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({
+    grant_type: 'authorization_code',
+    code: authCode,
+    redirect_uri: redirectUri,
+    client_id: clientId,
+    client_secret: clientSecret
+  })
+});
+
+const { id_token, access_token } = await tokenResponse.json();
+
+// 3. 驗證 ID 權杖
+const decoded = jwt.verify(id_token, publicKey, {
+  issuer: issuer,
+  audience: clientId
+});
+
+// 4. 提取使用者身分
+const userId = decoded.sub;
+const email = decoded.email;
+</code></pre>
+<p>這顯示了基本流程：重新導向到授權端點，交換碼以取得權杖，驗證 ID 權杖，提取使用者身分。</p>
+<h2 id="安全性考量">安全性考量</h2>
+<p>OIDC 安全最佳實務。</p>
+<h3 id="權杖安全">權杖安全</h3>
+<p>小心保護權杖：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 權杖安全最佳實務</p><div class="admonition-content"><p><strong>儲存</strong></p>
+<ul>
+<li>永不在 localStorage 中儲存權杖</li>
+<li>儘可能使用 httpOnly cookie</li>
+<li>靜態加密權杖</li>
+<li>登出時清除權杖</li>
+</ul>
+<p><strong>傳輸</strong></p>
+<ul>
+<li>始終使用 HTTPS</li>
+<li>驗證 TLS 憑證</li>
+<li>避免在 URL 中使用權杖</li>
+<li>使用安全標頭</li>
+</ul>
+<p><strong>驗證</strong></p>
+<ul>
+<li>驗證權杖簽章</li>
+<li>檢查過期時間</li>
+<li>驗證頒發者</li>
+<li>驗證受眾</li>
+<li>檢查 nonce</li>
+</ul>
+<p><strong>輪換</strong></p>
+<ul>
+<li>短期存取權杖（15 分鐘）</li>
+<li>重新整理權杖輪換</li>
+<li>撤銷機制</li>
+<li>監控濫用</li>
+</ul>
+</div></div>
+<p>權杖是持有者憑證——任何擁有權杖的人都可以使用它。在 localStorage 中儲存權杖會使其暴露於 XSS 攻擊。在信任權杖之前，始終完全驗證權杖。</p>
+<h3 id="公共客戶端的-PKCE">公共客戶端的 PKCE</h3>
+<p>始終對公共客戶端使用 PKCE：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🔐 PKCE 最佳實務</p><div class="admonition-content"><p><strong>何時使用</strong></p>
+<ul>
+<li>行動應用程式</li>
+<li>單頁應用程式</li>
+<li>任何公共客戶端</li>
+<li>即使對機密客戶端（縱深防禦）</li>
+</ul>
+<p><strong>實作</strong></p>
+<ul>
+<li>產生加密隨機驗證器</li>
+<li>使用 S256 挑戰方法（SHA-256）</li>
+<li>永不重用驗證器</li>
+<li>在伺服器端驗證</li>
+</ul>
+</div></div>
+<p>PKCE 現在建議用於所有 OAuth/OIDC 流程，不僅僅是公共客戶端。它提供了針對授權碼攔截的縱深防禦。</p>
+<h3 id="State-和-Nonce">State 和 Nonce</h3>
+<p>使用 state 和 nonce 參數：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ State 和 Nonce 參數</p><div class="admonition-content"><p><strong>State 參數</strong></p>
+<ul>
+<li>防止 CSRF 攻擊</li>
+<li>隨機、不可預測的值</li>
+<li>在回呼時驗證</li>
+<li>安全必需</li>
+</ul>
+<p><strong>Nonce 參數</strong></p>
+<ul>
+<li>防止重播攻擊</li>
+<li>包含在 ID 權杖中</li>
+<li>由客戶端驗證</li>
+<li>將權杖繫結到工作階段</li>
+</ul>
+</div></div>
+<p>這兩個參數對安全至關重要。State 防止 CSRF 攻擊，攻擊者誘騙使用者使用攻擊者控制的帳戶進行身份驗證。Nonce 防止權杖重播攻擊。</p>
+<h2 id="OIDC-vs-SAML">OIDC vs SAML</h2>
+<p>在 OIDC 和 SAML 之間選擇。</p>
+<h3 id="比較">比較</h3>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🎯 OIDC vs SAML 決策</p><div class="admonition-content"><p><strong>選擇 SAML 當：</strong></p>
+<ul>
+<li>與舊版企業應用整合</li>
+<li>供應商僅支援 SAML</li>
+<li>現有 SAML 基礎設施</li>
+<li>法規要求指定 SAML</li>
+</ul>
+<p><strong>選擇 OIDC 當：</strong></p>
+<ul>
+<li>建構新應用程式</li>
+<li>行動應用身份驗證</li>
+<li>需要 API 授權</li>
+<li>現代架構</li>
+<li>開發者體驗重要</li>
+</ul>
+<p><strong>技術差異</strong></p>
+<ul>
+<li>SAML：基於 XML，瀏覽器重新導向</li>
+<li>OIDC：基於 JSON，RESTful API</li>
+<li>SAML：僅瀏覽器流程</li>
+<li>OIDC：行動裝置、Web、API 支援</li>
+</ul>
+</div></div>
+<p>SAML 不會消失——太多企業應用程式依賴它。但新專案應該使用 OIDC。它更簡單、更靈活，更適合現代架構。</p>
+<h3 id="遷移路徑">遷移路徑</h3>
+<p>許多組織同時執行兩種協定：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔄 SAML 到 OIDC 遷移</p><div class="admonition-content"><p><strong>混合方法</strong></p>
+<ul>
+<li>保留 SAML 用於舊版應用</li>
+<li>新開發使用 OIDC</li>
+<li>IdP 支援兩種協定</li>
+<li>逐步遷移</li>
+</ul>
+<p><strong>遷移步驟</strong></p>
+<ol>
+<li>部署支援 OIDC 的 IdP</li>
+<li>為現有應用維護 SAML</li>
+<li>使用 OIDC 建構新應用</li>
+<li>在可行時遷移應用</li>
+<li>最終棄用 SAML</li>
+</ol>
+</div></div>
+<p>大多數企業 IdP 同時支援 SAML 和 OIDC。這允許逐步遷移而不會中斷現有整合。</p>
+<h2 id="常見錯誤">常見錯誤</h2>
+<p>避免這些 OIDC 陷阱：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 OIDC 反模式</p><div class="admonition-content"><p><strong>不完整的權杖驗證</strong></p>
+<ul>
+<li>跳過簽章驗證</li>
+<li>不檢查過期時間</li>
+<li>忽略受眾宣告</li>
+<li>缺少 nonce 驗證</li>
+</ul>
+<p><strong>不安全的權杖儲存</strong></p>
+<ul>
+<li>儲存在 localStorage 中</li>
+<li>長期權杖</li>
+<li>無權杖輪換</li>
+<li>在日誌中暴露權杖</li>
+</ul>
+<p><strong>使用隱式流程</strong></p>
+<ul>
+<li>已棄用且不安全</li>
+<li>使用授權碼 + PKCE</li>
+<li>即使對 SPA</li>
+</ul>
+<p><strong>從頭實作</strong></p>
+<ul>
+<li>複雜的協定細節</li>
+<li>安全漏洞</li>
+<li>使用標準函式庫</li>
+</ul>
+<p><strong>混淆 OAuth 和 OIDC</strong></p>
+<ul>
+<li>OAuth 是授權</li>
+<li>OIDC 是身份驗證</li>
+<li>使用 OIDC 進行登入</li>
+</ul>
+</div></div>
+<p>最常見的錯誤是不完整的權杖驗證。每個驗證步驟都防止特定的攻擊。跳過任何步驟都會造成漏洞。</p>
+<h2 id="結論">結論</h2>
+<p>OpenID Connect 解決了 OAuth 2.0 未設計解決的身份驗證問題。透過新增 ID 權杖和標準化使用者資訊端點，OIDC 提供了適用於 Web 應用程式、行動應用和 API 的安全、現代身份驗證。</p>
+<p>OIDC 的成功來自於在 OAuth 2.0 經過驗證的基礎上建構，同時新增了缺失的身份驗證層。該協定比 SAML 更簡單，比自訂實作更安全，比舊版協定更適合現代架構。</p>
+<p>關鍵要點：</p>
+<ul>
+<li>OIDC 用於身份驗證，OAuth 用於授權</li>
+<li>對所有客戶端使用帶 PKCE 的授權碼流程</li>
+<li>始終完全驗證 ID 權杖</li>
+<li>使用標準函式庫，不要從頭實作</li>
+<li>新專案選擇 OIDC，保留 SAML 用於舊版整合</li>
+<li>小心保護權杖——它們是持有者憑證</li>
+<li>使用 state 和 nonce 參數以確保安全</li>
+</ul>
+<p>在建構現代應用程式時，OIDC 應該是你身份驗證的預設選擇。它提供了當今 Web、行動裝置和 API 驅動架構所需的安全性、靈活性和開發者體驗。該協定處理複雜的安全細節，讓你專注於建構功能而不是身份驗證基礎設施。</p>
+<p>無論你使用 Auth0 或 Okta 等託管提供者，還是使用 Keycloak 自託管，OIDC 都提供了跨平台和使用案例運作的標準化身份驗證。這種標準化是 OIDC 最大的優勢——一個在任何地方都能運作的協定，實作一致，具有強大的安全屬性。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2014/11/OpenID-Connect-Modern-Authentication-Explained/" data-id="21e4b072" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "OpenID Connect：現代身份驗證詳解",
+        "image": "https://neo01.com/assets/security/lock.png",
+        "keywords": "Authentication OIDC Security",
+        "genre": "Cybersecurity",
+        "datePublished": "2014-11-11",
+        "dateCreated": "2014-11-11",
+        "dateModified": "2025-11-26",
+        "url": "https://neo01.com//zh-TW/2014/11/OpenID-Connect-Modern-Authentication-Explained/",
+        "description": "OpenID Connect 基於 OAuth 2.0 建構，為現代應用程式提供標準化的身份驗證。了解 OIDC 如何統一身份驗證和授權、何時使用它而不是 SAML，以及如何安全實作。",
+        "wordCount": 761
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">系列文章</h3>
+        <div class="widget-series">
+            <ul>
+<li>🔐 <strong>Authentication Series</strong>
+<ul>
+<li><a href="/2010/01/Evolution-of-Single-Sign-On-From-Kerberos-to-OIDC/">The Evolution of Single Sign-On</a></li>
+<li><a href="/2010/02/Understanding-SAML-Enterprise-Federation-Explained/">Understanding SAML</a></li>
+<li><a href="/2010/03/Understanding-Kerberos-Network-Authentication-Explained/">Understanding Kerberos</a></li>
+<li><a href="/2014/11/OpenID-Connect-Modern-Authentication-Explained/">OpenID Connect</a></li>
+<li><a href="/2020/12/OAuth-2.0-Security-Best-Practices-From-Design-to-Implementation/">OAuth 2.0 Security Best Practices</a></li>
+<li><a href="/2021/12/Identity-Broker-Patterns/" class="active">Identity Broker</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    </div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock 伺服器：透過模擬加速開發" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock 伺服器：透過模擬加速開發</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中啟用 i18n：多語言部落格完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中啟用 i18n：多語言部落格完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/How-I-Use-AI-to-Learn/" class="thumbnail">
+        <span style="background-image:url(/assets/learning/thumbnail_80.png)" alt="我如何使用 AI 學習：透過迭代知識建構的個人旅程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/How-I-Use-AI-to-Learn/" class="title">我如何使用 AI 學習：透過迭代知識建構的個人旅程</a></p>
+                            <p class="item-date"><time datetime="2025-10-18T16:00:00.000Z" itemprop="datePublished">2025-10-19</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="thumbnail">
+        <span style="background-image:url(/2025/10/Tools-Games-And-Browser-Built-In-AI/thumbnail.jpeg)" alt="工具、遊戲與瀏覽器內建 AI 遊樂場" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/10/Tools-Games-And-Browser-Built-In-AI/" class="title">工具、遊戲與瀏覽器內建 AI 遊樂場</a></p>
+                            <p class="item-date"><time datetime="2025-10-01T16:00:00.000Z" itemprop="datePublished">2025-10-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="thumbnail">
+        <span style="background-image:url(/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/thumbnail.jpeg)" alt="代理式編碼的崛起：AI 驅動的軟體工程" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">人工智慧</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/09/The_Rise_of_Agentic_Coding_AI_Powered_Software_Engineering/" class="title">代理式編碼的崛起：AI 驅動的軟體工程</a></p>
+                            <p class="item-date"><time datetime="2025-09-19T16:00:00.000Z" itemprop="datePublished">2025-09-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#02bb0c2a</div>
+                <img src="/qr/qr-1b359c6890570da7e760e1a629a07b77.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#02bb0c2a">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

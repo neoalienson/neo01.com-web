@@ -1,0 +1,1384 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Git LFS：版本控制中的大型文件管理 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="DevOps,Git,Version Control">
+    
+    
+    <meta name="description" content="Git 在处理大型二进制文件时会遇到困难，但 Git LFS 提供了解决方案。了解何时使用 LFS 以及何时完全不将文件纳入版本控制，决定了它是成为强大工具还是过度工程化的负担。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Git LFS：版本控制中的大型文件管理">
+<meta property="og:url" content="https://neo01.com/zh-CN/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Git 在处理大型二进制文件时会遇到困难，但 Git LFS 提供了解决方案。了解何时使用 LFS 以及何时完全不将文件纳入版本控制，决定了它是成为强大工具还是过度工程化的负担。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/git/thumbnail.png">
+<meta property="article:published_time" content="2016-01-27T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-26T15:16:54.577Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="Git">
+<meta property="article:tag" content="Version Control">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/git/thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me/">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2016/01/Git-LFS-Managing-Large-Files-in-Version-Control-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Git LFS：版本控制中的大型文件管理
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2016-01-27T16:00:00.000Z" itemprop="datePublished">2016-01-28</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-26T15:16:54.577Z" itemprop="datePublished">2025-11-26</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/Git/">Git</a> <a class="tag-link" href="/zh-CN/tags/Version-Control/">Version Control</a> <a class="tag-link" href="/zh-CN/tags/DevOps/">DevOps</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%A4%A7%E5%9E%8B%E6%96%87%E4%BB%B6%E9%97%AE%E9%A2%98"><span class="toc-text">大型文件问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Git-LFS-%E6%9E%B6%E6%9E%84"><span class="toc-text">Git LFS 架构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%97%B6%E4%BD%BF%E7%94%A8-Git-LFS"><span class="toc-text">何时使用 Git LFS</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E5%AE%9E%E7%8E%B0"><span class="toc-text">实际实现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Git-LFS-%E7%9A%84%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%A1%88"><span class="toc-text">Git LFS 的替代方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li></ol>
+            <p>版本控制系统擅长跟踪文本文件。开发者提交代码、审查差异、无缝合并变更。但当引入大型二进制文件——机器学习模型权重、视频素材、编译后的二进制文件——Git 就会陷入停滞。仓库膨胀到数 GB。克隆需要数小时。简单的操作就会超时。</p>
+<p>传统的 Git 会在仓库历史中存储每个文件的每个版本。一个 100MB 的文件修改十次会消耗 1GB 的仓库空间。每个克隆仓库的开发者都会下载所有版本，即使他们只需要最新版本。让 Git 在代码管理上如此强大的分布式特性，在处理大型文件时反而成为负担。</p>
+<p>Git Large File Storage (LFS) 通过将大型文件替换为仓库中的小型指针文件来解决这个问题。实际的文件内容存放在独立的服务器上。开发者只下载他们需要的版本。仓库保持小巧且快速。</p>
+<p>这种方法听起来很理想，但 Git LFS 引入了复杂性、基础设施需求和新的故障模式。了解 LFS 何时能增加价值——以及何时更简单的方法就足够——决定了它是解决问题还是制造问题。</p>
+<p>本文探讨 Git 中大型文件的技术挑战，检视 Git LFS 的运作方式，提供何时采用它的指引，并针对不同情境提供替代方案。</p>
+<h2 id="大型文件问题">大型文件问题</h2>
+<p>Git 的架构在处理大型二进制文件时会产生根本性的问题。</p>
+<h3 id="Git-如何存储文件">Git 如何存储文件</h3>
+<p>Git 的存储模型针对文本进行优化：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📦 Git 存储架构</p><div class="admonition-content"><p><strong>对象存储</strong></p>
+<ul>
+<li>每个文件版本都是一个 blob 对象</li>
+<li>存储在 <code>.git/objects/</code> 目录中</li>
+<li>压缩但完整的副本</li>
+<li>对相似文件进行差异压缩</li>
+</ul>
+<p><strong>仓库增长</strong></p>
+<ul>
+<li>每次提交都会添加新的 blob</li>
+<li>历史包含所有版本</li>
+<li>克隆会下载整个历史</li>
+<li>无法只获取部分历史</li>
+</ul>
+<p><strong>文本 vs 二进制</strong></p>
+<ul>
+<li>文本：差异压缩效果良好</li>
+<li>二进制：压缩通常无效</li>
+<li>小型文本变更：小型差异</li>
+<li>小型二进制变更：完整的新副本</li>
+</ul>
+</div></div>
+<p>当你提交一个 10KB 的源文件时，Git 会高效地存储它。修改一行，Git 只存储差异。但二进制文件很少能有效压缩。一个稍微修改的 500MB 机器学习模型仍然需要存储另外 500MB。</p>
+<h3 id="实际影响">实际影响</h3>
+<p>大型文件会产生具体的问题：</p>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 仓库膨胀</p><div class="admonition-content"><p><strong>场景：机器学习模型训练</strong></p>
+<p>数据科学团队在每次训练执行后提交模型权重：</p>
+<ul>
+<li>初始模型：500MB</li>
+<li>20 次训练迭代后：20 个版本</li>
+<li>仓库大小：10GB</li>
+<li>在快速连接上的克隆时间：45 分钟</li>
+</ul>
+<p><strong>影响：</strong></p>
+<ul>
+<li>新团队成员需要等待数小时才能开始工作</li>
+<li>CI/CD 流水线超时</li>
+<li>Git 操作变慢</li>
+<li>开发者避免拉取更新</li>
+</ul>
+<p><strong>成本：</strong></p>
+<ul>
+<li>生产力损失：每位开发者每周 2 小时</li>
+<li>基础设施：更大的存储空间、更多带宽</li>
+<li>挫折感：「Git 坏掉了」</li>
+</ul>
+</div></div>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 网络瓶颈</p><div class="admonition-content"><p><strong>场景：游戏素材开发</strong></p>
+<p>游戏工作室在 Git 中跟踪 3D 模型和纹理：</p>
+<ul>
+<li>100 个高分辨率纹理：每个 50MB</li>
+<li>50 个 3D 模型：每个 20MB</li>
+<li>6 个月的历史</li>
+<li>仓库大小：15GB</li>
+</ul>
+<p><strong>影响：</strong></p>
+<ul>
+<li>连接速度慢的远程开发者无法工作</li>
+<li>推送/拉取操作需要 30 分钟以上</li>
+<li>二进制文件的合并冲突无法解决</li>
+<li>团队考虑放弃 Git</li>
+</ul>
+<p><strong>成本：</strong></p>
+<ul>
+<li>远程工作变得不可能</li>
+<li>协作中断</li>
+<li>失去版本控制的好处</li>
+</ul>
+</div></div>
+<div class="admonition error"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚫 存储成本</p><div class="admonition-content"><p><strong>场景：视频制作</strong></p>
+<p>视频团队提交原始素材以进行版本控制：</p>
+<ul>
+<li>4K 视频片段：每分钟 1GB</li>
+<li>项目生命周期中有 100 个片段</li>
+<li>每个片段有多个版本</li>
+<li>仓库大小：500GB</li>
+</ul>
+<p><strong>影响：</strong></p>
+<ul>
+<li>超过 GitHub/GitLab 存储限制</li>
+<li>自建服务器需要昂贵的存储空间</li>
+<li>备份变得昂贵且缓慢</li>
+<li>仓库变得无法维护</li>
+</ul>
+<p><strong>成本：</strong></p>
+<ul>
+<li>存储：云端托管每月 $500</li>
+<li>备份：每月 $200</li>
+<li>开发者时间：每月 10 小时管理问题</li>
+<li>总计：一个仓库每月 $1,200</li>
+</ul>
+</div></div>
+<h2 id="Git-LFS-架构">Git LFS 架构</h2>
+<p>Git LFS 用指针替换大型文件，同时将实际内容分开存储。</p>
+<h3 id="LFS-如何运作">LFS 如何运作</h3>
+<p>核心机制是指针替换：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔍 LFS 指针系统</p><div class="admonition-content"><p><strong>指针文件</strong></p>
+<p>version https://git-lfs.github.com/spec/v1
+oid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393
+size 133742</p>
+<p><strong>发生的事情</strong></p>
+<ol>
+<li>开发者提交大型文件</li>
+<li>LFS 将文件上传到 LFS 服务器</li>
+<li>Git 存储小型指针文件（130 字节）</li>
+<li>仓库保持小巧</li>
+</ol>
+<p><strong>检出时</strong></p>
+<ol>
+<li>Git 检出指针文件</li>
+<li>LFS 检测到指针</li>
+<li>LFS 从服务器下载实际文件</li>
+<li>用真实文件替换指针</li>
+</ol>
+<p><strong>好处</strong></p>
+<ul>
+<li>仓库只包含指针</li>
+<li>克隆只下载当前版本</li>
+<li>历史保持轻量</li>
+<li>大型文件高效存储</li>
+</ul>
+</div></div>
+<p>指针文件非常小——无论实际文件大小如何，大约 130 字节。一个 5GB 的模型权重在 Git 历史中变成 130 字节的指针。仓库保持快速。</p>
+<h3 id="LFS-服务器架构">LFS 服务器架构</h3>
+<p>LFS 需要额外的基础设施：</p>
+<div class="mermaid">graph TB
+    Dev[开发者]
+    Git[Git 仓库]
+    LFS[LFS 服务器]
+    Storage[对象存储]
+    
+    Dev --&gt;|git push| Git
+    Dev --&gt;|lfs push| LFS
+    LFS --&gt;|存储| Storage
+    
+    Dev2[另一位开发者]
+    Dev2 --&gt;|git clone| Git
+    Dev2 --&gt;|lfs pull| LFS
+    Storage --&gt;|获取| LFS
+    
+    style Git fill:#f9f,stroke:#333,stroke-width:2px
+    style LFS fill:#bbf,stroke:#333,stroke-width:2px
+    style Storage fill:#bfb,stroke:#333,stroke-width:2px</div>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🏗️ LFS 基础设施</p><div class="admonition-content"><p><strong>组件</strong></p>
+<ul>
+<li>Git 仓库：存储指针</li>
+<li>LFS 服务器：管理大型文件</li>
+<li>对象存储：存储实际内容</li>
+<li>身份验证：控制访问</li>
+</ul>
+<p><strong>托管选项</strong></p>
+<ul>
+<li>GitHub：免费 1GB，提供付费方案</li>
+<li>GitLab：每个仓库免费 10GB</li>
+<li>Bitbucket：免费 1GB，提供付费方案</li>
+<li>自建：完全控制，更复杂</li>
+</ul>
+<p><strong>需求</strong></p>
+<ul>
+<li>与 Git 分开的存储空间</li>
+<li>上传/下载的网络带宽</li>
+<li>身份验证集成</li>
+<li>备份策略</li>
+</ul>
+</div></div>
+<p>与完全分布式的普通 Git 不同，LFS 引入了集中式组件。LFS 服务器成为关键依赖项。如果它停机，开发者就无法访问大型文件。</p>
+<h2 id="何时使用-Git-LFS">何时使用 Git LFS</h2>
+<p>LFS 解决特定问题，但并非总是正确的选择。</p>
+<h3 id="适合-LFS-的候选文件">适合 LFS 的候选文件</h3>
+<p>LFS 适用于某些文件类型：</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 积极开发中的二进制素材</p><div class="admonition-content"><p>游戏工作室和设计团队处理在开发过程中频繁变更的二进制素材。一个 3D 角色模型可能会经历数十次迭代，因为艺术家会调整比例、纹理和动画。营销材料的设计文件会随着利益相关者提供反馈而演变。音频片段会针对时间和混音进行调整。</p>
+<p>这些文件对于普通 Git 来说太大了——高分辨率纹理可能是 50MB，角色模型 30MB，Photoshop 合成文件 100MB。没有 LFS，仓库在几周的开发后就会膨胀到数 GB。但这些素材需要版本控制。艺术家需要回滚变更、比较版本，并在不覆盖彼此工作的情况下协作。</p>
+<p>LFS 完美地解决了这个问题。仓库保持小巧——即使有数百个素材也低于 100MB。艺术家可以直接提交而不用担心仓库大小。版本历史得以保留。当发生冲突时，它们在 Git 工作流程中是可见的。团队获得版本控制的所有好处，而没有性能损失。</p>
+</div></div>
+<p><strong>示例：游戏开发</strong></p>
+<ul>
+<li>角色模型：每个 50MB</li>
+<li>纹理文件：每个 20MB</li>
+<li>音频片段：每个 10MB</li>
+<li>总计：500 个文件，15GB 的素材</li>
+<li>使用 LFS 的仓库大小：80MB</li>
+</ul>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 机器学习模型检查点</p><div class="admonition-content"><p>数据科学家训练模型需要跟踪实验。使用不同超参数训练的模型会产生不同的权重。比较这些版本需要保留多个检查点。没有版本控制，团队会采用手动命名方案——model_v1.bin、model_v2_final.bin、model_v2_final_actually_final.bin——这很快就会变得无法维护。</p>
+<p>模型权重通常范围从 100MB 到 4GB。这些文件对于普通 Git 来说太大，但对 LFS 来说很完美。关键好处是将代码链接到模型。当你检出特定提交时，你会同时获得训练代码和它产生的模型权重。这实现了真正的可重现性——你可以验证特定模型来自特定的代码和超参数。</p>
+<p>LFS 适用于最大约 4GB 的模型——选择这个大小限制是为了适应大多数文件系统。超过这个大小，像 DVC 或 Weights &amp; Biases 这样的专门工具提供更好的工作流程。但对于小型到中型模型，LFS 提供了最简单的版本控制路径。</p>
+</div></div>
+<p><strong>示例：深度学习项目</strong></p>
+<ul>
+<li>模型检查点：每个 200MB - 4GB</li>
+<li>10 个实验，每个 5 个检查点</li>
+<li>总计：50 个文件，10GB</li>
+<li>使用 LFS 的仓库大小：120MB</li>
+<li>好处：代码和模型保持同步</li>
+</ul>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 文档素材</p><div class="admonition-content"><p>技术文档通常包含二进制素材——视频教程、专有格式的架构图、PDF 导出。这些素材应该与它们记录的代码一起版本化。当代码变更时，文档会更新。保持它们同步可以防止文档过时的常见问题。</p>
+<p>文档素材的变更频率低于代码，使它们成为 LFS 的理想选择。视频教程可能录制一次，每季更新一次。架构图随着主要版本演变。适中的文件大小——通常 10MB 到 200MB——和不频繁的更新意味着 LFS 存储成本保持低廉。</p>
+<p>替代方案是分开存储文档，但这会破坏代码和文档之间的链接。使用 LFS，检出发布标签会同时给你代码和描述它的文档。撰写者可以直接提交到仓库。团队维护单一真实来源。</p>
+</div></div>
+<p><strong>示例：产品文档</strong></p>
+<ul>
+<li>视频教程：每个 100MB</li>
+<li>图表源文件（Visio、Sketch）：每个 10MB</li>
+<li>PDF 导出：每个 5MB</li>
+<li>总计：50 个文件，2GB</li>
+<li>使用 LFS 的仓库大小：90MB</li>
+</ul>
+<h3 id="LFS-不适用的情况">LFS 不适用的情况</h3>
+<p>许多场景不适合使用 LFS：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 真正的大型文件（&gt; 4GB）</p><div class="admonition-content"><p>LFS 不支持部分文件下载。当你检出文件时，你会下载整个文件。这使得 LFS 对于大于约 4GB 的文件不切实际——选择这个大小限制是为了适应包括 FAT32 在内的大多数文件系统。</p>
+<p>一个 50GB 的原始视频文件在典型连接上需要数小时才能下载。一个 100GB 的数据集对于 LFS 工作流程来说太大了。即使你的网络可以处理，LFS 服务器存储成本也会变得过高。一个 50GB 文件的十个版本会消耗 500GB 的 LFS 存储空间。</p>
+<p>对于这些文件，带有引用的外部存储效果更好。将文件存储在 S3 或类似的对象存储中。将带有存储位置和校验和的小型元数据文件提交到 Git。只在需要时下载大型文件。这种方法支持任何文件大小，启用部分下载，并且在规模上成本更低。</p>
+</div></div>
+<p><strong>示例：视频制作</strong></p>
+<ul>
+<li>4K 原始素材：每个文件 50GB</li>
+<li>项目生命周期中有 20 个片段</li>
+<li>总计：1TB</li>
+<li>LFS 成本：过高</li>
+<li>更好的方案：S3 搭配 Git 中的清单</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 构建产物</p><div class="admonition-content"><p>编译后的二进制文件、打包的应用程序和其他构建输出根本不应该在版本控制中。这些是生成的文件——构建过程的输出，而不是源输入。版本控制是用于源代码的。</p>
+<p>提交构建产物会产生问题。仓库随着每次构建而增长。开发者下载他们不需要的产物。历史充满噪音。当你需要特定构建时，你无法分辨是哪个源代码产生的。</p>
+<p>像 Artifactory 或 Nexus 这样的产物仓库可以正确地解决这个问题。它们存储构建输出，并带有链接到源提交的元数据。你可以获取任何构建并追溯到确切的源代码。存储针对二进制文件进行优化。旧产物可以自动清理。这是适合这项工作的正确工具。</p>
+</div></div>
+<p><strong>示例：应用程序发布</strong></p>
+<ul>
+<li>编译后的二进制文件：200MB</li>
+<li>每日构建：每年 365 次</li>
+<li>总计：每年 73GB</li>
+<li>错误：LFS 或 Git</li>
+<li>正确：Artifactory 搭配 Git 标签</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 频繁变更的大型文件</p><div class="admonition-content"><p>LFS 存储随着每个版本而增长。每天修改的 1GB 文件每年会产生 365GB 的 LFS 存储空间。数据库转储、日志文件和频繁变更的缓存文件存储成本高昂，且提供的价值很少。</p>
+<p>这些文件不受益于版本控制。你很少需要比较昨天的数据库转储和今天的。日志文件用日志管理工具分析更好。缓存文件本质上是临时的。跟踪它们的历史浪费存储空间且没有好处。</p>
+<p>解决方案很简单：不要版本化这些文件。将它们加入 <code>.gitignore</code>。在本地或适当的系统中存储它们——数据库用于数据，日志聚合器用于日志，临时存储用于缓存。版本控制是用于历史重要的文件。</p>
+<p><strong>示例：开发数据库</strong></p>
+<ul>
+<li>数据库转储：2GB</li>
+<li>开发期间每天更新</li>
+<li>30 天：60GB 的 LFS 存储空间</li>
+<li>价值：最小（只需要最新的）</li>
+<li>更好的方案：本地文件，根据需要重新生成</li>
+</ul>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 没有可用的 LFS 服务器</p><div class="admonition-content"><p>LFS 需要 Git 之外的基础设施。某些企业网络会阻止 LFS 端点。某些 Git 托管提供商不支持 LFS。自建需要维护 LFS 服务器和对象存储。</p>
+<p>没有 LFS 基础设施，你无法推送或拉取大型文件。对于需要这些文件的团队成员来说，仓库变得无法使用。这种基础设施依赖性是一个真正的限制——与完全分布式的普通 Git 不同，LFS 引入了必须可用的集中式组件。</p>
+<p>如果 LFS 基础设施不可用或不可靠，请使用替代方法。带有引用的外部存储不需要特殊基础设施。像 DVC 这样的专门工具可以使用任何 S3 兼容的存储。有时最简单的解决方案是完全不将大型文件纳入版本控制。</p>
+</div></div>
+<h2 id="实际实现">实际实现</h2>
+<p>有效使用 LFS 需要了解其工作流程和限制。</p>
+<h3 id="设置-Git-LFS">设置 Git LFS</h3>
+<p>基本设置很简单：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🔧 LFS 设置步骤</p><div class="admonition-content"><p><strong>安装</strong></p>
+<p>安装 LFS：
+git lfs install</p>
+<p>跟踪文件类型：
+git lfs track "<em>.psd"
+git lfs track "</em>.bin"
+git lfs track "models/*.h5"</p>
+<p>提交跟踪配置：
+git add .gitattributes
+git commit -m "Configure LFS tracking"</p>
+<p><strong>创建的内容</strong></p>
+<p>.gitattributes 文件：</p>
+<p>*.psd filter=lfs diff=lfs merge=lfs -text
+<em>.bin filter=lfs diff=lfs merge=lfs -text
+models/</em>.h5 filter=lfs diff=lfs merge=lfs -text</p>
+<p><strong>使用 LFS</strong></p>
+<p>正常添加和提交：
+git add model.bin
+git commit -m "Add trained model"</p>
+<p>推送会同时发送到 Git 和 LFS：
+git push origin main</p>
+<p>克隆会自动获取 LFS 文件：
+git clone https://github.com/user/repo.git</p>
+</div></div>
+<p><code>.gitattributes</code> 文件告诉 Git 哪些文件要用 LFS 处理。一旦配置完成，LFS 对大多数操作来说都是透明的。</p>
+<h3 id="常见工作流程">常见工作流程</h3>
+<p>不同的场景需要不同的方法：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>📋 LFS 工作流程</p><div class="admonition-content"><p><strong>选择性检出</strong></p>
+<p>克隆时不下载 LFS 文件：
+GIT_LFS_SKIP_SMUDGE=1 git clone repo.git</p>
+<p>稍后下载特定文件：
+git lfs pull --include="models/production/*"</p>
+<p><strong>清理旧版本</strong></p>
+<p>从本地缓存移除旧的 LFS 文件：
+git lfs prune</p>
+<p>只保留最近的版本：
+git lfs prune --verify-remote --recent</p>
+<p><strong>迁移现有文件</strong></p>
+<p>将现有文件转换为 LFS：
+git lfs migrate import --include="*.psd"</p>
+<p>重写历史（小心！）：
+git lfs migrate import --include="*.bin" --everything</p>
+<p><strong>检查 LFS 状态</strong></p>
+<p>查看哪些文件被跟踪：
+git lfs ls-files</p>
+<p>检查 LFS 存储使用量：
+git lfs env</p>
+</div></div>
+<h3 id="疑难排解常见问题">疑难排解常见问题</h3>
+<p>LFS 引入了新的故障模式：</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 常见 LFS 问题</p><div class="admonition-content"><p><strong>「This exceeds GitHub's file size limit」</strong></p>
+<ul>
+<li>原因：文件在没有 LFS 跟踪的情况下提交</li>
+<li>解决方案：在提交前配置 <code>.gitattributes</code></li>
+<li>预防：及早设置 LFS 跟踪</li>
+</ul>
+<p><strong>「Error downloading object」</strong></p>
+<ul>
+<li>原因：LFS 服务器无法连接或文件丢失</li>
+<li>解决方案：检查网络，验证 LFS 服务器状态</li>
+<li>应对措施：暂时跳过 LFS 文件</li>
+</ul>
+<p><strong>「Encountered X file(s) that should have been pointers」</strong></p>
+<ul>
+<li>原因：文件在配置 LFS 之前提交</li>
+<li>解决方案：使用 <code>git lfs migrate</code> 修复历史</li>
+<li>预防：在第一次提交前配置 LFS</li>
+</ul>
+<p><strong>克隆/拉取缓慢</strong></p>
+<ul>
+<li>原因：下载许多大型 LFS 文件</li>
+<li>解决方案：使用 <code>GIT_LFS_SKIP_SMUDGE=1</code> 进行选择性下载</li>
+<li>替代方案：只获取需要的文件</li>
+</ul>
+</div></div>
+<h2 id="Git-LFS-的替代方案">Git LFS 的替代方案</h2>
+<p>许多场景有比 LFS 更好的解决方案。</p>
+<h3 id="带有引用的外部存储">带有引用的外部存储</h3>
+<p>对于真正的大型文件，改为存储引用：</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 基于引用的方法</p><div class="admonition-content"><p><strong>架构</strong></p>
+<ul>
+<li>将文件存储在 S3、GCS 或类似服务中</li>
+<li>在 Git 中提交元数据和引用</li>
+<li>根据需要下载文件</li>
+<li>通过对象存储进行版本控制</li>
+</ul>
+</div></div>
+<p><strong>示例结构</strong></p>
+<p>repo/<br>
+├── models/<br>
+│   ├── config.yaml          # 在 Git 中<br>
+│   └── <a target="_blank" rel="noopener" href="http://download.sh">download.sh</a>          # 在 Git 中<br>
+└── data/<br>
+├── manifest.json        # 在 Git 中<br>
+└── fetch_data.py        # 在 Git 中</p>
+<p><strong>好处</strong></p>
+<ul>
+<li>不需要 LFS 基础设施</li>
+<li>支持任何文件大小</li>
+<li>灵活的存储选项</li>
+<li>规模化时成本更低</li>
+<li>可能进行部分下载</li>
+</ul>
+<p>这种方法适用于数据集、大型模型和视频文件。仓库保持小巧且快速。存储成本更低。团队有更多灵活性。</p>
+<h3 id="专门工具">专门工具</h3>
+<p>不同领域有专门构建的解决方案：</p>
+<div class="admonition anote"><p class="admonition-title"><span class="mdi mdi-note-outline admonition-icon"></span>🛠️ 领域特定工具</p><div class="admonition-content"><p><strong>机器学习</strong></p>
+<ul>
+<li>DVC (Data Version Control)：类似 Git 的数据/模型版本控制</li>
+<li>Weights &amp; Biases：实验跟踪</li>
+<li>MLflow：模型注册表</li>
+<li>Hugging Face：模型托管</li>
+</ul>
+<p><strong>游戏开发</strong></p>
+<ul>
+<li>Perforce：专为大型二进制文件设计</li>
+<li>Plastic SCM：处理大型素材效果良好</li>
+<li>Unity Collaborate：为 Unity 项目构建</li>
+</ul>
+<p><strong>媒体制作</strong></p>
+<ul>
+<li>Frame.io：视频协作</li>
+<li>Dropbox：简单的文件同步</li>
+<li>Resilio Sync：P2P 文件同步</li>
+</ul>
+<p><strong>构建产物</strong></p>
+<ul>
+<li>Artifactory：通用产物仓库</li>
+<li>Nexus：Maven/npm/Docker 注册表</li>
+<li>Docker Hub：容器镜像</li>
+</ul>
+</div></div>
+<p>这些工具比通用版本控制更好地解决特定问题。它们了解领域需求并相应地进行优化。</p>
+<h2 id="结论">结论</h2>
+<p>Git LFS 为需要版本控制的二进制素材团队解决了实际问题。它保持仓库快速，同时为否则会使 Git 膨胀的文件保留历史。</p>
+<p>但 LFS 不是通用解决方案。它需要基础设施、增加复杂性，并有大小限制。对于大于 4GB 的文件，带有元数据引用的专门存储效果更好。对于构建产物，专用的产物仓库更合适。对于大量数据集，像 DVC 这样的工具提供更好的工作流程。</p>
+<p>关键是将工具与问题匹配。对积极开发中的二进制素材使用 LFS——3D 模型、设计文件、小型机器学习模型。对大型静态文件使用外部存储。对领域特定需求使用专门工具。对不需要版本控制的文件什么都不用。</p>
+<p>Git LFS 在正确应用时很强大。了解其优势和限制可确保它解决问题而不是制造问题。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 决策框架</p><div class="admonition-content"><p><strong>使用 Git LFS 当：</strong></p>
+<ul>
+<li>二进制文件需要版本历史</li>
+<li>文件大小为 10MB - 2GB</li>
+<li>团队在素材上协作</li>
+<li>LFS 基础设施可用</li>
+</ul>
+<p><strong>使用外部存储当：</strong></p>
+<ul>
+<li>文件超过 4GB</li>
+<li>不需要详细历史</li>
+<li>需要部分下载</li>
+<li>非常频繁的更新</li>
+</ul>
+<p><strong>使用专门工具当：</strong></p>
+<ul>
+<li>领域特定需求</li>
+<li>需要高级功能</li>
+<li>团队已经在使用它们</li>
+<li>更适合的工作流程</li>
+</ul>
+<p><strong>什么都不用当：</strong></p>
+<ul>
+<li>文件是生成的产物</li>
+<li>临时或缓存文件</li>
+<li>可以轻松重新创建</li>
+<li>不需要协作</li>
+</ul>
+</div></div>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/" data-id="7515c7c1" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Git LFS：版本控制中的大型文件管理",
+        "image": "https://neo01.com/assets/git/thumbnail.png",
+        "keywords": "DevOps Git Version Control",
+        "genre": "Development",
+        "datePublished": "2016-01-28",
+        "dateCreated": "2016-01-28",
+        "dateModified": "2025-11-26",
+        "url": "https://neo01.com//zh-CN/2016/01/Git-LFS-Managing-Large-Files-in-Version-Control/",
+        "description": "Git 在处理大型二进制文件时会遇到困难，但 Git LFS 提供了解决方案。了解何时使用 LFS 以及何时完全不将文件纳入版本控制，决定了它是成为强大工具还是过度工程化的负担。",
+        "wordCount": 717
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock 服务器：通过模拟加速开发" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock 服务器：通过模拟加速开发</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中启用 i18n：多语言博客完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中启用 i18n：多语言博客完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#b868e132</div>
+                <img src="/qr/qr-1bb632267efcb9f745d084d6ace6a2fe.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#b868e132">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

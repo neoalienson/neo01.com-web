@@ -1,0 +1,1457 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>异步请求-回复模式：构建响应式分布式系统 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="">
+    
+    
+    <meta name="description" content="了解异步请求-回复模式如何通过将长时间运行的操作与即时响应解耦，实现响应式应用程序，防止超时并改善用户体验。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="异步请求-回复模式：构建响应式分布式系统">
+<meta property="og:url" content="https://neo01.com/zh-CN/2020/04/Asynchronous-Request-Reply-Pattern/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="了解异步请求-回复模式如何通过将长时间运行的操作与即时响应解耦，实现响应式应用程序，防止超时并改善用户体验。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+<meta property="article:published_time" content="2020-04-19T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-15T13:03:51.079Z">
+<meta property="article:author" content="Neo Alienson">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2020/04/Asynchronous-Request-Reply-Pattern/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2020/04/Asynchronous-Request-Reply-Pattern/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2020/04/Asynchronous-Request-Reply-Pattern/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2020/04/Asynchronous-Request-Reply-Pattern/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me/">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2020/04/Asynchronous-Request-Reply-Pattern-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        异步请求-回复模式：构建响应式分布式系统
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2020-04-19T16:00:00.000Z" itemprop="datePublished">2020-04-20</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-15T13:03:51.079Z" itemprop="datePublished">2025-11-15</time>
+        
+    </div>
+
+
+                
+
+                
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%EF%BC%9A%E5%BD%93%E6%93%8D%E4%BD%9C%E8%80%97%E6%97%B6%E8%BF%87%E9%95%BF"><span class="toc-text">问题：当操作耗时过长</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%EF%BC%9A%E5%B0%86%E8%AF%B7%E6%B1%82%E4%B8%8E%E5%93%8D%E5%BA%94%E8%A7%A3%E8%80%A6"><span class="toc-text">解决方案：将请求与响应解耦</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E8%BF%90%E4%BD%9C%E6%96%B9%E5%BC%8F%EF%BC%9A%E6%A8%A1%E5%BC%8F%E5%AE%9E%E6%88%98"><span class="toc-text">运作方式：模式实战</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E7%8E%B0%E7%AD%96%E7%95%A5"><span class="toc-text">实现策略</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E5%AE%9E%E7%8E%B0%E8%80%83%E9%87%8F"><span class="toc-text">关键实现考量</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BD%95%E6%97%B6%E4%BD%BF%E7%94%A8%E6%AD%A4%E6%A8%A1%E5%BC%8F"><span class="toc-text">何时使用此模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E8%B4%A8%E9%87%8F%E5%B1%9E%E6%80%A7"><span class="toc-text">架构质量属性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%B8%B8%E8%A7%81%E9%99%B7%E9%98%B1%E4%B8%8E%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88"><span class="toc-text">常见陷阱与解决方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E7%A4%BA%E4%BE%8B%EF%BC%9A%E6%96%87%E6%A1%A3%E5%A4%84%E7%90%86%E6%9C%8D%E5%8A%A1"><span class="toc-text">实际示例：文档处理服务</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%9B%B8%E5%85%B3%E6%A8%A1%E5%BC%8F"><span class="toc-text">相关模式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E8%B5%84%E6%96%99"><span class="toc-text">参考资料</span></a></li></ol>
+            <p>现代应用程序经常需要执行需要大量时间完成的操作——处理大型文件、生成复杂报表，或调用缓慢的外部 API。当这些操作阻塞请求线程时，会造成糟糕的用户体验，并可能耗尽服务器资源。异步请求-回复模式通过将请求与响应解耦来解决这个问题，让应用程序在后台处理工作时保持响应。</p>
+<h2 id="问题：当操作耗时过长">问题：当操作耗时过长</h2>
+<p>传统的同步请求-响应模型适用于快速操作。客户端发送请求，等待处理，然后接收响应——全部在几秒内完成。然而，当操作耗时较长时，这个模型就会失效：</p>
+<ul>
+<li><strong>超时失败</strong>：HTTP 连接在处理完成前超时</li>
+<li><strong>资源耗尽</strong>：线程保持阻塞状态，限制并发请求数量</li>
+<li><strong>糟糕的用户体验</strong>：用户盯着加载动画或冻结的界面</li>
+<li><strong>连锁故障</strong>：缓慢的操作可能导致整个系统崩溃</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 同步陷阱</p><div class="admonition-content"><p>单一耗时 30 秒的缓慢操作可能在整个期间占用一个线程。在线程数量有限的情况下，仅仅几个缓慢的请求就能让整个应用程序对新请求无响应。</p>
+</div></div>
+<p>考虑这些常见场景：</p>
+<ul>
+<li><strong>视频处理</strong>：将上传的视频转换为多种格式</li>
+<li><strong>报表生成</strong>：从大型数据集创建复杂的分析报表</li>
+<li><strong>批处理操作</strong>：在单一请求中处理数千条记录</li>
+<li><strong>外部 API 调用</strong>：等待缓慢的第三方服务</li>
+<li><strong>机器学习</strong>：在大型模型上执行推理</li>
+</ul>
+<h2 id="解决方案：将请求与响应解耦">解决方案：将请求与响应解耦</h2>
+<p>异步请求-回复模式将请求提交与结果获取分离：</p>
+<ol>
+<li><strong>客户端提交请求</strong>并立即收到确认消息及状态端点</li>
+<li><strong>服务器在后台异步处理</strong></li>
+<li><strong>客户端轮询状态端点</strong>或在完成时接收回调</li>
+<li><strong>客户端在处理完成时获取结果</strong></li>
+</ol>
+<div class="mermaid">sequenceDiagram
+    participant Client as 客户端
+    participant API as API 网关
+    participant Queue as 消息队列
+    participant Worker as 后台工作进程
+    participant Storage as 结果存储
+    
+    Client-&gt;&gt;API: 1. POST /process (请求)
+    API-&gt;&gt;Queue: 2. 将任务加入队列
+    API--&gt;&gt;Client: 3. 202 Accepted + 状态 URL
+    
+    Note over Client: 客户端可自由执行其他工作
+    
+    Worker-&gt;&gt;Queue: 4. 从队列取出任务
+    Worker-&gt;&gt;Worker: 5. 处理（长时间操作）
+    Worker-&gt;&gt;Storage: 6. 存储结果
+    
+    Client-&gt;&gt;API: 7. GET /status/{id}
+    API-&gt;&gt;Storage: 8. 检查状态
+    Storage--&gt;&gt;API: 9. 状态：完成
+    API--&gt;&gt;Client: 10. 200 OK + 结果 URL
+    
+    Client-&gt;&gt;API: 11. GET /result/{id}
+    API-&gt;&gt;Storage: 12. 获取结果
+    Storage--&gt;&gt;API: 13. 返回结果
+    API--&gt;&gt;Client: 14. 200 OK + 结果数据</div>
+<h2 id="运作方式：模式实战">运作方式：模式实战</h2>
+<p>让我们逐步了解如何为视频转码服务实现此模式：</p>
+<h3 id="步骤-1：提交请求">步骤 1：提交请求</h3>
+<p>客户端启动处理并立即收到确认：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 客户端提交视频进行处理</span>
+<span class="token keyword">const</span> response <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'/api/videos/transcode'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">videoUrl</span><span class="token operator">:</span> <span class="token string">'https://neo01.com/video.mp4'</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">formats</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token string">'720p'</span><span class="token punctuation">,</span> <span class="token string">'1080p'</span><span class="token punctuation">,</span> <span class="token string">'4k'</span><span class="token punctuation">]</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 服务器立即响应 202 Accepted</span>
+<span class="token comment">// {</span>
+<span class="token comment">//   "jobId": "job-12345",</span>
+<span class="token comment">//   "status": "pending",</span>
+<span class="token comment">//   "statusUrl": "/api/videos/status/job-12345"</span>
+<span class="token comment">// }</span>
+
+<span class="token keyword">const</span> <span class="token punctuation">{</span> jobId<span class="token punctuation">,</span> statusUrl <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token keyword">await</span> response<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="步骤-2：异步处理">步骤 2：异步处理</h3>
+<p>服务器将工作加入队列并在后台处理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// API 端点处理器</span>
+app<span class="token punctuation">.</span><span class="token function">post</span><span class="token punctuation">(</span><span class="token string">'/api/videos/transcode'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> jobId <span class="token operator">=</span> <span class="token function">generateJobId</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// 存储作业元数据</span>
+  <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">id</span><span class="token operator">:</span> jobId<span class="token punctuation">,</span>
+    <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'pending'</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">request</span><span class="token operator">:</span> req<span class="token punctuation">.</span>body<span class="token punctuation">,</span>
+    <span class="token literal-property property">createdAt</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// 加入队列进行后台处理</span>
+  <span class="token keyword">await</span> messageQueue<span class="token punctuation">.</span><span class="token function">send</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    jobId<span class="token punctuation">,</span>
+    <span class="token literal-property property">videoUrl</span><span class="token operator">:</span> req<span class="token punctuation">.</span>body<span class="token punctuation">.</span>videoUrl<span class="token punctuation">,</span>
+    <span class="token literal-property property">formats</span><span class="token operator">:</span> req<span class="token punctuation">.</span>body<span class="token punctuation">.</span>formats
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// 立即响应</span>
+  res<span class="token punctuation">.</span><span class="token function">status</span><span class="token punctuation">(</span><span class="token number">202</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    jobId<span class="token punctuation">,</span>
+    <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'pending'</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">statusUrl</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">/api/videos/status/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>jobId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 后台工作进程</span>
+messageQueue<span class="token punctuation">.</span><span class="token function">subscribe</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>jobId<span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'processing'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token keyword">try</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">transcodeVideo</span><span class="token punctuation">(</span>
+      message<span class="token punctuation">.</span>videoUrl<span class="token punctuation">,</span>
+      message<span class="token punctuation">.</span>formats
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>jobId<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'completed'</span><span class="token punctuation">,</span>
+      results<span class="token punctuation">,</span>
+      <span class="token literal-property property">completedAt</span><span class="token operator">:</span> Date<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>message<span class="token punctuation">.</span>jobId<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'failed'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">error</span><span class="token operator">:</span> error<span class="token punctuation">.</span>message
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h3 id="步骤-3：检查状态">步骤 3：检查状态</h3>
+<p>客户端轮询状态端点以跟踪进度：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 客户端轮询完成状态</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">waitForCompletion</span><span class="token punctuation">(</span><span class="token parameter">statusUrl</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">while</span> <span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> response <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>statusUrl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> status <span class="token operator">=</span> <span class="token keyword">await</span> response<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>status<span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'completed'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> status<span class="token punctuation">.</span>results<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>status<span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'failed'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span>status<span class="token punctuation">.</span>error<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">// 再次轮询前等待</span>
+    <span class="token keyword">await</span> <span class="token function">sleep</span><span class="token punctuation">(</span><span class="token number">2000</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 状态端点</span>
+app<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token string">'/api/videos/status/:jobId'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> job <span class="token operator">=</span> <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>req<span class="token punctuation">.</span>params<span class="token punctuation">.</span>jobId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>job<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> res<span class="token punctuation">.</span><span class="token function">status</span><span class="token punctuation">(</span><span class="token number">404</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">error</span><span class="token operator">:</span> <span class="token string">'Job not found'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">jobId</span><span class="token operator">:</span> job<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+    <span class="token literal-property property">status</span><span class="token operator">:</span> job<span class="token punctuation">.</span>status<span class="token punctuation">,</span>
+    <span class="token literal-property property">results</span><span class="token operator">:</span> job<span class="token punctuation">.</span>results<span class="token punctuation">,</span>
+    <span class="token literal-property property">createdAt</span><span class="token operator">:</span> job<span class="token punctuation">.</span>createdAt<span class="token punctuation">,</span>
+    <span class="token literal-property property">completedAt</span><span class="token operator">:</span> job<span class="token punctuation">.</span>completedAt
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h2 id="实现策略">实现策略</h2>
+<h3 id="策略-1：轮询">策略 1：轮询</h3>
+<p>客户端定期检查状态端点：</p>
+<p><strong>优点：</strong></p>
+<ul>
+<li>实现简单</li>
+<li>适用于任何 HTTP 客户端</li>
+<li>不需要服务器端回调基础设施</li>
+</ul>
+<p><strong>缺点：</strong></p>
+<ul>
+<li>增加网络流量</li>
+<li>延迟通知（轮询间隔）</li>
+<li>当没有变化时浪费请求</li>
+</ul>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 指数退避轮询</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">pollWithBackoff</span><span class="token punctuation">(</span><span class="token parameter">statusUrl<span class="token punctuation">,</span> maxAttempts <span class="token operator">=</span> <span class="token number">30</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">let</span> delay <span class="token operator">=</span> <span class="token number">1000</span><span class="token punctuation">;</span> <span class="token comment">// 从 1 秒开始</span>
+  
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> maxAttempts<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> status <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">checkStatus</span><span class="token punctuation">(</span>statusUrl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>status<span class="token punctuation">.</span>status <span class="token operator">!==</span> <span class="token string">'pending'</span> <span class="token operator">&amp;&amp;</span> status<span class="token punctuation">.</span>status <span class="token operator">!==</span> <span class="token string">'processing'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> status<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">await</span> <span class="token function">sleep</span><span class="token punctuation">(</span>delay<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    delay <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span>delay <span class="token operator">*</span> <span class="token number">1.5</span><span class="token punctuation">,</span> <span class="token number">30000</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 最多 30 秒</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token string">'Polling timeout'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="策略-2：Webhooks">策略 2：Webhooks</h3>
+<p>服务器在处理完成时回调客户端：</p>
+<p><strong>优点：</strong></p>
+<ul>
+<li>立即通知</li>
+<li>不浪费轮询请求</li>
+<li>有效利用资源</li>
+</ul>
+<p><strong>缺点：</strong></p>
+<ul>
+<li>需要可公开访问的回调 URL</li>
+<li>更复杂的错误处理</li>
+<li>安全性考量（验证、确认）</li>
+</ul>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 客户端提供回调 URL</span>
+<span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">'/api/videos/transcode'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">videoUrl</span><span class="token operator">:</span> <span class="token string">'https://neo01.com/video.mp4'</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">formats</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token string">'720p'</span><span class="token punctuation">,</span> <span class="token string">'1080p'</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">callbackUrl</span><span class="token operator">:</span> <span class="token string">'https://client.com/webhook/video-complete'</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 服务器在完成时调用 webhook</span>
+<span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">notifyCompletion</span><span class="token punctuation">(</span><span class="token parameter">job</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>job<span class="token punctuation">.</span>callbackUrl<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>job<span class="token punctuation">.</span>callbackUrl<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">method</span><span class="token operator">:</span> <span class="token string">'POST'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">headers</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+        <span class="token string-property property">'X-Signature'</span><span class="token operator">:</span> <span class="token function">generateSignature</span><span class="token punctuation">(</span>job<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string-property property">'Content-Type'</span><span class="token operator">:</span> <span class="token string">'application/json'</span>
+      <span class="token punctuation">}</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">body</span><span class="token operator">:</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token literal-property property">jobId</span><span class="token operator">:</span> job<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+        <span class="token literal-property property">status</span><span class="token operator">:</span> job<span class="token punctuation">.</span>status<span class="token punctuation">,</span>
+        <span class="token literal-property property">results</span><span class="token operator">:</span> job<span class="token punctuation">.</span>results
+      <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="策略-3：WebSockets">策略 3：WebSockets</h3>
+<p>维护持久连接以进行实时更新：</p>
+<p><strong>优点：</strong></p>
+<ul>
+<li>实时双向通信</li>
+<li>对多次更新有效率</li>
+<li>适合进度跟踪</li>
+</ul>
+<p><strong>缺点：</strong></p>
+<ul>
+<li>更复杂的基础设施</li>
+<li>连接管理开销</li>
+<li>不适用于所有环境</li>
+</ul>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 客户端建立 WebSocket 连接</span>
+<span class="token keyword">const</span> ws <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">WebSocket</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">wss://api.neo01.com/jobs/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>jobId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+ws<span class="token punctuation">.</span><span class="token function-variable function">onmessage</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token parameter">event</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> update <span class="token operator">=</span> <span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">parse</span><span class="token punctuation">(</span>event<span class="token punctuation">.</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>update<span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'processing'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">进度：</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>update<span class="token punctuation">.</span>progress<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">%</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>update<span class="token punctuation">.</span>status <span class="token operator">===</span> <span class="token string">'completed'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'作业完成：'</span><span class="token punctuation">,</span> update<span class="token punctuation">.</span>results<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    ws<span class="token punctuation">.</span><span class="token function">close</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span></code></pre>
+<h2 id="关键实现考量">关键实现考量</h2>
+<h3 id="1-状态端点设计">1. 状态端点设计</h3>
+<p>设计清晰、信息丰富的状态响应：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 设计良好的状态响应</span>
+<span class="token punctuation">{</span>
+  <span class="token string-property property">"jobId"</span><span class="token operator">:</span> <span class="token string">"job-12345"</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"status"</span><span class="token operator">:</span> <span class="token string">"processing"</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"progress"</span><span class="token operator">:</span> <span class="token number">65</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"message"</span><span class="token operator">:</span> <span class="token string">"正在转码为 1080p 格式"</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"createdAt"</span><span class="token operator">:</span> <span class="token string">"2020-04-15T10:30:00Z"</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"estimatedCompletion"</span><span class="token operator">:</span> <span class="token string">"2020-04-15T10:35:00Z"</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"_links"</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+    <span class="token string-property property">"self"</span><span class="token operator">:</span> <span class="token string">"/api/videos/status/job-12345"</span><span class="token punctuation">,</span>
+    <span class="token string-property property">"cancel"</span><span class="token operator">:</span> <span class="token string">"/api/videos/cancel/job-12345"</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h3 id="2-HTTP-状态码">2. HTTP 状态码</h3>
+<p>使用适当的状态码来传达状态：</p>
+<ul>
+<li><strong>202 Accepted</strong>：请求已接受处理</li>
+<li><strong>200 OK</strong>：状态检查成功</li>
+<li><strong>303 See Other</strong>：处理完成，重定向至结果</li>
+<li><strong>404 Not Found</strong>：作业 ID 不存在</li>
+<li><strong>410 Gone</strong>：作业已过期或清理</li>
+</ul>
+<h3 id="3-结果存储与过期">3. 结果存储与过期</h3>
+<p>实现结果的生命周期管理：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 存储具有 TTL 的结果</span>
+<span class="token keyword">await</span> resultStore<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> result<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">expiresIn</span><span class="token operator">:</span> <span class="token number">24</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token comment">// 24 小时</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 清理过期的作业</span>
+<span class="token function">setInterval</span><span class="token punctuation">(</span><span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> expiredJobs <span class="token operator">=</span> <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">findExpired</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> job <span class="token keyword">of</span> expiredJobs<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> resultStore<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>job<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">delete</span><span class="token punctuation">(</span>job<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">60</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">;</span> <span class="token comment">// 每小时</span></code></pre>
+<h3 id="4-幂等性">4. 幂等性</h3>
+<p>确保请求可以安全地重试：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// 使用幂等性密钥</span>
+app<span class="token punctuation">.</span><span class="token function">post</span><span class="token punctuation">(</span><span class="token string">'/api/videos/transcode'</span><span class="token punctuation">,</span> <span class="token keyword">async</span> <span class="token punctuation">(</span><span class="token parameter">req<span class="token punctuation">,</span> res</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> idempotencyKey <span class="token operator">=</span> req<span class="token punctuation">.</span>headers<span class="token punctuation">[</span><span class="token string">'idempotency-key'</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  
+  <span class="token comment">// 检查是否已处理</span>
+  <span class="token keyword">const</span> existing <span class="token operator">=</span> <span class="token keyword">await</span> jobStore<span class="token punctuation">.</span><span class="token function">findByIdempotencyKey</span><span class="token punctuation">(</span>idempotencyKey<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>existing<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> res<span class="token punctuation">.</span><span class="token function">status</span><span class="token punctuation">(</span><span class="token number">202</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">jobId</span><span class="token operator">:</span> existing<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+      <span class="token literal-property property">status</span><span class="token operator">:</span> existing<span class="token punctuation">.</span>status<span class="token punctuation">,</span>
+      <span class="token literal-property property">statusUrl</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">/api/videos/status/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>existing<span class="token punctuation">.</span>id<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token comment">// 处理新请求</span>
+  <span class="token keyword">const</span> jobId <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">createJob</span><span class="token punctuation">(</span>req<span class="token punctuation">.</span>body<span class="token punctuation">,</span> idempotencyKey<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token comment">// ...</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<h2 id="何时使用此模式">何时使用此模式</h2>
+<h3 id="理想场景">理想场景</h3>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 完美使用案例</p><div class="admonition-content"><p><strong>长时间运行的操作</strong>：需要超过几秒才能完成的任务</p>
+<p><strong>资源密集型处理</strong>：消耗大量 CPU、内存或 I/O 的操作</p>
+<p><strong>外部依赖</strong>：调用缓慢或不可靠的第三方服务</p>
+<p><strong>批处理</strong>：对大型数据集或多个项目的操作</p>
+</div></div>
+<h3 id="考虑替代方案的情况">考虑替代方案的情况</h3>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>🤔 请三思如果...</p><div class="admonition-content"><p><strong>快速操作</strong>：亚秒级操作不会从异步复杂性中受益</p>
+<p><strong>简单用例</strong>：直接的 CRUD 操作同步运作良好</p>
+<p><strong>实时需求</strong>：当绝对需要立即结果时</p>
+</div></div>
+<h2 id="架构质量属性">架构质量属性</h2>
+<h3 id="可扩展性">可扩展性</h3>
+<p>此模式实现水平扩展：</p>
+<ul>
+<li><strong>工作进程扩展</strong>：添加更多后台工作进程以处理增加的负载</li>
+<li><strong>队列缓冲</strong>：消息队列吸收流量高峰</li>
+<li><strong>资源优化</strong>：API 和处理层独立扩展</li>
+</ul>
+<h3 id="韧性">韧性</h3>
+<p>通过以下方式增强容错能力：</p>
+<ul>
+<li><strong>重试逻辑</strong>：失败的作业可以自动重试</li>
+<li><strong>断路器</strong>：防止连锁故障</li>
+<li><strong>优雅降级</strong>：即使工作进程过载，API 仍保持响应</li>
+</ul>
+<h3 id="用户体验">用户体验</h3>
+<p>改善响应性：</p>
+<ul>
+<li><strong>即时反馈</strong>：用户获得即时确认</li>
+<li><strong>进度更新</strong>：显示处理状态和预估完成时间</li>
+<li><strong>非阻塞</strong>：用户可以在等待时继续其他活动</li>
+</ul>
+<h2 id="常见陷阱与解决方案">常见陷阱与解决方案</h2>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 注意</p><div class="admonition-content"><p><strong>轮询风暴</strong>：太多客户端过于频繁地轮询</p>
+<p><strong>解决方案</strong>：实现指数退避和速率限制</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 注意</p><div class="admonition-content"><p><strong>丢失结果</strong>：结果在客户端获取前过期</p>
+<p><strong>解决方案</strong>：设置适当的 TTL 并在过期前通知客户端</p>
+</div></div>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 注意</p><div class="admonition-content"><p><strong>孤立作业</strong>：作业永远卡在处理状态</p>
+<p><strong>解决方案</strong>：实现作业超时和死信队列</p>
+</div></div>
+<h2 id="实际示例：文档处理服务">实际示例：文档处理服务</h2>
+<p>这是一个完整的文档处理服务示例：</p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript"><span class="token comment">// API 层</span>
+<span class="token keyword">class</span> <span class="token class-name">DocumentProcessingAPI</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">submitDocument</span><span class="token punctuation">(</span><span class="token parameter">file<span class="token punctuation">,</span> options</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> jobId <span class="token operator">=</span> <span class="token function">uuidv4</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 上传文件至存储</span>
+    <span class="token keyword">const</span> fileUrl <span class="token operator">=</span> <span class="token keyword">await</span> storage<span class="token punctuation">.</span><span class="token function">upload</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 创建作业记录</span>
+    <span class="token keyword">await</span> db<span class="token punctuation">.</span>jobs<span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">id</span><span class="token operator">:</span> jobId<span class="token punctuation">,</span>
+      <span class="token literal-property property">status</span><span class="token operator">:</span> <span class="token string">'pending'</span><span class="token punctuation">,</span>
+      fileUrl<span class="token punctuation">,</span>
+      options<span class="token punctuation">,</span>
+      <span class="token literal-property property">createdAt</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">// 加入队列进行处理</span>
+    <span class="token keyword">await</span> queue<span class="token punctuation">.</span><span class="token function">publish</span><span class="token punctuation">(</span><span class="token string">'document-processing'</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      jobId<span class="token punctuation">,</span>
+      fileUrl<span class="token punctuation">,</span>
+      options
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      jobId<span class="token punctuation">,</span>
+      <span class="token literal-property property">statusUrl</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">/api/documents/status/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>jobId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">getStatus</span><span class="token punctuation">(</span><span class="token parameter">jobId</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> job <span class="token operator">=</span> <span class="token keyword">await</span> db<span class="token punctuation">.</span>jobs<span class="token punctuation">.</span><span class="token function">findById</span><span class="token punctuation">(</span>jobId<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>job<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">NotFoundError</span><span class="token punctuation">(</span><span class="token string">'Job not found'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">jobId</span><span class="token operator">:</span> job<span class="token punctuation">.</span>id<span class="token punctuation">,</span>
+      <span class="token literal-property property">status</span><span class="token operator">:</span> job<span class="token punctuation">.</span>status<span class="token punctuation">,</span>
+      <span class="token literal-property property">progress</span><span class="token operator">:</span> job<span class="token punctuation">.</span>progress<span class="token punctuation">,</span>
+      <span class="token literal-property property">result</span><span class="token operator">:</span> job<span class="token punctuation">.</span>result<span class="token punctuation">,</span>
+      <span class="token literal-property property">error</span><span class="token operator">:</span> job<span class="token punctuation">.</span>error
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 工作进程层</span>
+<span class="token keyword">class</span> <span class="token class-name">DocumentProcessor</span> <span class="token punctuation">{</span>
+  <span class="token keyword">async</span> <span class="token function">processJob</span><span class="token punctuation">(</span><span class="token parameter">message</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token punctuation">{</span> jobId<span class="token punctuation">,</span> fileUrl<span class="token punctuation">,</span> options <span class="token punctuation">}</span> <span class="token operator">=</span> message<span class="token punctuation">;</span>
+    
+    <span class="token keyword">try</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'processing'</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 下载文档</span>
+      <span class="token keyword">const</span> document <span class="token operator">=</span> <span class="token keyword">await</span> storage<span class="token punctuation">.</span><span class="token function">download</span><span class="token punctuation">(</span>fileUrl<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'processing'</span><span class="token punctuation">,</span> <span class="token number">25</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 提取文本</span>
+      <span class="token keyword">const</span> text <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">extractText</span><span class="token punctuation">(</span>document<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'processing'</span><span class="token punctuation">,</span> <span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 分析内容</span>
+      <span class="token keyword">const</span> analysis <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">analyzeContent</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> options<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'processing'</span><span class="token punctuation">,</span> <span class="token number">75</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 生成报表</span>
+      <span class="token keyword">const</span> report <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">generateReport</span><span class="token punctuation">(</span>analysis<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'processing'</span><span class="token punctuation">,</span> <span class="token number">90</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+      <span class="token comment">// 存储结果</span>
+      <span class="token keyword">const</span> resultUrl <span class="token operator">=</span> <span class="token keyword">await</span> storage<span class="token punctuation">.</span><span class="token function">upload</span><span class="token punctuation">(</span>report<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'completed'</span><span class="token punctuation">,</span> <span class="token number">100</span><span class="token punctuation">,</span> <span class="token punctuation">{</span> resultUrl <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      
+    <span class="token punctuation">}</span> <span class="token keyword">catch</span> <span class="token punctuation">(</span>error<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">await</span> <span class="token keyword">this</span><span class="token punctuation">.</span><span class="token function">updateStatus</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token string">'failed'</span><span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> error<span class="token punctuation">.</span>message<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">throw</span> error<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  
+  <span class="token keyword">async</span> <span class="token function">updateStatus</span><span class="token punctuation">(</span><span class="token parameter">jobId<span class="token punctuation">,</span> status<span class="token punctuation">,</span> progress<span class="token punctuation">,</span> result <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">,</span> error <span class="token operator">=</span> <span class="token keyword">null</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">await</span> db<span class="token punctuation">.</span>jobs<span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span>jobId<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      status<span class="token punctuation">,</span>
+      progress<span class="token punctuation">,</span>
+      result<span class="token punctuation">,</span>
+      error<span class="token punctuation">,</span>
+      <span class="token literal-property property">updatedAt</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Date</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<h2 id="结论">结论</h2>
+<p>异步请求-回复模式对于构建响应式、可扩展的分布式系统至关重要。通过将长时间运行的操作与即时响应解耦，它实现了：</p>
+<ul>
+<li><strong>更好的用户体验</strong>：即时反馈和非阻塞操作</li>
+<li><strong>改善的可扩展性</strong>：API 和处理层独立扩展</li>
+<li><strong>增强的韧性</strong>：优雅地处理故障和重试</li>
+<li><strong>资源效率</strong>：最佳利用线程和连接</li>
+</ul>
+<p>虽然它通过状态跟踪和结果管理引入了复杂性，但对于需要超过几秒的操作，其好处远远超过成本。当您需要执行耗时的工作而不阻塞客户端时，请考虑使用此模式。</p>
+<h2 id="相关模式">相关模式</h2>
+<ul>
+<li><strong>Claim-Check 模式</strong>：补充异步处理以处理大型负载</li>
+<li><strong>基于队列的负载均衡</strong>：使用消息队列平滑流量高峰</li>
+<li><strong>竞争消费者</strong>：实现队列作业的并行处理</li>
+<li><strong>优先队列</strong>：在其他作业之前处理高优先级作业</li>
+</ul>
+<h2 id="参考资料">参考资料</h2>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/architecture/patterns/async-request-reply">Microsoft Azure 架构模式：异步请求-回复</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.enterpriseintegrationpatterns.com/patterns/messaging/RequestReply.html">企业集成模式：请求-回复</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2020/04/Asynchronous-Request-Reply-Pattern/" data-id="720a1107" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "异步请求-回复模式：构建响应式分布式系统",
+        "image": "https://neo01.com/assets/architecture/thumbnail.png",
+        "keywords": "",
+        "genre": "Architecture",
+        "datePublished": "2020-04-20",
+        "dateCreated": "2020-04-20",
+        "dateModified": "2025-11-15",
+        "url": "https://neo01.com//zh-CN/2020/04/Asynchronous-Request-Reply-Pattern/",
+        "description": "了解异步请求-回复模式如何通过将长时间运行的操作与即时响应解耦，实现响应式应用程序，防止超时并改善用户体验。",
+        "wordCount": 3882
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">系列文章</h3>
+        <div class="widget-series">
+            <ul>
+<li>🏗️ <strong>Architecture Pattern Series</strong>
+<ul>
+<li><a href="/2020/05/Architecture-Patterns-Quick-Reference/" class="active">Architecture Patterns Quick Reference</a></li>
+<li><a href="/2019/01/Rate-Limiting-Pattern/">Rate Limiting Pattern</a></li>
+<li><a href="/2019/02/Anti-Corruption-Layer-Pattern/">Anti-Corruption Layer Pattern</a></li>
+<li><a href="/2019/03/Retry-Pattern/">Retry Pattern</a></li>
+<li><a href="/2019/04/Claim-Check-Pattern/">Claim Check Pattern</a></li>
+<li><a href="/2019/05/Materialized-View-Pattern/">Materialized View Pattern</a></li>
+<li><a href="/2019/06/Strangler-Fig-Pattern/">Strangler Fig Pattern</a></li>
+<li><a href="/2019/07/Sidecar-Pattern/">Sidecar Pattern</a></li>
+<li><a href="/2019/08/Sharding-Pattern/">Sharding Pattern</a></li>
+<li><a href="/2019/09/Gateway-Aggregation-Pattern/">Gateway Aggregation Pattern</a></li>
+<li><a href="/2019/10/Publisher-Subscriber-Pattern/">Publisher-Subscriber Pattern</a></li>
+<li><a href="/2019/11/Health-Endpoint-Monitoring-Pattern/">Health Endpoint Monitoring Pattern</a></li>
+<li><a href="/2019/12/Federated-Identity-Pattern/">Federated Identity Pattern</a></li>
+<li><a href="/2020/01/Circuit-Breaker-Pattern/">Circuit Breaker Pattern</a></li>
+<li><a href="/2020/03/Bulkhead-Pattern/">Bulkhead Pattern</a></li>
+<li><a href="/2020/04/Asynchronous-Request-Reply-Pattern/">Asynchronous Request-Reply Pattern</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    </div>
+
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock 服务器：通过模拟加速开发" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock 服务器：通过模拟加速开发</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中启用 i18n：多语言博客完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中启用 i18n：多语言博客完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#91281d8f</div>
+                <img src="/qr/qr-77cc988e83d5eb2d1912f0639926b014.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#91281d8f">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

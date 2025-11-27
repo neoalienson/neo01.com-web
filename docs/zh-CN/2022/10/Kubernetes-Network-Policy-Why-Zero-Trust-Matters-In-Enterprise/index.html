@@ -1,0 +1,1321 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Kubernetes 网络策略 - 为何零信任对企业至关重要 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Kubernetes,Network Policy,Security">
+    
+    
+    <meta name="description" content="在 Kubernetes 中，默认情况下每个 Pod 都可以与其他 Pod 通信。对企业而言，这不是安全性——这是等待发生的数据泄露。了解为何网络策略是您的第一道防线。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Kubernetes 网络策略 - 为何零信任对企业至关重要">
+<meta property="og:url" content="https://neo01.com/zh-CN/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="在 Kubernetes 中，默认情况下每个 Pod 都可以与其他 Pod 通信。对企业而言，这不是安全性——这是等待发生的数据泄露。了解为何网络策略是您的第一道防线。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/k8s/thumbnail.png">
+<meta property="article:published_time" content="2022-09-30T16:00:00.000Z">
+<meta property="article:modified_time" content="2025-11-15T13:03:51.130Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Kubernetes">
+<meta property="article:tag" content="Network Policy">
+<meta property="article:tag" content="Security">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/k8s/thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me/">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Cybersecurity/">Cybersecurity</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Kubernetes 网络策略 - 为何零信任对企业至关重要
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2022-09-30T16:00:00.000Z" itemprop="datePublished">2022-10-01</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2025-11-15T13:03:51.130Z" itemprop="datePublished">2025-11-15</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/Security/">Security</a> <a class="tag-link" href="/zh-CN/tags/Kubernetes/">Kubernetes</a> <a class="tag-link" href="/zh-CN/tags/Network-Policy/">Network Policy</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%89%81%E5%B9%B3%E7%BD%91%E7%BB%9C%E9%97%AE%E9%A2%98"><span class="toc-text">扁平网络问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BD%91%E7%BB%9C%E7%AD%96%E7%95%A5%E7%99%BB%E5%9C%BA%EF%BC%9AKubernetes-%E7%9A%84%E9%9B%B6%E4%BF%A1%E4%BB%BB"><span class="toc-text">网络策略登场：Kubernetes 的零信任</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%BA%E4%BD%95%E4%BC%81%E4%B8%9A%E4%B8%8D%E8%83%BD%E5%BF%BD%E8%A7%86%E8%BF%99%E4%B8%80%E7%82%B9"><span class="toc-text">为何企业不能忽视这一点</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%A1%88%EF%BC%9A%E5%B1%9E%E6%80%A7%E5%9E%8B%E9%98%B2%E7%81%AB%E5%A2%99%E4%B8%8E%E6%9C%8D%E5%8A%A1%E7%BD%91%E6%A0%BC"><span class="toc-text">替代方案：属性型防火墙与服务网格</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%AF%94%E8%BE%83%EF%BC%9A%E7%BD%91%E7%BB%9C%E7%AD%96%E7%95%A5-vs-%E6%9C%8D%E5%8A%A1%E7%BD%91%E6%A0%BC-vs-ABAC-%E9%98%B2%E7%81%AB%E5%A2%99"><span class="toc-text">比较：网络策略 vs 服务网格 vs ABAC 防火墙</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%AE%9E%E9%99%85%E5%AE%9E%E7%8E%B0"><span class="toc-text">实际实现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97"><span class="toc-text">入门指南</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BB%93%E8%AE%BA"><span class="toc-text">结论</span></a></li></ol>
+            <p>在 Kubernetes 的世界中，有一个许多企业忽视的危险默认设置：每个 Pod 都可以与其他 Pod 通信，跨越所有命名空间，没有任何限制。这就像建造一栋办公室，每扇门都没上锁，每个文件柜都是开放的，每位员工都可以进入每个房间。方便吗？是的。安全吗？绝对不是。</p>
+<p>对于处理敏感数据、法规遵从或多租户环境的企业来说，这种扁平网络模型是一颗定时炸弹。一个被入侵的 Pod 可以成为横向移动攻击整个集群的跳板。这就是为什么 Kubernetes 网络策略不仅重要，而且是必不可少的。</p>
+<h2 id="扁平网络问题">扁平网络问题</h2>
+<p>Kubernetes 的设计理念是简单性。默认情况下，网络模型是扁平的——任何 Pod 都可以使用 IP 地址连接到任何其他 Pod。这使得开发变得容易，消除了网络复杂性，但也造成了巨大的安全漏洞。</p>
+<p>考虑一个典型的企业应用程序：</p>
+<ul>
+<li>前端 Pod 处理用户请求</li>
+<li>后端 API Pod 处理业务逻辑</li>
+<li>数据库 Pod 存储敏感的客户数据</li>
+<li>管理 Pod 用于集群管理</li>
+<li>第三方集成 Pod 连接到外部服务</li>
+</ul>
+<p>在默认的 Kubernetes 设置中，被入侵的前端 Pod 可以直接访问您的数据库 Pod。被利用的第三方集成可以连接到您的管理工具。没有障碍，没有检查点，没有隔离。</p>
+<div class="admonition danger"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🚨 数据泄露情境</p><div class="admonition-content"><p>攻击者利用您面向公众的 Web 应用程序中的漏洞。他们获得了前端 Pod 的 shell 访问权限。如果没有网络策略，他们现在可以扫描整个集群，发现数据库 Pod，并窃取客户数据——这一切都是因为没有任何东西阻止他们建立这些连接。</p>
+</div></div>
+<p>这不是理论上的。<a target="_blank" rel="noopener" href="https://redlock.io/blog/cryptojacking-tesla">2020 年 Tesla Kubernetes 数据泄露</a>就是因为暴露的 Kubernetes 仪表板导致被入侵的 Pod 可以访问存储在集群其他地方的 AWS 凭证。网络隔离本可以限制爆炸半径。</p>
+<h2 id="网络策略登场：Kubernetes-的零信任">网络策略登场：Kubernetes 的零信任</h2>
+<p>Kubernetes 网络策略是一个规范，定义了 Pod 如何相互通信以及如何与外部端点通信。它是您集群的防火墙，但不是使用 IP 地址和端口，而是根据 Pod 标签、命名空间和 CIDR 块定义规则。</p>
+<p>核心原则很简单：<strong>默认拒绝，明确允许</strong>。这就是零信任网络——在证明必要之前，什么都不信任。</p>
+<p>基本的网络策略如下所示：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> networking.k8s.io/v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> NetworkPolicy
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> backend<span class="token punctuation">-</span>policy
+  <span class="token key atrule">namespace</span><span class="token punctuation">:</span> production
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+    <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+      <span class="token key atrule">app</span><span class="token punctuation">:</span> backend
+  <span class="token key atrule">policyTypes</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> Ingress
+  <span class="token punctuation">-</span> Egress
+  <span class="token key atrule">ingress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">from</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">app</span><span class="token punctuation">:</span> frontend
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">8080</span>
+  <span class="token key atrule">egress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">to</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">app</span><span class="token punctuation">:</span> database
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">5432</span></code></pre>
+<p>这个策略说："后端 Pod 只能在端口 8080 上接收来自前端 Pod 的流量，并且只能在端口 5432 上向数据库 Pod 发送流量。"其他一切都被阻止。</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 深度防御</p><div class="admonition-content"><p>网络策略不能取代应用程序级别的安全性、身份验证或加密。它们是深度防御策略中的一层。即使攻击者入侵了一个 Pod，网络策略也会限制他们可以连接的范围。</p>
+</div></div>
+<h2 id="为何企业不能忽视这一点">为何企业不能忽视这一点</h2>
+<p>对于企业来说，网络策略不是可选的——它们是合规性和安全性的必需品：</p>
+<p><strong>法规遵从</strong>：PCI-DSS、HIPAA 和 SOC 2 等标准要求网络隔离。您必须证明敏感数据与较不受信任的组件隔离。网络策略提供可审计的、声明式的隔离证明。</p>
+<p><strong>多租户</strong>：如果您在同一个集群上运行多个团队或客户，网络策略可以防止一个租户访问另一个租户的资源。没有它们，命名空间隔离纯粹是逻辑上的，而不是强制执行的。</p>
+<p><strong>爆炸半径限制</strong>：当（不是如果）发生安全事件时，网络策略可以控制损害。开发命名空间中被入侵的 Pod 无法连接到生产环境。被攻破的前端无法直接访问数据库。</p>
+<p><strong>审计和可见性</strong>：网络策略是声明式的并且受版本控制。您可以审计谁在何时更改了什么以及为什么。将此与埋藏在网络设备中的传统防火墙规则进行比较。</p>
+<p><strong>成本效益</strong>：无需为每个安全区域部署单独的集群（昂贵且操作复杂），您可以使用网络策略在单个集群内建立安全边界。</p>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📊 合规要求</p><div class="admonition-content"><p>PCI-DSS 要求 1.2.1 明确规定限制入站和出站流量，仅限于持卡人数据环境所需的流量。网络策略是满足此要求的 Kubernetes 原生方式。</p>
+</div></div>
+<h2 id="替代方案：属性型防火墙与服务网格">替代方案：属性型防火墙与服务网格</h2>
+<p>网络策略并不是唯一的选择。企业还有其他选项来保护 Kubernetes 网络：</p>
+<h3 id="传统防火墙：节点级陷阱">传统防火墙：节点级陷阱</h3>
+<p>您可以使用传统网络防火墙或云安全组来控制 Kubernetes 节点之间的流量。但这种方法有一个致命缺陷，许多企业发现得太晚了。</p>
+<p><strong>问题所在</strong>：传统防火墙在节点级运作，而不是在 Pod 级。这就是为什么这很危险：</p>
+<p>想象您有一个 Kubernetes 节点运行三个 Pod：</p>
+<ul>
+<li>Pod A：前端应用程序（需要互联网访问 CDN）</li>
+<li>Pod B：后端 API（永远不应该访问互联网）</li>
+<li>Pod C：数据库（绝对不能访问互联网）</li>
+</ul>
+<p>使用传统防火墙，您配置节点的安全组以允许出站互联网访问，因为 Pod A 需要它。但问题来了：<strong>所有三个 Pod 现在都有互联网访问权限</strong>。防火墙无法区分 Pod——它只看到节点的 IP 地址。</p>
+<p>这意味着：</p>
+<ul>
+<li>您的数据库 Pod 可以将数据泄露到外部服务器</li>
+<li>您的后端 API 可以被用作出站攻击的代理</li>
+<li>被入侵的 Pod 可以下载恶意软件或与命令控制服务器通信</li>
+</ul>
+<div class="admonition danger"><p class="admonition-title"><span class="mdi mdi-alert-circle-outline admonition-icon"></span>🔓 节点级安全漏洞</p><div class="admonition-content"><p>如果防火墙规则允许节点访问互联网（即使只是为了一个 Pod），该节点上的每个 Pod 都会继承该访问权限。您无法使用传统防火墙强制执行 Pod 特定的出站策略。这就是为什么节点级安全性对 Kubernetes 来说是不够的。</p>
+</div></div>
+<div class="mermaid">graph TB
+    subgraph "传统防火墙（节点级）"
+        FW1["防火墙规则：允许互联网"]
+        Node1["Kubernetes 节点"]
+        FW1 -.-&gt;|"应用到整个节点"| Node1
+        
+        subgraph Node1
+            PodA1["Pod A<br>（需要互联网）"]
+            PodB1["Pod B<br>（不应访问互联网）"]
+            PodC1["Pod C - 数据库<br>（绝不能访问互联网）"]
+        end
+        
+        PodA1 --&gt;|"✓ 允许"| Internet1["互联网"]
+        PodB1 --&gt;|"✓ 允许（问题！）"| Internet1
+        PodC1 --&gt;|"✓ 允许（危险！）"| Internet1
+    end
+    
+    subgraph "网络策略（Pod 级）"
+        Node2["Kubernetes 节点"]
+        
+        subgraph Node2
+            PodA2["Pod A<br>（需要互联网）"]
+            PodB2["Pod B<br>（不应访问互联网）"]
+            PodC2["Pod C - 数据库<br>（绝不能访问互联网）"]
+        end
+        
+        NP1["网络策略：<br>仅允许 Pod A"]
+        NP1 -.-&gt;|"应用到特定 Pod"| PodA2
+        
+        PodA2 --&gt;|"✓ 允许"| Internet2["互联网"]
+        PodB2 -.-&gt;|"✗ 阻止"| Internet2
+        PodC2 -.-&gt;|"✗ 阻止"| Internet2
+    end
+    
+    style PodB1 fill:#ffcccc
+    style PodC1 fill:#ff9999
+    style PodB2 fill:#ccffcc
+    style PodC2 fill:#ccffcc
+    style FW1 fill:#ffeecc
+    style NP1 fill:#ccffee</div>
+<p><strong>其他限制</strong>：</p>
+<ul>
+<li><strong>基于 IP，而非基于 Pod</strong>：Pod 是短暂的，具有动态 IP。基于 IP 地址的防火墙规则在 Pod 创建和销毁时变得无法管理。</li>
+<li><strong>没有 Kubernetes 感知能力</strong>：防火墙不理解命名空间、标签或 Pod 选择器。您失去了声明式的 Kubernetes 原生方法。</li>
+<li><strong>粗粒度控制</strong>：您只能在节点级控制流量，而不是在实际安全边界所在的工作负载级。</li>
+</ul>
+<h3 id="属性型访问控制（ABAC）防火墙">属性型访问控制（ABAC）防火墙</h3>
+<p>一些新一代防火墙支持属性型策略，其中规则使用元数据属性而不是 IP 地址定义。这在理念上更接近 Kubernetes 网络策略：</p>
+<ul>
+<li><strong>元数据驱动</strong>：基于应用程序身份、用户上下文或工作负载属性的规则</li>
+<li><strong>动态</strong>：策略随着工作负载变化而调整，无需手动更新 IP</li>
+<li><strong>集中式</strong>：整个基础设施的单一策略引擎</li>
+</ul>
+<p>然而，ABAC 防火墙通常是 Kubernetes 外部的，需要集成且通常成本高昂。它们对于混合环境（Kubernetes + VM + 云服务）很强大，但增加了复杂性。</p>
+<h3 id="服务网格（Istio、Linkerd、Consul）">服务网格（Istio、Linkerd、Consul）</h3>
+<p>服务网格提供第 7 层（应用程序级）流量管理和安全性：</p>
+<ul>
+<li><strong>双向 TLS</strong>：服务之间的自动加密和身份验证</li>
+<li><strong>细粒度策略</strong>：基于 HTTP 方法、标头、路径的控制</li>
+<li><strong>可观察性</strong>：详细的流量指标和追踪</li>
+<li><strong>高级路由</strong>：金丝雀部署、流量分割、重试</li>
+</ul>
+<p>服务网格非常强大，但也有权衡：</p>
+<p><strong>复杂性</strong>：显著的学习曲线和操作开销。您要为每个 Pod 添加 sidecar，管理控制平面，并调试新的基础设施层。</p>
+<p><strong>性能开销</strong>：Sidecar 代理增加延迟（通常每跳 1-5 毫秒）和资源消耗。</p>
+<p><strong>成本</strong>：更多资源、更多复杂性、更多操作负担。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 何时使用什么</p><div class="admonition-content"><p><strong>网络策略</strong>：从这里开始。它们内置于 Kubernetes，易于实现，涵盖 80% 的企业安全需求。无需额外基础设施。</p>
+<p><strong>服务网格</strong>：当您需要第 7 层功能（如双向 TLS、高级路由或详细可观察性）时添加。最适合具有复杂服务间通信的微服务架构。</p>
+<p><strong>ABAC 防火墙</strong>：考虑用于混合环境，您需要跨 Kubernetes、VM 和云服务的一致策略。通常是企业级决策，而不仅仅是针对 Kubernetes。</p>
+</div></div>
+<h2 id="比较：网络策略-vs-服务网格-vs-ABAC-防火墙">比较：网络策略 vs 服务网格 vs ABAC 防火墙</h2>
+<table>
+<thead>
+<tr>
+<th>功能</th>
+<th>网络策略</th>
+<th>服务网格</th>
+<th>ABAC 防火墙</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>层级</strong></td>
+<td>第 3/4 层（IP/端口）</td>
+<td>第 7 层（HTTP/gRPC）</td>
+<td>第 3-7 层</td>
+</tr>
+<tr>
+<td><strong>复杂性</strong></td>
+<td>低</td>
+<td>高</td>
+<td>中</td>
+</tr>
+<tr>
+<td><strong>性能影响</strong></td>
+<td>最小</td>
+<td>1-5 毫秒延迟</td>
+<td>不一定</td>
+</tr>
+<tr>
+<td><strong>成本</strong></td>
+<td>免费（内置）</td>
+<td>资源开销</td>
+<td>许可成本</td>
+</tr>
+<tr>
+<td><strong>加密</strong></td>
+<td>否（需要单独解决方案）</td>
+<td>包含双向 TLS</td>
+<td>取决于产品</td>
+</tr>
+<tr>
+<td><strong>可观察性</strong></td>
+<td>基本（取决于 CNI）</td>
+<td>优秀</td>
+<td>良好</td>
+</tr>
+<tr>
+<td><strong>Kubernetes 原生</strong></td>
+<td>是</td>
+<td>是</td>
+<td>否</td>
+</tr>
+<tr>
+<td><strong>学习曲线</strong></td>
+<td>平缓</td>
+<td>陡峭</td>
+<td>中等</td>
+</tr>
+<tr>
+<td><strong>最适合</strong></td>
+<td>基本隔离</td>
+<td>微服务安全</td>
+<td>混合环境</td>
+</tr>
+</tbody>
+</table>
+<h2 id="实际实现">实际实现</h2>
+<p>让我们通过一个实际示例：保护三层应用程序。</p>
+<p><strong>架构</strong>：</p>
+<ul>
+<li>前端 Pod（面向公众）</li>
+<li>后端 API Pod（内部）</li>
+<li>数据库 Pod（敏感数据）</li>
+</ul>
+<p><strong>安全要求</strong>：</p>
+<ul>
+<li>前端只能与后端 API 通信</li>
+<li>后端 API 只能与数据库通信</li>
+<li>数据库仅接受来自后端的连接</li>
+<li>除了前端（用于 CDN 资产）外，没有 Pod 可以访问互联网</li>
+</ul>
+<p><strong>实现</strong>：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># 默认拒绝所有流量</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> networking.k8s.io/v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> NetworkPolicy
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> default<span class="token punctuation">-</span>deny<span class="token punctuation">-</span>all
+  <span class="token key atrule">namespace</span><span class="token punctuation">:</span> production
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">podSelector</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+  <span class="token key atrule">policyTypes</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> Ingress
+  <span class="token punctuation">-</span> Egress
+
+<span class="token punctuation">---</span>
+<span class="token comment"># 允许前端接收外部流量</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> networking.k8s.io/v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> NetworkPolicy
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> frontend<span class="token punctuation">-</span>policy
+  <span class="token key atrule">namespace</span><span class="token punctuation">:</span> production
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+    <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+      <span class="token key atrule">tier</span><span class="token punctuation">:</span> frontend
+  <span class="token key atrule">policyTypes</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> Ingress
+  <span class="token punctuation">-</span> Egress
+  <span class="token key atrule">ingress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">from</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">namespaceSelector</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">80</span>
+  <span class="token key atrule">egress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">to</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">tier</span><span class="token punctuation">:</span> backend
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">8080</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">to</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">namespaceSelector</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+      <span class="token key atrule">podSelector</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">443</span>  <span class="token comment"># 允许 HTTPS 用于 CDN</span>
+
+<span class="token punctuation">---</span>
+<span class="token comment"># 允许后端仅与数据库通信</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> networking.k8s.io/v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> NetworkPolicy
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> backend<span class="token punctuation">-</span>policy
+  <span class="token key atrule">namespace</span><span class="token punctuation">:</span> production
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+    <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+      <span class="token key atrule">tier</span><span class="token punctuation">:</span> backend
+  <span class="token key atrule">policyTypes</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> Ingress
+  <span class="token punctuation">-</span> Egress
+  <span class="token key atrule">ingress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">from</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">tier</span><span class="token punctuation">:</span> frontend
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">8080</span>
+  <span class="token key atrule">egress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">to</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">tier</span><span class="token punctuation">:</span> database
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">5432</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">to</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">namespaceSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">name</span><span class="token punctuation">:</span> kube<span class="token punctuation">-</span>system
+      <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">k8s-app</span><span class="token punctuation">:</span> kube<span class="token punctuation">-</span>dns
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> UDP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">53</span>  <span class="token comment"># 允许 DNS</span>
+
+<span class="token punctuation">---</span>
+<span class="token comment"># 数据库仅接受来自后端的连接</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> networking.k8s.io/v1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> NetworkPolicy
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> database<span class="token punctuation">-</span>policy
+  <span class="token key atrule">namespace</span><span class="token punctuation">:</span> production
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+    <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+      <span class="token key atrule">tier</span><span class="token punctuation">:</span> database
+  <span class="token key atrule">policyTypes</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> Ingress
+  <span class="token key atrule">ingress</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">from</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">podSelector</span><span class="token punctuation">:</span>
+        <span class="token key atrule">matchLabels</span><span class="token punctuation">:</span>
+          <span class="token key atrule">tier</span><span class="token punctuation">:</span> backend
+    <span class="token key atrule">ports</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">protocol</span><span class="token punctuation">:</span> TCP
+      <span class="token key atrule">port</span><span class="token punctuation">:</span> <span class="token number">5432</span></code></pre>
+<p>这种设置建立了清晰的边界。即使攻击者入侵了前端，他们也无法直接访问数据库。他们需要同时入侵前端和后端才能接触到敏感数据——显著提高了门槛。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 别忘了 DNS</p><div class="admonition-content"><p>一个常见的错误是忘记允许 DNS 流量。Pod 需要将服务名称解析为 IP 地址。始终包含 kube-dns 或 CoreDNS 的出站规则，通常在 UDP 端口 53 上。</p>
+</div></div>
+<h2 id="入门指南">入门指南</h2>
+<p>实现网络策略不必是全有或全无。以下是务实的方法：</p>
+<p><strong>1. 验证 CNI 支持</strong>：并非所有容器网络接口（CNI）插件都支持网络策略。Calico、Cilium 和 Weave Net 支持。AWS VPC CNI 和 Azure CNI 需要额外配置。检查您的 CNI 文档。</p>
+<p><strong>2. 从监控开始</strong>：在强制执行策略之前，以审计模式部署它们（如果您的 CNI 支持），或使用 <a target="_blank" rel="noopener" href="https://github.com/cilium/hubble">Cilium Hubble</a> 等工具可视化现有流量模式。</p>
+<p><strong>3. 从全部拒绝开始</strong>：在非关键命名空间中创建默认的全部拒绝策略。这会强制您明确允许必要的流量，揭示您的实际通信模式。</p>
+<p><strong>4. 逐步加入白名单</strong>：一次添加一个允许规则，每次更改后进行测试。从明显的流程（前端 → 后端）开始，然后处理边缘情况。</p>
+<p><strong>5. 自动化测试</strong>：使用 <a target="_blank" rel="noopener" href="https://github.com/controlplaneio/netassert">netassert</a> 等工具为您的网络策略编写测试。这可以防止策略更改时的回归。</p>
+<p><strong>6. 文档化和版本控制</strong>：将策略与应用程序清单一起存储在 Git 中。记录每个规则存在的原因。未来的您（或您的团队成员）会感谢您。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>🛠️ 有用的工具</p><div class="admonition-content"><ul>
+<li><strong><a target="_blank" rel="noopener" href="https://editor.cilium.io/">Cilium Editor</a></strong>：可视化网络策略编辑器</li>
+<li><strong><a target="_blank" rel="noopener" href="https://github.com/runoncloud/kubectl-np-viewer">Network Policy Viewer</a></strong>：将策略可视化为图形</li>
+<li><strong><a target="_blank" rel="noopener" href="https://github.com/inspektor-gadget/inspektor-gadget">Inspektor Gadget</a></strong>：实时调试网络流量</li>
+<li><strong><a target="_blank" rel="noopener" href="https://www.tigera.io/tigera-products/calico-enterprise/">Calico Enterprise</a></strong>：高级策略管理（商业版）</li>
+</ul>
+</div></div>
+<h2 id="结论">结论</h2>
+<p>Kubernetes 网络策略对企业来说不是可选的。它是集群安全的基础，是防止横向移动的第一道防线，也是受监管行业的合规要求。</p>
+<p>是的，有替代方案——服务网格提供更多功能，ABAC 防火墙提供更广泛的覆盖范围——但网络策略内置于 Kubernetes，不需要额外的基础设施，并解决了最关键的问题：防止不受限制的 Pod 间通信。</p>
+<p>从简单开始。部署默认拒绝策略。将必要的流量加入白名单。彻底测试。您的安全团队、合规审计员和未来的事件响应人员会感谢您。</p>
+<p>在 Kubernetes 中，默认是信任。对于企业来说，标准必须是零信任。网络策略就是您实现这一目标的方式。</p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/" data-id="7983eb6e" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Kubernetes 网络策略 - 为何零信任对企业至关重要",
+        "image": "https://neo01.com/assets/k8s/thumbnail.png",
+        "keywords": "Kubernetes Network Policy Security",
+        "genre": "Cybersecurity",
+        "datePublished": "2022-10-01",
+        "dateCreated": "2022-10-01",
+        "dateModified": "2025-11-15",
+        "url": "https://neo01.com//zh-CN/2022/10/Kubernetes-Network-Policy-Why-Zero-Trust-Matters-In-Enterprise/",
+        "description": "在 Kubernetes 中，默认情况下每个 Pod 都可以与其他 Pod 通信。对企业而言，这不是安全性——这是等待发生的数据泄露。了解为何网络策略是您的第一道防线。",
+        "wordCount": 1644
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                
+            
+                
+                
+                
+            
+                
+                    <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="thumbnail">
+        <span style="background-image:url(/assets/futuristic/mesh.png)" alt="Mock 服务器：通过模拟加速开发" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/11/Mock-Servers-Accelerating-Development-Through-Simulation/" class="title">Mock 服务器：通过模拟加速开发</a></p>
+                            <p class="item-date"><time datetime="2025-10-31T16:00:00.000Z" itemprop="datePublished">2025-11-01</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="thumbnail">
+        <span style="background-image:url(/assets/hexo/thumbnail.png)" alt="在 Hexo 中启用 i18n：多语言博客完整指南" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/Enabling-i18n-in-Hexo/" class="title">在 Hexo 中启用 i18n：多语言博客完整指南</a></p>
+                            <p class="item-date"><time datetime="2025-10-29T16:00:00.000Z" itemprop="datePublished">2025-10-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：高级安全主题" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Advanced-Security-Topics/" class="title">CISP学习指南：高级安全主题</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Email-Security/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：电子邮件安全与网络协议" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Email-Security/" class="title">CISP学习指南：电子邮件安全与网络协议</a></p>
+                            <p class="item-date"><time datetime="2025-10-22T16:00:00.000Z" itemprop="datePublished">2025-10-23</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="thumbnail">
+        <span style="background-image:url(/assets/cisp/thumbnail_80.png)" alt="CISP学习指南：访问控制机制、蜜网、审计系统与WAPI" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">网络安全</a></p>
+                            <p class="item-title"><a href="/zh-CN/2025/10/CISP-Access-Control-Audit-WAPI/" class="title">CISP学习指南：访问控制机制、蜜网、审计系统与WAPI</a></p>
+                            <p class="item-date"><time datetime="2025-10-21T16:00:00.000Z" itemprop="datePublished">2025-10-22</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                
+            
+                
+                
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">75</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#84b6bd8d</div>
+                <img src="/qr/qr-95301fb64a0eab4d3a32c91bb5b0ac7e.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#84b6bd8d">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2025 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
