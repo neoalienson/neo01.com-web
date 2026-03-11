@@ -1,0 +1,1481 @@
+<!DOCTYPE html><html lang="en"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Database Internals,Performance,PostgreSQL">
+    
+    
+    <meta name="description" content="Deep dive into the Volcano Model—PostgreSQL's foundational execution architecture. Learn how Next()/GetNext() drives every query, why row-by-row processing matters, and when vectorization breaks the r">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture">
+<meta property="og:url" content="https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Deep dive into the Volcano Model—PostgreSQL's foundational execution architecture. Learn how Next()/GetNext() drives every query, why row-by-row processing matters, and when vectorization breaks the r">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://neo01.com/assets/architecture/volcano-thumbnail.png">
+<meta property="article:published_time" content="2026-02-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-11T15:01:05.757Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Database Internals">
+<meta property="article:tag" content="Performance">
+<meta property="article:tag" content="PostgreSQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/volcano-thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+<style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'en';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/">Home</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/Art-Gallery/">Art Gallery</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Architecture/">Architecture</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Cybersecurity/">Cybersecurity</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Development/">Development</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Misc/">Misc</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/about-me/">About</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="Search">
+        <button type="submit" title="Search" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="Type something...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'en',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/02/Understanding-PostgreSQL-Volcano-Model" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-02-14T16:00:00.000Z" itemprop="datePublished">2026-02-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-11T15:01:05.757Z" itemprop="datePublished">2026-03-11</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/Database-Internals/">Database Internals</a> <a class="tag-link" href="/tags/Performance/">Performance</a> <a class="tag-link" href="/tags/PostgreSQL/">PostgreSQL</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-What-Is-the-Volcano-Model"><span class="toc-text">1 What Is the Volcano Model?</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-The-Iterator-Interface-Next-GetNext"><span class="toc-text">2 The Iterator Interface: Next() / GetNext()</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-Operator-Trees-How-Queries-Become-Execution-Plans"><span class="toc-text">3 Operator Trees: How Queries Become Execution Plans</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-Row-by-Row-Processing-The-Good-The-Bad-and-The-Slow"><span class="toc-text">4 Row-by-Row Processing: The Good, The Bad, and The Slow</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-PostgreSQL%E2%80%99s-Implementation-ExecProcNode"><span class="toc-text">5 PostgreSQL’s Implementation: ExecProcNode</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-Performance-Implications-When-Volcano-Shines-vs-Struggles"><span class="toc-text">6 Performance Implications: When Volcano Shines vs. Struggles</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-Vectorized-Execution-The-Alternative"><span class="toc-text">7 Vectorized Execution: The Alternative</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-Hybrid-Approaches-Getting-the-Best-of-Both"><span class="toc-text">8 Hybrid Approaches: Getting the Best of Both</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-Practical-Takeaways-for-PostgreSQL-Users"><span class="toc-text">9 Practical Takeaways for PostgreSQL Users</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#10-The-Future-Is-Vectorization-Coming-to-PostgreSQL"><span class="toc-text">10 The Future: Is Vectorization Coming to PostgreSQL?</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Summary-The-Volcano-Model-in-One-Diagram"><span class="toc-text">Summary: The Volcano Model in One Diagram</span></a></li></ol>
+            <p>Every SQL query you run in PostgreSQL—whether a simple <code>SELECT * FROM users</code> or a 20-table join with window functions—executes through the same elegant mechanism: <strong>the Volcano Model</strong> (also known as the Iterator Model).</p>
+<p>This 1980s architecture is why PostgreSQL can:</p>
+<ul>
+<li>Stream gigabytes of results without loading everything into memory</li>
+<li>Stop early on <code>LIMIT</code> queries without processing all rows</li>
+<li>Chain operators flexibly without custom code for each combination</li>
+</ul>
+<p>But it’s also why PostgreSQL struggles with certain analytical workloads where <strong>vectorized execution</strong> shines. Here’s the deep dive: how the Volcano Model works, why PostgreSQL chose it, and where it breaks down.</p>
+<hr>
+<h2 id="1-What-Is-the-Volcano-Model">1 What Is the Volcano Model?</h2>
+<p>The <strong>Volcano Model</strong> is an execution architecture where queries are represented as <strong>trees of operators</strong>, each exposing a standard interface: <code>Next()</code> (or <code>GetNext()</code> in PostgreSQL’s codebase).</p>
+<p>Each operator:</p>
+<ul>
+<li>Requests rows from its child(ren) by calling <code>Next()</code></li>
+<li>Processes one row at a time</li>
+<li>Returns one row to its parent</li>
+</ul>
+<p>This <strong>pull-based</strong> model means data flows up the tree, one row per call, until the top node returns results to the client.</p>
+<p><strong>Simple Example:</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> name <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> age <span class="token operator">&gt;</span> <span class="token number">25</span><span class="token punctuation">;</span></code></pre>
+<p>Executes as:</p>
+<div class="mermaid">flowchart BT
+    A[Seq Scan: users] --&gt; B[Filter: age &gt; 25]
+    B --&gt; C[Projection: name]
+    C --&gt; D[Client]
+    
+    style A fill:#e3f2fd,stroke:#1976d2
+    style B fill:#fff3e0,stroke:#f57c00
+    style C fill:#e8f5e9,stroke:#388e3c</div>
+<p><strong>Execution Flow:</strong></p>
+<pre class="language-none"><code class="language-none">Client: "Give me a row"
+  ↓
+Projection: "Here's a row" (calls Filter.Next())
+  ↓
+Filter: "Here's a filtered row" (calls SeqScan.Next())
+  ↓
+SeqScan: "Here's a raw row from disk"</code></pre>
+<p>Each operator is <strong>independent</strong>. The Filter doesn’t know if data comes from a Seq Scan, Index Scan, or Join. The Projection doesn’t know if data is filtered or raw. This <strong>modularity</strong> is the Volcano Model’s superpower.</p>
+<hr>
+<h2 id="2-The-Iterator-Interface-Next-GetNext">2 The Iterator Interface: Next() / GetNext()</h2>
+<p>In PostgreSQL’s codebase, every executor node implements the same core interface:</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from postgres/src/include/nodes/execnodes.h */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">PlanState</span> <span class="token punctuation">{</span>
+    <span class="token comment">/* ... state fields ... */</span>
+<span class="token punctuation">}</span> PlanState<span class="token punctuation">;</span>
+
+<span class="token comment">/* Every node type implements this pattern */</span>
+<span class="token keyword">static</span> <span class="token keyword">inline</span> TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecProcNode</span><span class="token punctuation">(</span>PlanState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-&gt;</span>is_done<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>  <span class="token comment">/* No more rows */</span>
+    
+    <span class="token comment">/* Node-specific logic */</span>
+    <span class="token keyword">return</span> node<span class="token operator">-&gt;</span>next_row<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>The Contract:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Return Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Valid <code>TupleTableSlot</code></td>
+<td>One row of data</td>
+</tr>
+<tr>
+<td><code>NULL</code></td>
+<td>No more rows (end of stream)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Generic Execution Loop:</strong></p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Pseudocode—PostgreSQL's actual executor */</span>
+<span class="token keyword">while</span> <span class="token punctuation">(</span>true<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    TupleTableSlot <span class="token operator">*</span>slot <span class="token operator">=</span> <span class="token function">ExecProcNode</span><span class="token punctuation">(</span>top_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">TupIsNull</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">break</span><span class="token punctuation">;</span>  <span class="token comment">/* No more rows */</span>
+    
+    <span class="token comment">/* Process the row (send to client, aggregate, etc.) */</span>
+    <span class="token function">send_to_client</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>This loop—<strong>call <code>Next()</code>, process row, repeat</strong>—is the entire Volcano Model. Every query, no matter how complex, reduces to this pattern.</p>
+<hr>
+<h2 id="3-Operator-Trees-How-Queries-Become-Execution-Plans">3 Operator Trees: How Queries Become Execution Plans</h2>
+<p>When you run a query, PostgreSQL’s planner builds an <strong>operator tree</strong>. Each node is an executor type with specific logic.</p>
+<h3 id="Common-Operator-Types">Common Operator Types</h3>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>What It Does</th>
+<th>Calls Child How Many Times?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Seq Scan</strong></td>
+<td>Reads table pages from disk</td>
+<td>N/A (leaf node)</td>
+</tr>
+<tr>
+<td><strong>Index Scan</strong></td>
+<td>Reads index, fetches heap tuples</td>
+<td>N/A (leaf node)</td>
+</tr>
+<tr>
+<td><strong>Filter</strong></td>
+<td>Applies WHERE clause</td>
+<td>1+ (until row passes filter)</td>
+</tr>
+<tr>
+<td><strong>Projection</strong></td>
+<td>Selects/computes columns</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>Nested Loop Join</strong></td>
+<td>For each outer row, scan inner</td>
+<td>1 outer + N inner</td>
+</tr>
+<tr>
+<td><strong>Hash Join</strong></td>
+<td>Build hash table, probe</td>
+<td>N (build phase) + N (probe phase)</td>
+</tr>
+<tr>
+<td><strong>Merge Join</strong></td>
+<td>Merge-sorted inputs</td>
+<td>1 from each sorted input</td>
+</tr>
+<tr>
+<td><strong>Aggregate</strong></td>
+<td>Groups and computes aggregates</td>
+<td>N (until group complete)</td>
+</tr>
+<tr>
+<td><strong>Sort</strong></td>
+<td>Sorts input, returns in order</td>
+<td>N (buffer all, then return)</td>
+</tr>
+<tr>
+<td><strong>Limit</strong></td>
+<td>Stops after N rows</td>
+<td>N (passes through)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="Example-Complex-Query">Example: Complex Query</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> 
+    u<span class="token punctuation">.</span>name<span class="token punctuation">,</span>
+    <span class="token function">COUNT</span><span class="token punctuation">(</span>o<span class="token punctuation">.</span>id<span class="token punctuation">)</span> <span class="token keyword">as</span> order_count
+<span class="token keyword">FROM</span> users u
+<span class="token keyword">LEFT</span> <span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>created_at <span class="token operator">&gt;</span> <span class="token string">'2025-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> u<span class="token punctuation">.</span>name
+<span class="token keyword">HAVING</span> <span class="token function">COUNT</span><span class="token punctuation">(</span>o<span class="token punctuation">.</span>id<span class="token punctuation">)</span> <span class="token operator">&gt;</span> <span class="token number">5</span>
+<span class="token keyword">ORDER</span> <span class="token keyword">BY</span> order_count <span class="token keyword">DESC</span>
+<span class="token keyword">LIMIT</span> <span class="token number">10</span><span class="token punctuation">;</span></code></pre>
+<p><strong>Execution Plan (Simplified):</strong></p>
+<div class="mermaid">flowchart BT
+    A[Seq Scan: users] --&gt; B[Filter: created_at &gt; 2025-01-01]
+    B --&gt; C[Hash Join: LEFT JOIN orders]
+    D[Seq Scan: orders] --&gt; C
+    C --&gt; E[Aggregate: GROUP BY u.name]
+    E --&gt; F[Filter: HAVING COUNT &gt; 5]
+    F --&gt; G[Sort: ORDER BY order_count DESC]
+    G --&gt; H[Limit: 10]
+    H --&gt; I[Projection: name, order_count]
+    I --&gt; J[Client]
+    
+    style A fill:#e3f2fd,stroke:#1976d2
+    style D fill:#e3f2fd,stroke:#1976d2
+    style C fill:#fff3e0,stroke:#f57c00
+    style E fill:#e8f5e9,stroke:#388e3c
+    style H fill:#fce4ec,stroke:#c2185b</div>
+<p><strong>Execution Flow (First Row):</strong></p>
+<pre class="language-none"><code class="language-none">1. Client calls Limit.Next()
+2. Limit calls Sort.Next()
+3. Sort buffers ALL input (calls Aggregate.Next() until NULL)
+4. Aggregate calls HAVING Filter.Next() for each group
+5. HAVING Filter calls Aggregate.Next() (which consumed the join)
+6. Hash Join builds hash table from orders, then probes with users
+7. Users Seq Scan reads rows, Filter applies created_at &gt; 2025-01-01
+8. Sort returns first row (highest order_count)
+9. Limit returns it to client</code></pre>
+<p>Notice: <strong>Sort must consume all input before returning anything</strong>. This is a <strong>blocking operator</strong>—it breaks the pure streaming model.</p>
+<hr>
+<h2 id="4-Row-by-Row-Processing-The-Good-The-Bad-and-The-Slow">4 Row-by-Row Processing: The Good, The Bad, and The Slow</h2>
+<h3 id="The-Good-Why-Volcano-Works-Well">The Good: Why Volcano Works Well</h3>
+<p><strong>1. Memory Efficiency</strong></p>
+<p>Non-blocking operators stream rows without buffering:</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> name <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> age <span class="token operator">&gt;</span> <span class="token number">25</span> <span class="token keyword">LIMIT</span> <span class="token number">10</span><span class="token punctuation">;</span></code></pre>
+<p>PostgreSQL can stop after finding 10 matching rows—no need to scan the entire table if matches are found early.</p>
+<p><strong>Memory Usage:</strong> O(1) per operator (just current row state)</p>
+<hr>
+<p><strong>2. Modularity</strong></p>
+<p>Operators compose freely. The same Filter works with:</p>
+<ul>
+<li>Seq Scan</li>
+<li>Index Scan</li>
+<li>Any Join type</li>
+<li>Subquery results</li>
+</ul>
+<p>No custom code needed for each combination.</p>
+<hr>
+<p><strong>3. Early Termination</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">EXISTS</span> <span class="token punctuation">(</span><span class="token keyword">SELECT</span> <span class="token number">1</span> <span class="token keyword">FROM</span> orders <span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">42</span><span class="token punctuation">)</span></code></pre>
+<p>Stops at the first matching row. No need to find all matches.</p>
+<hr>
+<p><strong>4. Simple Implementation</strong></p>
+<p>Each operator is a self-contained function:</p>
+<pre class="language-c" data-language="c"><code class="language-c">TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecFilter</span><span class="token punctuation">(</span>FilterState <span class="token operator">*</span>state<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>true<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        TupleTableSlot <span class="token operator">*</span>slot <span class="token operator">=</span> <span class="token function">ExecProcNode</span><span class="token punctuation">(</span><span class="token function">outer_plan</span><span class="token punctuation">(</span>state<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">TupIsNull</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">passes_qual</span><span class="token punctuation">(</span>slot<span class="token punctuation">,</span> state<span class="token operator">-&gt;</span>qual<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> slot<span class="token punctuation">;</span>
+        
+        <span class="token comment">/* Row doesn't match—try next */</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>~30 lines of code. Easy to reason about. Easy to debug.</p>
+<hr>
+<h3 id="The-Bad-Where-Volcano-Struggles">The Bad: Where Volcano Struggles</h3>
+<p><strong>1. Function Call Overhead</strong></p>
+<p>Every row requires:</p>
+<ul>
+<li><code>Next()</code> call to child</li>
+<li><code>Next()</code> call from parent</li>
+<li>Virtual function dispatch (in some implementations)</li>
+</ul>
+<p>For 1 million rows: <strong>2 million function calls</strong> just for plumbing.</p>
+<hr>
+<p><strong>2. No Vectorization</strong></p>
+<p>Modern CPUs excel at <strong>SIMD</strong> (Single Instruction, Multiple Data):</p>
+<pre class="language-none"><code class="language-none">Scalar (Volcano):  Process row 1, then row 2, then row 3...
+Vectorized:        Process rows 1-1024 in parallel</code></pre>
+<p>Volcano’s row-by-row model can’t exploit SIMD because:</p>
+<ul>
+<li>Each row is processed independently</li>
+<li>No batch context for vectorization</li>
+<li>State is per-row, not per-batch</li>
+</ul>
+<hr>
+<p><strong>3. Cache Inefficiency</strong></p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Volcano: scattered memory access */</span>
+<span class="token keyword">while</span> <span class="token punctuation">(</span>row <span class="token operator">=</span> <span class="token function">Next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>row<span class="token operator">-&gt;</span>col1<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* May be in different cache line */</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>row<span class="token operator">-&gt;</span>col2<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* Another cache miss */</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>row<span class="token operator">-&gt;</span>col3<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* Another cache miss */</span>
+<span class="token punctuation">}</span></code></pre>
+<p>Columnar/vectorized engines process all values of one column together:</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Vectorized: sequential memory access */</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span>batch <span class="token operator">:</span> batches<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>batch<span class="token punctuation">.</span>col1<span class="token punctuation">[</span><span class="token number">0.</span><span class="token number">.1023</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* Sequential—cache friendly */</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>batch<span class="token punctuation">.</span>col2<span class="token punctuation">[</span><span class="token number">0.</span><span class="token number">.1023</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* Sequential—cache friendly */</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<p><strong>4. Blocking Operators Break Streaming</strong></p>
+<p>Some operators must consume all input before producing output:</p>
+<table>
+<thead>
+<tr>
+<th>Blocking Operator</th>
+<th>Why It Blocks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sort</strong></td>
+<td>Must see all rows to determine order</td>
+</tr>
+<tr>
+<td><strong>Hash Aggregate</strong></td>
+<td>Must see all rows in a group before computing aggregate</td>
+</tr>
+<tr>
+<td><strong>Hash Join (build phase)</strong></td>
+<td>Must build entire hash table before probing</td>
+</tr>
+<tr>
+<td><strong>Distinct</strong></td>
+<td>Must see all rows to eliminate duplicates</td>
+</tr>
+</tbody>
+</table>
+<p>When a blocking operator is in the plan, <strong>upstream operators can’t stream</strong>—they must buffer.</p>
+<hr>
+<h2 id="5-PostgreSQL’s-Implementation-ExecProcNode">5 PostgreSQL’s Implementation: ExecProcNode</h2>
+<p>In PostgreSQL’s source code, the Volcano interface is <code>ExecProcNode()</code>:</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from src/include/nodes/execnodes.h */</span>
+<span class="token keyword">static</span> <span class="token keyword">inline</span> TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecProcNode</span><span class="token punctuation">(</span>PlanState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-&gt;</span>is_done<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">/* Dispatch to node-specific function */</span>
+    <span class="token keyword">return</span> node<span class="token operator">-&gt;</span><span class="token function">ExecProcNode</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>Each node type implements its own <code>ExecProcNode</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Node Type</th>
+<th>Implementation Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seq Scan</td>
+<td><code>ExecSeqScan()</code></td>
+</tr>
+<tr>
+<td>Index Scan</td>
+<td><code>ExecIndexScan()</code></td>
+</tr>
+<tr>
+<td>Hash Join</td>
+<td><code>ExecHashJoin()</code></td>
+</tr>
+<tr>
+<td>Aggregate</td>
+<td><code>ExecAggregate()</code></td>
+</tr>
+<tr>
+<td>Sort</td>
+<td><code>ExecSort()</code></td>
+</tr>
+<tr>
+<td>Filter</td>
+<td><code>ExecFilter()</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="Example-Filter-Node">Example: Filter Node</h3>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from src/backend/executor/nodeFilter.c */</span>
+TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecFilter</span><span class="token punctuation">(</span>FilterState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    ExprContext <span class="token operator">*</span>econtext <span class="token operator">=</span> node<span class="token operator">-&gt;</span>ps<span class="token punctuation">.</span>ps_ExprContext<span class="token punctuation">;</span>
+    ExprState <span class="token operator">*</span>qual <span class="token operator">=</span> node<span class="token operator">-&gt;</span>filterqual<span class="token punctuation">;</span>
+    
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">/* Get tuple from outer plan */</span>
+        TupleTableSlot <span class="token operator">*</span>slot <span class="token operator">=</span> <span class="token function">ExecProcNode</span><span class="token punctuation">(</span><span class="token function">outerPlan</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">/* No more rows? */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">TupIsNull</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">/* Set up expression context */</span>
+        econtext<span class="token operator">-&gt;</span>ecxt_outertuple <span class="token operator">=</span> slot<span class="token punctuation">;</span>
+        
+        <span class="token comment">/* Check qualification */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">ExecQual</span><span class="token punctuation">(</span>qual<span class="token punctuation">,</span> econtext<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> slot<span class="token punctuation">;</span>  <span class="token comment">/* Passes filter—return it */</span>
+        
+        <span class="token comment">/* Doesn't pass—loop and try next row */</span>
+        <span class="token function">InstrCountFiltered1</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* Stats tracking */</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>Key Observations:</strong></p>
+<ol>
+<li><strong>Infinite loop</strong> until a row passes or no more rows</li>
+<li><strong>Single row in, single row out</strong></li>
+<li><strong>Stateless</strong> between calls (except for stats)</li>
+<li><strong>Delegates to child</strong> via <code>ExecProcNode(outerPlan(node))</code></li>
+</ol>
+<p>This pattern repeats across ~50 executor node types.</p>
+<hr>
+<h2 id="6-Performance-Implications-When-Volcano-Shines-vs-Struggles">6 Performance Implications: When Volcano Shines vs. Struggles</h2>
+<h3 id="Volcano-Excels-At">Volcano Excels At:</h3>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OLTP</strong> (short, selective queries)</td>
+<td>Few rows processed; function call overhead negligible</td>
+</tr>
+<tr>
+<td><strong>Index scans with LIMIT</strong></td>
+<td>Early termination; minimal I/O</td>
+</tr>
+<tr>
+<td><strong>Streaming large results</strong></td>
+<td>No buffering; constant memory</td>
+</tr>
+<tr>
+<td><strong>Complex joins with selective filters</strong></td>
+<td>Filters reduce rows before expensive joins</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example: OLTP Query</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> orders 
+<span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">12345</span> 
+  <span class="token operator">AND</span> <span class="token keyword">status</span> <span class="token operator">=</span> <span class="token string">'pending'</span>
+<span class="token keyword">LIMIT</span> <span class="token number">1</span><span class="token punctuation">;</span></code></pre>
+<ul>
+<li>Index Scan finds matching row in ~3 I/O operations</li>
+<li>Filter applies <code>status = 'pending'</code></li>
+<li>Limit stops after first match</li>
+<li><strong>Total rows processed:</strong> 1-5</li>
+<li><strong>Volcano overhead:</strong> Negligible</li>
+</ul>
+<hr>
+<h3 id="Volcano-Struggles-At">Volcano Struggles At:</h3>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Analytical</strong> (scan millions of rows)</td>
+<td>Function call overhead dominates</td>
+</tr>
+<tr>
+<td><strong>Columnar access patterns</strong></td>
+<td>Row-by-row prevents column vectorization</td>
+</tr>
+<tr>
+<td><strong>Bulk aggregations</strong></td>
+<td>No batch processing for SIMD</td>
+</tr>
+<tr>
+<td><strong>Full table scans with simple filters</strong></td>
+<td>90% of time in <code>Next()</code> plumbing</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example: Analytical Query</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> 
+    DATE_TRUNC<span class="token punctuation">(</span><span class="token string">'month'</span><span class="token punctuation">,</span> created_at<span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">month</span><span class="token punctuation">,</span>
+    <span class="token function">SUM</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span> <span class="token keyword">as</span> total
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2020-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> <span class="token keyword">month</span><span class="token punctuation">;</span></code></pre>
+<ul>
+<li>Scans 100 million rows</li>
+<li>Each row: <code>Next()</code> call, filter check, date truncation, aggregation</li>
+<li><strong>Function calls:</strong> 200+ million (2 per row)</li>
+<li><strong>Volcano overhead:</strong> 20-40% of total time</li>
+</ul>
+<hr>
+<h2 id="7-Vectorized-Execution-The-Alternative">7 Vectorized Execution: The Alternative</h2>
+<p><strong>Vectorized engines</strong> (ClickHouse, DuckDB, Snowflake) process rows in <strong>batches</strong> (typically 1024-8192 rows):</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Vectorized interface */</span>
+<span class="token keyword">struct</span> <span class="token class-name">VectorBatch</span> <span class="token punctuation">{</span>
+    <span class="token class-name">int32_t</span> col1<span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token class-name">int32_t</span> col2<span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    bool nulls<span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> count<span class="token punctuation">;</span>  <span class="token comment">/* Actual rows in batch */</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+VectorBatch<span class="token operator">*</span> <span class="token function">NextBatch</span><span class="token punctuation">(</span>Operator<span class="token operator">*</span> op<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<p><strong>Execution:</strong></p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token keyword">while</span> <span class="token punctuation">(</span>batch <span class="token operator">=</span> <span class="token function">NextBatch</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">/* Process all 1024 rows at once */</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> batch<span class="token operator">-&gt;</span>count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>batch<span class="token operator">-&gt;</span>nulls<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">&amp;&amp;</span> batch<span class="token operator">-&gt;</span>col1<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">&gt;</span> <span class="token number">25</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            result<span class="token operator">-&gt;</span>col1<span class="token punctuation">[</span>result<span class="token operator">-&gt;</span>count<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> batch<span class="token operator">-&gt;</span>col1<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>Benefits:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Volcano (Row)</th>
+<th>Vectorized (Batch)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Function calls per row</td>
+<td>2+</td>
+<td>2 / batch_size (~0.002)</td>
+</tr>
+<tr>
+<td>SIMD utilization</td>
+<td>None</td>
+<td>High (process 4-8 values per instruction)</td>
+</tr>
+<tr>
+<td>Cache efficiency</td>
+<td>Poor (row layout)</td>
+<td>High (column layout)</td>
+</tr>
+<tr>
+<td>Code complexity</td>
+<td>Low</td>
+<td>High (batch management, vectorization)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Why-PostgreSQL-Doesn’t-Use-Vectorization-Yet">Why PostgreSQL Doesn’t Use Vectorization (Yet)</h3>
+<p><strong>1. Historical Reasons</strong></p>
+<p>PostgreSQL’s executor was designed in the 1980s-1990s, before SIMD and columnar storage were mainstream.</p>
+<p><strong>2. Architecture Coupling</strong></p>
+<p>Vectorization requires:</p>
+<ul>
+<li>Columnar storage (or row-to-column conversion)</li>
+<li>Batch-aware operators (rewriting ~50 node types)</li>
+<li>Vectorized expression evaluation (rewriting expression engine)</li>
+</ul>
+<p><strong>3. OLTP Focus</strong></p>
+<p>PostgreSQL optimizes for mixed workloads, not just analytics.</p>
+<p><strong>4. Extension Approach</strong></p>
+<p>Instead of rewriting the core, PostgreSQL supports extensions:</p>
+<ul>
+<li><strong>Columnar storage:</strong> Citus Columnar, Hydra</li>
+<li><strong>Vectorized execution:</strong> Experimental patches (not merged)</li>
+</ul>
+<hr>
+<h2 id="8-Hybrid-Approaches-Getting-the-Best-of-Both">8 Hybrid Approaches: Getting the Best of Both</h2>
+<p>Some databases blend Volcano with vectorization:</p>
+<h3 id="Apache-Spark">Apache Spark</h3>
+<ul>
+<li><strong>Volcano-style</strong> iterator interface</li>
+<li><strong>Vectorized readers</strong> (Parquet, ORC)</li>
+<li><strong>Whole-stage code generation</strong> (fuses operators, eliminates <code>Next()</code> calls)</li>
+</ul>
+<h3 id="DuckDB">DuckDB</h3>
+<ul>
+<li><strong>Vectorized execution</strong> as default</li>
+<li><strong>Volcano-style</strong> operator trees</li>
+<li><strong>Chunk-based</strong> processing (2048 rows per chunk)</li>
+</ul>
+<h3 id="PostgreSQL-Current">PostgreSQL (Current)</h3>
+<ul>
+<li><strong>Volcano model</strong> throughout</li>
+<li><strong>Just-in-Time compilation</strong> (LLVM) for expression evaluation</li>
+<li><strong>Parallel query</strong> for some operations (parallel Seq Scan, Hash Join, Aggregate)</li>
+</ul>
+<p><strong>JIT Compilation Example:</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SET</span> jit <span class="token operator">=</span> <span class="token keyword">on</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> <span class="token function">sum</span><span class="token punctuation">(</span>amount <span class="token operator">*</span> <span class="token number">1.15</span><span class="token punctuation">)</span>  <span class="token comment">/* Expression compiled to native code */</span>
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2025-01-01'</span><span class="token punctuation">;</span></code></pre>
+<p>PostgreSQL compiles the expression <code>amount * 1.15</code> to native machine code, reducing interpretation overhead. This doesn’t fix Volcano’s row-by-row model, but it helps.</p>
+<hr>
+<h2 id="9-Practical-Takeaways-for-PostgreSQL-Users">9 Practical Takeaways for PostgreSQL Users</h2>
+<h3 id="When-Volcano-Works-Well">When Volcano Works Well:</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ✅ Good: Selective index scan */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> email <span class="token operator">=</span> <span class="token string">'user@example.com'</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ Good: Early termination */</span>
+<span class="token keyword">SELECT</span> <span class="token keyword">EXISTS</span> <span class="token punctuation">(</span><span class="token keyword">SELECT</span> <span class="token number">1</span> <span class="token keyword">FROM</span> orders <span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">42</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ Good: Streaming with LIMIT */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> logs <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> <span class="token keyword">timestamp</span> <span class="token keyword">DESC</span> <span class="token keyword">LIMIT</span> <span class="token number">100</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ Good: Pipelined joins */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users u
+<span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>country <span class="token operator">=</span> <span class="token string">'US'</span><span class="token punctuation">;</span>  <span class="token comment">/* Filter reduces join input */</span></code></pre>
+<hr>
+<h3 id="When-Volcano-Struggles">When Volcano Struggles:</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ⚠️ Poor: Full table scan with aggregation */</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span>  <span class="token comment">/* Must scan all rows */</span>
+
+<span class="token comment">/* ⚠️ Poor: Complex expression on every row */</span>
+<span class="token keyword">SELECT</span> UPPER<span class="token punctuation">(</span>CONCAT<span class="token punctuation">(</span>first_name<span class="token punctuation">,</span> <span class="token string">' '</span><span class="token punctuation">,</span> last_name<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> users<span class="token punctuation">;</span>
+
+<span class="token comment">/* ⚠️ Poor: Blocking operators on large datasets */</span>
+<span class="token keyword">SELECT</span> <span class="token keyword">DISTINCT</span> category <span class="token keyword">FROM</span> products<span class="token punctuation">;</span>  <span class="token comment">/* Must buffer all */</span>
+
+<span class="token comment">/* ⚠️ Poor: Analytical window functions */</span>
+<span class="token keyword">SELECT</span> 
+    user_id<span class="token punctuation">,</span>
+    <span class="token function">AVG</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span> <span class="token keyword">OVER</span> <span class="token punctuation">(</span><span class="token keyword">PARTITION</span> <span class="token keyword">BY</span> user_id <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> <span class="token keyword">date</span><span class="token punctuation">)</span>
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="Optimization-Strategies">Optimization Strategies:</h3>
+<p><strong>1. Push Filters Down</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ❌ Bad: Filter after join */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users u
+<span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>created_at <span class="token operator">&gt;</span> <span class="token string">'2025-01-01'</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ Good: Filter before join (PostgreSQL does this automatically) */</span>
+<span class="token comment">/* Planner pushes filter down to users scan */</span></code></pre>
+<p><strong>2. Use Indexes to Reduce Rows</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ❌ Bad: Seq Scan on large table */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span> <span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">42</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ Good: Index Scan */</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">INDEX</span> <span class="token keyword">ON</span> <span class="token keyword">transactions</span><span class="token punctuation">(</span>user_id<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<p><strong>3. Avoid Unnecessary Blocking Operators</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ❌ Bad: DISTINCT on large result */</span>
+<span class="token keyword">SELECT</span> <span class="token keyword">DISTINCT</span> category <span class="token keyword">FROM</span> million_row_table<span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ Good: GROUP BY (same result, clearer intent) */</span>
+<span class="token keyword">SELECT</span> category <span class="token keyword">FROM</span> million_row_table <span class="token keyword">GROUP</span> <span class="token keyword">BY</span> category<span class="token punctuation">;</span></code></pre>
+<p><strong>4. Leverage Parallel Query</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* Enable parallel query */</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* Parallel Seq Scan + Hash Aggregate */</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> large_table<span class="token punctuation">;</span></code></pre>
+<hr>
+<h2 id="10-The-Future-Is-Vectorization-Coming-to-PostgreSQL">10 The Future: Is Vectorization Coming to PostgreSQL?</h2>
+<p><strong>Short answer:</strong> Not to the core, but extensions are experimenting.</p>
+<h3 id="Current-Efforts">Current Efforts:</h3>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Approach</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Citus Columnar</strong></td>
+<td>Columnar storage with row-by-row execution</td>
+<td>Production</td>
+</tr>
+<tr>
+<td><strong>Hydra</strong></td>
+<td>Columnar storage for analytics</td>
+<td>Production</td>
+</tr>
+<tr>
+<td><strong>pg_vectorize</strong></td>
+<td>Vectorized expression evaluation</td>
+<td>Experimental</td>
+</tr>
+<tr>
+<td><strong>LLVM JIT</strong></td>
+<td>Compiled expressions (not vectorized)</td>
+<td>Production (PG11+)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="Why-Core-Won’t-Change-Soon">Why Core Won’t Change Soon:</h3>
+<ol>
+<li><strong>Backward compatibility</strong> — Extensions rely on current executor API</li>
+<li><strong>Complexity</strong> — Rewriting 50+ node types is a massive undertaking</li>
+<li><strong>Trade-offs</strong> — Vectorization helps analytics, hurts OLTP latency</li>
+<li><strong>Philosophy</strong> — PostgreSQL prefers stable, incremental improvements</li>
+</ol>
+<p><strong>Most likely path:</strong> Vectorization via extensions, not core changes.</p>
+<hr>
+<h2 id="Summary-The-Volcano-Model-in-One-Diagram">Summary: The Volcano Model in One Diagram</h2>
+<div class="mermaid">flowchart LR
+    subgraph "Query Plan"
+        A[Limit: 10] --&gt; B[Sort: ORDER BY]
+        B --&gt; C[Aggregate: GROUP BY]
+        C --&gt; D[Hash Join]
+        D --&gt; E[Seq Scan: users]
+        D --&gt; F[Seq Scan: orders]
+    end
+    
+    subgraph "Execution (Volcano Model)"
+        G["Client: Next()"] --&gt; H["Limit: Next()"]
+        H --&gt; I["Sort: Next() — buffers all"]
+        I --&gt; J["Aggregate: Next() — per group"]
+        J --&gt; K["Hash Join: Next() — probe phase"]
+        K --&gt; L["Seq Scan: Next() — returns row"]
+    end
+    
+    style A fill:#fce4ec,stroke:#c2185b
+    style B fill:#fff3e0,stroke:#f57c00
+    style C fill:#e8f5e9,stroke:#388e3c
+    style G fill:#e3f2fd,stroke:#1976d2</div>
+<p><strong>Key Takeaways:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Volcano Model</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Interface</strong></td>
+<td><code>Next()</code> / <code>GetNext()</code> — one row at a time</td>
+</tr>
+<tr>
+<td><strong>Structure</strong></td>
+<td>Tree of operators</td>
+</tr>
+<tr>
+<td><strong>Data flow</strong></td>
+<td>Pull-based (child → parent)</td>
+</tr>
+<tr>
+<td><strong>Memory</strong></td>
+<td>O(1) for streaming, O(N) for blocking operators</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>OLTP, selective queries, streaming</td>
+</tr>
+<tr>
+<td><strong>Worst for</strong></td>
+<td>Analytical, full scans, bulk aggregations</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL status</strong></td>
+<td>Core execution model since inception</td>
+</tr>
+</tbody>
+</table>
+<p>The Volcano Model isn’t perfect—but after 40+ years, it’s still the foundation of most SQL databases. Understanding it helps you write queries that work <em>with</em> PostgreSQL’s architecture, not against it.</p>
+<hr>
+<p><strong>Further Reading:</strong></p>
+<ul>
+<li>Graefe, Goetz. <a target="_blank" rel="noopener" href="https://www.cs.du.edu/~snarayan/courses/comp_db/lecture11.pdf">“Volcano—An Extensible and Parallel Query Evaluation System”</a> (1994) — The original paper</li>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/tree/master/src/backend/executor"><code>src/backend/executor/</code></a> — Actual implementation</li>
+<li>“PostgreSQL Internals” by Egor Rogov — Deep dive into executor architecture</li>
+<li>DuckDB Documentation: <a target="_blank" rel="noopener" href="https://duckdb.org/docs/internals/vectorized_execution">“Vectorized Execution”</a> — Alternative approach</li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/" data-id="7c8ad72f" class="article-share-link"><i class="fa fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Understanding PostgreSQL&#39;s Volcano Model: The Iterator Execution Architecture",
+        "image": "https://neo01.com/assets/architecture/volcano-thumbnail.png",
+        "keywords": "Database Internals Performance PostgreSQL",
+        "genre": "Architecture",
+        "datePublished": "2026-02-15",
+        "dateCreated": "2026-02-15",
+        "dateModified": "2026-03-11",
+        "url": "https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/",
+        "description": "Deep dive into the Volcano Model—PostgreSQL's foundational execution architecture. Learn how Next()/GetNext() drives every query, why row-by-row processing matters, and when vectorization breaks the rules.",
+        "wordCount": 3585
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>follow:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">links</h3>
+    <div class="widget">
+        <ul><li><a href="/ai">AI Playground</a></li><li><a href="/tools">Tools</a></li><li><a href="/games">Games</a></li><li><a href="/pages/useful-information">Useful Information</a></li><li><a href="/pages/Hexo-Blogging-Cheatsheet">Hexo Blogging Cheatsheet</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">recents</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/02/Understanding-PostgreSQL-Volcano-Model/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/volcano-thumbnail_80.png)" alt="Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Architecture</a></p>
+                            <p class="item-title"><a href="/2026/02/Understanding-PostgreSQL-Volcano-Model/" class="title">Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture</a></p>
+                            <p class="item-date"><time datetime="2026-02-14T16:00:00.000Z" itemprop="datePublished">2026-02-15</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/01/Architecture-Decision-Log-Advanced-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/thumbnail1_80.png)" alt="Architecture Decision Log: Advanced Topics (Part 2)" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Architecture</a></p>
+                            <p class="item-title"><a href="/2026/01/Architecture-Decision-Log-Advanced-Topics/" class="title">Architecture Decision Log: Advanced Topics (Part 2)</a></p>
+                            <p class="item-date"><time datetime="2026-01-19T16:00:00.000Z" itemprop="datePublished">2026-01-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/01/Architecture-Decision-Log-Guide/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/thumbnail1_80.png)" alt="Architecture Decision Log: A Practical Guide (Part 1)" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Architecture</a></p>
+                            <p class="item-title"><a href="/2026/01/Architecture-Decision-Log-Guide/" class="title">Architecture Decision Log: A Practical Guide (Part 1)</a></p>
+                            <p class="item-date"><time datetime="2026-01-14T16:00:00.000Z" itemprop="datePublished">2026-01-15</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/12/RTGS-Acronyms-and-Abbreviations/" class="thumbnail">
+        <span style="background-image:url(/assets/rtgs/thumbnail_80.jpg)" alt="RTGS Reference: Complete Acronyms and Abbreviations Guide" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Misc</a></p>
+                            <p class="item-title"><a href="/2025/12/RTGS-Acronyms-and-Abbreviations/" class="title">RTGS Reference: Complete Acronyms and Abbreviations Guide</a></p>
+                            <p class="item-date"><time datetime="2025-12-29T16:00:00.000Z" itemprop="datePublished">2025-12-30</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2025/12/Understanding-RTGS-High-Availability/" class="thumbnail">
+        <span style="background-image:url(/assets/rtgs/thumbnail_80.jpg)" alt="Understanding RTGS: High Availability and Performance Design" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Misc</a></p>
+                            <p class="item-title"><a href="/2025/12/Understanding-RTGS-High-Availability/" class="title">Understanding RTGS: High Availability and Performance Design</a></p>
+                            <p class="item-date"><time datetime="2025-12-19T16:00:00.000Z" itemprop="datePublished">2025-12-20</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2026/">2026</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2025/">2025</a>
+                    <span class="archive-list-count">84</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2002/">2002</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#03dc24aa</div>
+                <img src="/qr/qr-be91f360a1902b0fb6a7fbfac984995a.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#03dc24aa">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. All rights reserved.
+                  <a href="/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
