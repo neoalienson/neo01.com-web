@@ -1,0 +1,1853 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>深入理解 PostgreSQL 的 Volcano 模型：迭代器執行架構 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Database Internals,Performance,PostgreSQL">
+    
+    
+    <meta name="description" content="深入探討 Volcano 模型——PostgreSQL 的基礎執行架構。了解 Next()/GetNext() 如何驅動每個查詢、為什麼逐列處理很重要，以及向量化何時打破規則。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="深入理解 PostgreSQL 的 Volcano 模型：迭代器執行架構">
+<meta property="og:url" content="https://neo01.com/zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="深入探討 Volcano 模型——PostgreSQL 的基礎執行架構。了解 Next()/GetNext() 如何驅動每個查詢、為什麼逐列處理很重要，以及向量化何時打破規則。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/architecture/volcano-thumbnail.png">
+<meta property="article:published_time" content="2026-02-14T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-11T15:41:29.022Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Database Internals">
+<meta property="article:tag" content="Performance">
+<meta property="article:tag" content="PostgreSQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/volcano-thumbnail.png">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/02/Understanding-PostgreSQL-Volcano-Model/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-TW';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me/">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/02/Understanding-PostgreSQL-Volcano-Model-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        深入理解 PostgreSQL 的 Volcano 模型：迭代器執行架構
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-02-14T16:00:00.000Z" itemprop="datePublished">2026-02-15</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-11T15:41:29.022Z" itemprop="datePublished">2026-03-11</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/zh-TW/tags/Database-Internals/">Database Internals</a> <a class="tag-link" href="/zh-TW/tags/Performance/">Performance</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E4%BB%80%E9%BA%BC%E6%98%AF-Volcano-%E6%A8%A1%E5%9E%8B%EF%BC%9F"><span class="toc-text">1 什麼是 Volcano 模型？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E8%BF%AD%E4%BB%A3%E5%99%A8%E4%BB%8B%E9%9D%A2%EF%BC%9ANext-GetNext"><span class="toc-text">2 迭代器介面：Next() / GetNext()</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E9%81%8B%E7%AE%97%E5%AD%90%E6%A8%B9%EF%BC%9A%E6%9F%A5%E8%A9%A2%E5%A6%82%E4%BD%95%E8%AE%8A%E6%88%90%E5%9F%B7%E8%A1%8C%E8%A8%88%E5%8A%83"><span class="toc-text">3 運算子樹：查詢如何變成執行計劃</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E9%80%90%E5%88%97%E8%99%95%E7%90%86%EF%BC%9A%E5%A5%BD%E7%9A%84%E3%80%81%E5%A3%9E%E7%9A%84%E5%92%8C%E6%85%A2%E7%9A%84"><span class="toc-text">4 逐列處理：好的、壞的和慢的</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-PostgreSQL-%E7%9A%84%E5%AF%A6%E4%BD%9C%EF%BC%9AExecProcNode"><span class="toc-text">5 PostgreSQL 的實作：ExecProcNode</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E6%95%88%E8%83%BD%E5%BD%B1%E9%9F%BF%EF%BC%9AVolcano-%E4%BD%95%E6%99%82%E7%99%BC%E5%85%89%E4%BD%95%E6%99%82%E6%8E%99%E6%89%8E"><span class="toc-text">6 效能影響：Volcano 何時發光何時掙扎</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E5%90%91%E9%87%8F%E5%8C%96%E5%9F%B7%E8%A1%8C%EF%BC%9A%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%A1%88"><span class="toc-text">7 向量化執行：替代方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E6%B7%B7%E5%90%88%E6%96%B9%E6%B3%95%EF%BC%9A%E5%85%A9%E5%85%A8%E5%85%B6%E7%BE%8E"><span class="toc-text">8 混合方法：兩全其美</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-PostgreSQL-%E7%94%A8%E6%88%B6%E7%9A%84%E5%AF%A6%E7%94%A8%E8%A6%81%E9%BB%9E"><span class="toc-text">9 PostgreSQL 用戶的實用要點</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#10-%E6%9C%AA%E4%BE%86%EF%BC%9A%E5%90%91%E9%87%8F%E5%8C%96%E6%9C%83%E4%BE%86%E5%88%B0-PostgreSQL-%E5%97%8E%EF%BC%9F"><span class="toc-text">10 未來：向量化會來到 PostgreSQL 嗎？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B8%BD%E7%B5%90%EF%BC%9A%E4%B8%80%E5%BC%B5%E5%9C%96%E4%B8%AD%E7%9A%84-Volcano-%E6%A8%A1%E5%9E%8B"><span class="toc-text">總結：一張圖中的 Volcano 模型</span></a></li></ol>
+            <p>你在 PostgreSQL 中執行的每個 SQL 查詢——無論是簡單的 <code>SELECT * FROM users</code> 還是帶有視窗函數的 20 表連接——都通過同一個優雅的機制執行：<strong>Volcano 模型</strong>（也稱為迭代器模型）。</p>
+<p>這個 1980 年代的架構讓 PostgreSQL 能夠：</p>
+<ul>
+<li>串流數 GB 的結果而不必將所有内容載入記憶體</li>
+<li>在 <code>LIMIT</code> 查詢中提前停止，無需處理所有列</li>
+<li>靈活地鏈接運算子，無需為每種組合編寫自訂代碼</li>
+</ul>
+<p>但這也是為什麼 PostgreSQL 在某些分析工作負載上掙扎，而<strong>向量化執行</strong>在這些場景中表現出色。以下是深入探討：Volcano 模型如何運作、為什麼 PostgreSQL 選擇它，以及它在哪裡失效。</p>
+<hr>
+<h2 id="1-什麼是-Volcano-模型？">1 什麼是 Volcano 模型？</h2>
+<p><strong>Volcano 模型</strong>是一種執行架構，其中查詢被表示為<strong>運算子樹</strong>，每個運算子暴露一個標準介面：<code>Next()</code>（在 PostgreSQL 代碼庫中為 <code>GetNext()</code>）。</p>
+<p>每個運算子：</p>
+<ul>
+<li>通過調用 <code>Next()</code> 向其子節點請求列</li>
+<li>一次處理一列</li>
+<li>向其父節點返回一列</li>
+</ul>
+<p>這個<strong>基於拉取</strong>的模型意味著數據向上流經樹，每次調用一列，直到頂部節點將結果返回給客戶端。</p>
+<h3 id="它是架構？模式？還是其他什麼？">它是架構？模式？還是其他什麼？</h3>
+<p>Volcano 模型經常使用不同的術語來描述。以下是精確的分類：</p>
+<table>
+<thead>
+<tr>
+<th>術語</th>
+<th>Volcano 是這個嗎？</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>執行模型</strong></td>
+<td>✅ <strong>最準確</strong></td>
+<td>定義計算<em>如何</em>進行（逐列、基於拉取）</td>
+</tr>
+<tr>
+<td><strong>架構模式</strong></td>
+<td>✅ <strong>也正確</strong></td>
+<td>定義高層結構（帶有標準介面的運算子樹）</td>
+</tr>
+<tr>
+<td><strong>設計模式</strong></td>
+<td>⚠️ <strong>部分</strong></td>
+<td>建立在<em>迭代器模式之上</em>，但不僅僅是一個模式</td>
+</tr>
+<tr>
+<td><strong>軟體架構</strong></td>
+<td>❌ <strong>太寬泛</strong></td>
+<td>它是資料庫架構的<em>一部分</em>，不是整個架構</td>
+</tr>
+<tr>
+<td><strong>演算法</strong></td>
+<td>❌ <strong>不是</strong></td>
+<td>它是結構框架，不是特定的計算過程</td>
+</tr>
+</tbody>
+</table>
+<p><strong>關係：</strong></p>
+<pre class="language-none"><code class="language-none">迭代器模式 (GoF 設計模式)
+        ↓
+    被使用
+        ↓
+Volcano 模型 (架構模式 / 執行模型)
+        ↓
+    實作於
+        ↓
+PostgreSQL 執行器 (軟體架構)</code></pre>
+<p><strong>為什麼混淆？</strong></p>
+<table>
+<thead>
+<tr>
+<th>來源</th>
+<th>使用術語</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>學術論文</strong></td>
+<td>“執行模型”</td>
+<td>專注於計算語義</td>
+</tr>
+<tr>
+<td><strong>資料庫供應商</strong></td>
+<td>“架構”</td>
+<td>行銷；聽起來更實質</td>
+</tr>
+<tr>
+<td><strong>軟體工程師</strong></td>
+<td>“模式”</td>
+<td>熟悉設計模式詞彙</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL 文件</strong></td>
+<td>“執行器”</td>
+<td>實作導向的命名</td>
+</tr>
+</tbody>
+</table>
+<p><strong>精確答案：</strong></p>
+<p>Volcano 模型最好描述為<strong>用於查詢執行的架構模式</strong>：</p>
+<ul>
+<li>使用<strong>迭代器模式</strong>作為基礎</li>
+<li>定義<strong>執行模型</strong>（基於拉取、一次一列）</li>
+<li>是資料庫整體軟體架構的<strong>一部分</strong></li>
+</ul>
+<p>這樣理解：</p>
+<ul>
+<li><strong>迭代器模式</strong> = “我如何遍历集合？”</li>
+<li><strong>Volcano 模型</strong> = “我如何組合運算子來執行查詢？”</li>
+<li><strong>PostgreSQL 執行器</strong> = “實作 Volcano 的實際代碼”</li>
+</ul>
+<hr>
+<p><strong>簡單範例：</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> name <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> age <span class="token operator">&gt;</span> <span class="token number">25</span><span class="token punctuation">;</span></code></pre>
+<p>執行為：</p>
+<div class="mermaid">flowchart BT
+    A[順序掃描：users] --&gt; B[過濾：age &gt; 25]
+    B --&gt; C[投影：name]
+    C --&gt; D[客戶端]
+    
+    style A fill:#e3f2fd,stroke:#1976d2
+    style B fill:#fff3e0,stroke:#f57c00
+    style C fill:#e8f5e9,stroke:#388e3c</div>
+<p><strong>執行流程：</strong></p>
+<pre class="language-none"><code class="language-none">客戶端："給我一列"
+  ↓
+投影："這是一列"（調用 Filter.Next()）
+  ↓
+過濾："這是過濾後的列"（調用 SeqScan.Next()）
+  ↓
+順序掃描："這是來自磁碟的原始列"</code></pre>
+<p>每個運算子都是<strong>獨立的</strong>。過濾器不知道數據來自順序掃描、索引掃描還是連接。投影不知道數據是否被過濾或原始。這種<strong>模組化</strong>是 Volcano 模型的超能力。</p>
+<hr>
+<h2 id="2-迭代器介面：Next-GetNext">2 迭代器介面：Next() / GetNext()</h2>
+<p>在 PostgreSQL 的代碼庫中，每個執行器節點實作相同的核心介面：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* 簡化自 postgres/src/include/nodes/execnodes.h */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">PlanState</span> <span class="token punctuation">{</span>
+    <span class="token comment">/* ... 狀態欄位 ... */</span>
+<span class="token punctuation">}</span> PlanState<span class="token punctuation">;</span>
+
+<span class="token comment">/* 每個節點類型實作這個模式 */</span>
+<span class="token keyword">static</span> <span class="token keyword">inline</span> TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecProcNode</span><span class="token punctuation">(</span>PlanState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-&gt;</span>is_done<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>  <span class="token comment">/* 沒有更多列 */</span>
+    
+    <span class="token comment">/* 節點特定邏輯 */</span>
+    <span class="token keyword">return</span> node<span class="token operator">-&gt;</span>next_row<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>契約：</strong></p>
+<table>
+<thead>
+<tr>
+<th>返回值</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>有效的 <code>TupleTableSlot</code></td>
+<td>一列數據</td>
+</tr>
+<tr>
+<td><code>NULL</code></td>
+<td>沒有更多列（串流結束）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>通用執行迴圈：</strong></p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* 偽代碼—PostgreSQL 的實際執行器 */</span>
+<span class="token keyword">while</span> <span class="token punctuation">(</span>true<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    TupleTableSlot <span class="token operator">*</span>slot <span class="token operator">=</span> <span class="token function">ExecProcNode</span><span class="token punctuation">(</span>top_node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">TupIsNull</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">break</span><span class="token punctuation">;</span>  <span class="token comment">/* 沒有更多列 */</span>
+    
+    <span class="token comment">/* 處理列（發送到客戶端、聚合等） */</span>
+    <span class="token function">send_to_client</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>這個迴圈——<strong>調用 <code>Next()</code>、處理列、重複</strong>——就是整個 Volcano 模型。每個查詢，無論多複雜，都歸結為這個模式。</p>
+<hr>
+<h2 id="3-運算子樹：查詢如何變成執行計劃">3 運算子樹：查詢如何變成執行計劃</h2>
+<p>當你運行查詢時，PostgreSQL 的規劃器建立一個<strong>運算子樹</strong>。每個節點是一個具有特定邏輯的執行器類型。</p>
+<h3 id="常見運算子類型">常見運算子類型</h3>
+<table>
+<thead>
+<tr>
+<th>運算子</th>
+<th>做什麼</th>
+<th>調用子節點多少次？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>順序掃描</strong></td>
+<td>從磁碟讀取表頁</td>
+<td>N/A（葉節點）</td>
+</tr>
+<tr>
+<td><strong>索引掃描</strong></td>
+<td>讀取索引，獲取堆元組</td>
+<td>N/A（葉節點）</td>
+</tr>
+<tr>
+<td><strong>過濾</strong></td>
+<td>應用 WHERE 子句</td>
+<td>1+（直到列通過過濾）</td>
+</tr>
+<tr>
+<td><strong>投影</strong></td>
+<td>選擇/計算列</td>
+<td>1</td>
+</tr>
+<tr>
+<td><strong>嵌套迴圈連接</strong></td>
+<td>對每個外部列，掃描內部</td>
+<td>1 外部 + N 內部</td>
+</tr>
+<tr>
+<td><strong>哈希連接</strong></td>
+<td>建立哈希表，探測</td>
+<td>N（建立階段）+ N（探測階段）</td>
+</tr>
+<tr>
+<td><strong>合併連接</strong></td>
+<td>合併排序的輸入</td>
+<td>每個排序輸入 1 次</td>
+</tr>
+<tr>
+<td><strong>聚合</strong></td>
+<td>分組並計算聚合</td>
+<td>N（直到分組完成）</td>
+</tr>
+<tr>
+<td><strong>排序</strong></td>
+<td>排序輸入，按順序返回</td>
+<td>N（緩衝全部，然後返回）</td>
+</tr>
+<tr>
+<td><strong>限制</strong></td>
+<td>在 N 列後停止</td>
+<td>N（傳遞通過）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="範例：複雜查詢">範例：複雜查詢</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span>
+    u<span class="token punctuation">.</span>name<span class="token punctuation">,</span>
+    <span class="token function">COUNT</span><span class="token punctuation">(</span>o<span class="token punctuation">.</span>id<span class="token punctuation">)</span> <span class="token keyword">as</span> order_count
+<span class="token keyword">FROM</span> users u
+<span class="token keyword">LEFT</span> <span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>created_at <span class="token operator">&gt;</span> <span class="token string">'2025-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> u<span class="token punctuation">.</span>name
+<span class="token keyword">HAVING</span> <span class="token function">COUNT</span><span class="token punctuation">(</span>o<span class="token punctuation">.</span>id<span class="token punctuation">)</span> <span class="token operator">&gt;</span> <span class="token number">5</span>
+<span class="token keyword">ORDER</span> <span class="token keyword">BY</span> order_count <span class="token keyword">DESC</span>
+<span class="token keyword">LIMIT</span> <span class="token number">10</span><span class="token punctuation">;</span></code></pre>
+<p><strong>執行計劃（簡化）：</strong></p>
+<div class="mermaid">flowchart BT
+    A[順序掃描：users] --&gt; B[過濾：created_at &gt; 2025-01-01]
+    B --&gt; C[哈希連接：LEFT JOIN orders]
+    D[順序掃描：orders] --&gt; C
+    C --&gt; E[聚合：GROUP BY u.name]
+    E --&gt; F[過濾：HAVING COUNT &gt; 5]
+    F --&gt; G[排序：ORDER BY order_count DESC]
+    G --&gt; H[限制：10]
+    H --&gt; I[投影：name, order_count]
+    I --&gt; J[客戶端]
+    
+    style A fill:#e3f2fd,stroke:#1976d2
+    style D fill:#e3f2fd,stroke:#1976d2
+    style C fill:#fff3e0,stroke:#f57c00
+    style E fill:#e8f5e9,stroke:#388e3c
+    style H fill:#fce4ec,stroke:#c2185b</div>
+<p><strong>執行流程（第一列）：</strong></p>
+<pre class="language-none"><code class="language-none">1. 客戶端調用 Limit.Next()
+2. Limit 調用 Sort.Next()
+3. Sort 緩衝所有輸入（調用 Aggregate.Next() 直到 NULL）
+4. Aggregate 為每個分組調用 HAVING Filter.Next()
+5. HAVING Filter 調用 Aggregate.Next()（已消耗連接）
+6. Hash Join 從 orders 建立哈希表，然後用 users 探測
+7. Users 順序掃描讀取列，Filter 應用 created_at &gt; '2025-01-01'
+8. Sort 返回第一列（最高 order_count）
+9. Limit 將其返回給客戶端</code></pre>
+<p>注意：<strong>Sort 必須在返回任何内容之前消耗所有輸入</strong>。這是一個<strong>阻塞運算子</strong>——它打破了純串流模型。</p>
+<div class="admonition question"><p class="admonition-title"><span class="mdi mdi-comment-question-outline admonition-icon"></span>🤔 為什麼這很重要？</p><div class="admonition-content"><p>像 <code>Sort</code>、<code>Hash Aggregate</code> 和 <code>Hash Join (建立階段)</code> 這樣的阻塞運算子強制 PostgreSQL 在產生結果之前<strong>緩衝數據</strong>。這意味著：</p>
+<ul>
+<li><strong>記憶體壓力</strong> — 必須適合 <code>work_mem</code> 或溢出到磁碟</li>
+<li><strong>無法提前終止</strong> — 即使有 <code>LIMIT</code> 也無法提前停止</li>
+<li><strong>延遲影響</strong> — 第一列需要更長時間才能返回</li>
+</ul>
+<p>當你在 <code>EXPLAIN ANALYZE</code> 中看到這些時，問：<em>"我能在這個運算子之前減少輸入大小嗎？"</em></p>
+</div></div>
+<hr>
+<h2 id="4-逐列處理：好的、壞的和慢的">4 逐列處理：好的、壞的和慢的</h2>
+<h3 id="好的：為什麼-Volcano-運作良好">好的：為什麼 Volcano 運作良好</h3>
+<p><strong>1. 記憶體效率</strong></p>
+<p>非阻塞運算子串流列而无需緩衝：</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> name <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> age <span class="token operator">&gt;</span> <span class="token number">25</span> <span class="token keyword">LIMIT</span> <span class="token number">10</span><span class="token punctuation">;</span></code></pre>
+<p>PostgreSQL 可以在找到 10 個匹配列後停止——如果提前找到匹配，無需掃描整個表。</p>
+<p><strong>記憶體使用：</strong> 每個運算子 O(1)（只是當前列狀態）</p>
+<hr>
+<p><strong>2. 模組化</strong></p>
+<p>運算子自由組合。相同的 Filter 可用於：</p>
+<ul>
+<li>順序掃描</li>
+<li>索引掃描</li>
+<li>任何連接類型</li>
+<li>子查詢結果</li>
+</ul>
+<p>無需為每種組合編寫自訂代碼。</p>
+<hr>
+<p><strong>3. 提前終止</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">EXISTS</span> <span class="token punctuation">(</span><span class="token keyword">SELECT</span> <span class="token number">1</span> <span class="token keyword">FROM</span> orders <span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">42</span><span class="token punctuation">)</span></code></pre>
+<p>在第一個匹配列處停止。無需找到所有匹配。</p>
+<hr>
+<p><strong>4. 簡單實作</strong></p>
+<p>每個運算子是一個自包含函數：</p>
+<pre class="language-c" data-language="c"><code class="language-c">TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecFilter</span><span class="token punctuation">(</span>FilterState <span class="token operator">*</span>state<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>true<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        TupleTableSlot <span class="token operator">*</span>slot <span class="token operator">=</span> <span class="token function">ExecProcNode</span><span class="token punctuation">(</span><span class="token function">outer_plan</span><span class="token punctuation">(</span>state<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">TupIsNull</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">passes_qual</span><span class="token punctuation">(</span>slot<span class="token punctuation">,</span> state<span class="token operator">-&gt;</span>qual<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> slot<span class="token punctuation">;</span>
+        
+        <span class="token comment">/* 列不匹配—嘗試下一列 */</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>約 30 行代碼。易於理解。易於除錯。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 關鍵洞察：簡單性實現可擴展性</p><div class="admonition-content"><p>因為每個運算子都很簡單（約 30-100 行），PostgreSQL 可以新增運算子類型而無需重寫整個執行器。這就是為什麼擴充功能可以新增自訂掃描方法、連接類型和聚合策略。Volcano 模型的<strong>統一介面</strong>使 PostgreSQL 可擴展。</p>
+</div></div>
+<hr>
+<h3 id="壞的：Volcano-在哪裡掙扎">壞的：Volcano 在哪裡掙扎</h3>
+<p><strong>1. 函數調用開銷</strong></p>
+<p>每列需要：</p>
+<ul>
+<li>調用子節點的 <code>Next()</code></li>
+<li>調用父節點的 <code>Next()</code></li>
+<li>虛擬函數分派（在某些實作中）</li>
+</ul>
+<p>對於 100 萬列：<strong>200 萬次函數調用</strong>只是用於管道。</p>
+<hr>
+<p><strong>2. 無向量化</strong></p>
+<p>現代 CPU 擅長 <strong>SIMD</strong>（單指令多數據）：</p>
+<pre class="language-none"><code class="language-none">純量 (Volcano)：處理列 1，然後列 2，然後列 3...
+向量化：       並行處理列 1-1024</code></pre>
+<p>Volcano 的逐列模型無法利用 SIMD，因為：</p>
+<ul>
+<li>每列獨立處理</li>
+<li>沒有用於向量化的批次上下文</li>
+<li>狀態是每列，不是每批次</li>
+</ul>
+<hr>
+<p><strong>3. 快取效率低</strong></p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Volcano：分散的記憶體訪問 */</span>
+<span class="token keyword">while</span> <span class="token punctuation">(</span>row <span class="token operator">=</span> <span class="token function">Next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>row<span class="token operator">-&gt;</span>col1<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* 可能在不同快取行 */</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>row<span class="token operator">-&gt;</span>col2<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* 又一次快取未命中 */</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>row<span class="token operator">-&gt;</span>col3<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* 又一次快取未命中 */</span>
+<span class="token punctuation">}</span></code></pre>
+<p>列式/向量化引擎一起處理一列的所有值：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* 向量化：順序記憶體訪問 */</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span>batch <span class="token operator">:</span> batches<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>batch<span class="token punctuation">.</span>col1<span class="token punctuation">[</span><span class="token number">0.</span><span class="token number">.1023</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* 順序—快取友好 */</span>
+    <span class="token function">process</span><span class="token punctuation">(</span>batch<span class="token punctuation">.</span>col2<span class="token punctuation">[</span><span class="token number">0.</span><span class="token number">.1023</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* 順序—快取友好 */</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<p><strong>4. 阻塞運算子打破串流</strong></p>
+<p>某些運算子必須在產生輸出之前消耗所有輸入：</p>
+<table>
+<thead>
+<tr>
+<th>阻塞運算子</th>
+<th>為什麼阻塞</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Sort</strong></td>
+<td>必須看到所有列才能確定順序</td>
+</tr>
+<tr>
+<td><strong>Hash Aggregate</strong></td>
+<td>必須看到分組中的所有列才能計算聚合</td>
+</tr>
+<tr>
+<td><strong>Hash Join (建立階段)</strong></td>
+<td>必須建立整個哈希表才能探測</td>
+</tr>
+<tr>
+<td><strong>Distinct</strong></td>
+<td>必須看到所有列才能消除重複</td>
+</tr>
+</tbody>
+</table>
+<p>當計劃中有阻塞運算子時，<strong>上游運算子無法串流</strong>——它們必須緩衝。</p>
+<hr>
+<h2 id="5-PostgreSQL-的實作：ExecProcNode">5 PostgreSQL 的實作：ExecProcNode</h2>
+<p>在 PostgreSQL 的原始碼中，Volcano 介面是 <code>ExecProcNode()</code>：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* 簡化自 src/include/nodes/execnodes.h */</span>
+<span class="token keyword">static</span> <span class="token keyword">inline</span> TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecProcNode</span><span class="token punctuation">(</span>PlanState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>node<span class="token operator">-&gt;</span>is_done<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    
+    <span class="token comment">/* 分派到節點特定函數 */</span>
+    <span class="token keyword">return</span> node<span class="token operator">-&gt;</span><span class="token function">ExecProcNode</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p>每個節點類型實作自己的 <code>ExecProcNode</code>：</p>
+<table>
+<thead>
+<tr>
+<th>節點類型</th>
+<th>實作函數</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>順序掃描</td>
+<td><code>ExecSeqScan()</code></td>
+</tr>
+<tr>
+<td>索引掃描</td>
+<td><code>ExecIndexScan()</code></td>
+</tr>
+<tr>
+<td>哈希連接</td>
+<td><code>ExecHashJoin()</code></td>
+</tr>
+<tr>
+<td>聚合</td>
+<td><code>ExecAggregate()</code></td>
+</tr>
+<tr>
+<td>排序</td>
+<td><code>ExecSort()</code></td>
+</tr>
+<tr>
+<td>過濾</td>
+<td><code>ExecFilter()</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="範例：過濾節點">範例：過濾節點</h3>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* 簡化自 src/backend/executor/nodeFilter.c */</span>
+TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecFilter</span><span class="token punctuation">(</span>FilterState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    ExprContext <span class="token operator">*</span>econtext <span class="token operator">=</span> node<span class="token operator">-&gt;</span>ps<span class="token punctuation">.</span>ps_ExprContext<span class="token punctuation">;</span>
+    ExprState <span class="token operator">*</span>qual <span class="token operator">=</span> node<span class="token operator">-&gt;</span>filterqual<span class="token punctuation">;</span>
+    
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token punctuation">;</span><span class="token punctuation">;</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">/* 從外部計劃獲取元組 */</span>
+        TupleTableSlot <span class="token operator">*</span>slot <span class="token operator">=</span> <span class="token function">ExecProcNode</span><span class="token punctuation">(</span><span class="token function">outerPlan</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">/* 沒有更多列？ */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">TupIsNull</span><span class="token punctuation">(</span>slot<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+        
+        <span class="token comment">/* 設置表達式上下文 */</span>
+        econtext<span class="token operator">-&gt;</span>ecxt_outertuple <span class="token operator">=</span> slot<span class="token punctuation">;</span>
+        
+        <span class="token comment">/* 檢查限定條件 */</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">ExecQual</span><span class="token punctuation">(</span>qual<span class="token punctuation">,</span> econtext<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> slot<span class="token punctuation">;</span>  <span class="token comment">/* 通過過濾—返回它 */</span>
+        
+        <span class="token comment">/* 未通過—迴圈並嘗試下一列 */</span>
+        <span class="token function">InstrCountFiltered1</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">/* 統計追蹤 */</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>關鍵觀察：</strong></p>
+<ol>
+<li><strong>無限迴圈</strong> 直到列通過或沒有更多列</li>
+<li><strong>單進單出</strong></li>
+<li><strong>無狀態</strong> 在調用之間（除了統計）</li>
+<li><strong>委託給子節點</strong> 通過 <code>ExecProcNode(outerPlan(node))</code></li>
+</ol>
+<p>這個模式在約 50 個執行器節點類型中重複。</p>
+<hr>
+<h2 id="6-效能影響：Volcano-何時發光何時掙扎">6 效能影響：Volcano 何時發光何時掙扎</h2>
+<h3 id="Volcano-擅長：">Volcano 擅長：</h3>
+<table>
+<thead>
+<tr>
+<th>工作負載</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OLTP</strong>（短、選擇性查詢）</td>
+<td>處理少量列；函數調用開銷可忽略</td>
+</tr>
+<tr>
+<td><strong>帶 LIMIT 的索引掃描</strong></td>
+<td>提前終止；最小 I/O</td>
+</tr>
+<tr>
+<td><strong>串流大結果</strong></td>
+<td>無緩衝；恆定記憶體</td>
+</tr>
+<tr>
+<td><strong>帶選擇性過濾的複雜連接</strong></td>
+<td>過濾在昂貴連接前減少列</td>
+</tr>
+</tbody>
+</table>
+<p><strong>範例：OLTP 查詢</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> orders
+<span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">12345</span>
+  <span class="token operator">AND</span> <span class="token keyword">status</span> <span class="token operator">=</span> <span class="token string">'pending'</span>
+<span class="token keyword">LIMIT</span> <span class="token number">1</span><span class="token punctuation">;</span></code></pre>
+<ul>
+<li>索引掃描在約 3 次 I/O 操作中找到匹配列</li>
+<li>過濾應用 <code>status = 'pending'</code></li>
+<li>Limit 在第一個匹配後停止</li>
+<li><strong>總處理列數：</strong> 1-5</li>
+<li><strong>Volcano 開銷：</strong> 可忽略</li>
+</ul>
+<hr>
+<h3 id="Volcano-掙扎：">Volcano 掙扎：</h3>
+<table>
+<thead>
+<tr>
+<th>工作負載</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>分析</strong>（掃描數百萬列）</td>
+<td>函數調用開銷主導</td>
+</tr>
+<tr>
+<td><strong>列式訪問模式</strong></td>
+<td>逐列阻止列向量化</td>
+</tr>
+<tr>
+<td><strong>批量聚合</strong></td>
+<td>無用於 SIMD 的批次處理</td>
+</tr>
+<tr>
+<td><strong>帶簡單過濾的全表掃描</strong></td>
+<td>90% 時間在 <code>Next()</code> 管道中</td>
+</tr>
+</tbody>
+</table>
+<p><strong>範例：分析查詢</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span>
+    DATE_TRUNC<span class="token punctuation">(</span><span class="token string">'month'</span><span class="token punctuation">,</span> created_at<span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">month</span><span class="token punctuation">,</span>
+    <span class="token function">SUM</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span> <span class="token keyword">as</span> total
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2020-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> <span class="token keyword">month</span><span class="token punctuation">;</span></code></pre>
+<ul>
+<li>掃描 1 億列</li>
+<li>每列：<code>Next()</code> 調用、過濾檢查、日期截斷、聚合</li>
+<li><strong>函數調用：</strong> 2 億+（每列 2 次）</li>
+<li><strong>Volcano 開銷：</strong> 總時間的 20-40%</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 隱藏成本：不只是函數調用</p><div class="admonition-content"><p>函數調用開銷只是問題的一部分。逐列處理還意味著：</p>
+<ol>
+<li><strong>分支預測錯誤</strong> — CPU 無法預測每列採取哪條路徑</li>
+<li><strong>SIMD 利用不足</strong> — 現代 CPU 可以並行處理 4-8 個值，但 Volcano 使用純量操作</li>
+<li><strong>快取抖動</strong> — 每列可能觸及不同的記憶體位置</li>
+</ol>
+<p>對於分析查詢，這些 CPU 級別的低效率通常比函數調用計數本身更重要。</p>
+</div></div>
+<hr>
+<h2 id="7-向量化執行：替代方案">7 向量化執行：替代方案</h2>
+<p><strong>向量化引擎</strong>（ClickHouse、DuckDB、Snowflake）以<strong>批次</strong>處理列（通常 1024-8192 列）：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* 向量化介面 */</span>
+<span class="token keyword">struct</span> <span class="token class-name">VectorBatch</span> <span class="token punctuation">{</span>
+    <span class="token class-name">int32_t</span> col1<span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token class-name">int32_t</span> col2<span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    bool nulls<span class="token punctuation">[</span><span class="token number">1024</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">int</span> count<span class="token punctuation">;</span>  <span class="token comment">/* 批次中的實際列數 */</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+VectorBatch<span class="token operator">*</span> <span class="token function">NextBatch</span><span class="token punctuation">(</span>Operator<span class="token operator">*</span> op<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<p><strong>執行：</strong></p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token keyword">while</span> <span class="token punctuation">(</span>batch <span class="token operator">=</span> <span class="token function">NextBatch</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">/* 一次處理所有 1024 列 */</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">int</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> batch<span class="token operator">-&gt;</span>count<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>batch<span class="token operator">-&gt;</span>nulls<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">&amp;&amp;</span> batch<span class="token operator">-&gt;</span>col1<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">&gt;</span> <span class="token number">25</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            result<span class="token operator">-&gt;</span>col1<span class="token punctuation">[</span>result<span class="token operator">-&gt;</span>count<span class="token operator">++</span><span class="token punctuation">]</span> <span class="token operator">=</span> batch<span class="token operator">-&gt;</span>col1<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>好處：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>Volcano (列)</th>
+<th>向量化 (批次)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>每列函數調用</td>
+<td>2+</td>
+<td>2 / batch_size (~0.002)</td>
+</tr>
+<tr>
+<td>SIMD 利用</td>
+<td>無</td>
+<td>高（每指令處理 4-8 個值）</td>
+</tr>
+<tr>
+<td>快取效率</td>
+<td>差（列佈局）</td>
+<td>高（列佈局）</td>
+</tr>
+<tr>
+<td>代碼複雜性</td>
+<td>低</td>
+<td>高（批次管理、向量化）</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition question"><p class="admonition-title"><span class="mdi mdi-comment-question-outline admonition-icon"></span>🤔 那麼為什麼 PostgreSQL 不切換？</p><div class="admonition-content"><p>如果向量化對分析快 5-10 倍，為什麼不採用？</p>
+<ul>
+<li><strong>向後相容</strong> — 擴充功能依賴當前的 <code>ExecProcNode()</code> API</li>
+<li><strong>代碼複雜性</strong> — 重寫 50+ 個節點類型是巨大的工作</li>
+<li><strong>OLTP 權衡</strong> — 向量化幫助分析但可能傷害 OLTP 延遲</li>
+<li><strong>哲學</strong> — PostgreSQL 偏好穩定、漸進的改進</li>
+</ul>
+<p>答案：<strong>通過擴充功能，不是核心變更</strong>。見下一節。</p>
+</div></div>
+<hr>
+<h3 id="為什麼-PostgreSQL（還）不使用向量化">為什麼 PostgreSQL（還）不使用向量化</h3>
+<p><strong>1. 歷史原因</strong></p>
+<p>PostgreSQL 的執行器設計於 1980-1990 年代，在 SIMD 和列式儲存成為主流之前。</p>
+<p><strong>2. 架構耦合</strong></p>
+<p>向量化需要：</p>
+<ul>
+<li>列式儲存（或列到列轉換）</li>
+<li>感知批次的運算子（重寫約 50 個節點類型）</li>
+<li>向量化表達式評估（重寫表達式引擎）</li>
+</ul>
+<p><strong>3. OLTP 焦點</strong></p>
+<p>PostgreSQL 優化混合工作負載，不僅僅是分析。</p>
+<p><strong>4. 擴充功能方法</strong></p>
+<p>PostgreSQL 支援擴充功能而不是重寫核心：</p>
+<ul>
+<li><strong>列式儲存：</strong> Citus Columnar、Hydra</li>
+<li><strong>向量化執行：</strong> 實驗性補丁（未合併）</li>
+</ul>
+<hr>
+<h2 id="8-混合方法：兩全其美">8 混合方法：兩全其美</h2>
+<p>某些資料庫混合 Volcano 與向量化：</p>
+<h3 id="Apache-Spark">Apache Spark</h3>
+<ul>
+<li><strong>Volcano 風格</strong> 迭代器介面</li>
+<li><strong>向量化讀取器</strong>（Parquet、ORC）</li>
+<li><strong>全程代碼生成</strong>（融合運算子、消除 <code>Next()</code> 調用）</li>
+</ul>
+<h3 id="DuckDB">DuckDB</h3>
+<ul>
+<li><strong>向量化執行</strong> 作為預設</li>
+<li><strong>Volcano 風格</strong> 運算子樹</li>
+<li><strong>基於區塊</strong> 處理（每區塊 2048 列）</li>
+</ul>
+<h3 id="PostgreSQL（當前）">PostgreSQL（當前）</h3>
+<ul>
+<li><strong>Volcano 模型</strong> 貫穿始終</li>
+<li><strong>即時編譯</strong>（LLVM）用於表達式評估</li>
+<li><strong>並行查詢</strong> 用於某些操作（並行順序掃描、哈希連接、聚合）</li>
+</ul>
+<p><strong>JIT 編譯範例：</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SET</span> jit <span class="token operator">=</span> <span class="token keyword">on</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> <span class="token function">sum</span><span class="token punctuation">(</span>amount <span class="token operator">*</span> <span class="token number">1.15</span><span class="token punctuation">)</span>  <span class="token comment">/* 表達式編譯為原生代碼 */</span>
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2025-01-01'</span><span class="token punctuation">;</span></code></pre>
+<p>PostgreSQL 將表達式 <code>amount * 1.15</code> 編譯為原生機器碼，減少解釋開銷。這沒有修復 Volcano 的逐列模型，但有幫助。</p>
+<hr>
+<h2 id="9-PostgreSQL-用戶的實用要點">9 PostgreSQL 用戶的實用要點</h2>
+<h3 id="Volcano-運作良好時：">Volcano 運作良好時：</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ✅ 好：選擇性索引掃描 */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> email <span class="token operator">=</span> <span class="token string">'user@example.com'</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ 好：提前終止 */</span>
+<span class="token keyword">SELECT</span> <span class="token keyword">EXISTS</span> <span class="token punctuation">(</span><span class="token keyword">SELECT</span> <span class="token number">1</span> <span class="token keyword">FROM</span> orders <span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">42</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ 好：帶 LIMIT 的串流 */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> logs <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> <span class="token keyword">timestamp</span> <span class="token keyword">DESC</span> <span class="token keyword">LIMIT</span> <span class="token number">100</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ 好：流水線連接 */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users u
+<span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>country <span class="token operator">=</span> <span class="token string">'US'</span><span class="token punctuation">;</span>  <span class="token comment">/* 過濾減少連接輸入 */</span></code></pre>
+<hr>
+<h3 id="Volcano-掙扎時：">Volcano 掙扎時：</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ⚠️ 差：帶聚合的全表掃描 */</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span>  <span class="token comment">/* 必須掃描所有列 */</span>
+
+<span class="token comment">/* ⚠️ 差：每列複雜表達式 */</span>
+<span class="token keyword">SELECT</span> UPPER<span class="token punctuation">(</span>CONCAT<span class="token punctuation">(</span>first_name<span class="token punctuation">,</span> <span class="token string">' '</span><span class="token punctuation">,</span> last_name<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> users<span class="token punctuation">;</span>
+
+<span class="token comment">/* ⚠️ 差：大資料集上的阻塞運算子 */</span>
+<span class="token keyword">SELECT</span> <span class="token keyword">DISTINCT</span> category <span class="token keyword">FROM</span> products<span class="token punctuation">;</span>  <span class="token comment">/* 必須緩衝所有 */</span>
+
+<span class="token comment">/* ⚠️ 差：分析視窗函數 */</span>
+<span class="token keyword">SELECT</span>
+    user_id<span class="token punctuation">,</span>
+    <span class="token function">AVG</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span> <span class="token keyword">OVER</span> <span class="token punctuation">(</span><span class="token keyword">PARTITION</span> <span class="token keyword">BY</span> user_id <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> <span class="token keyword">date</span><span class="token punctuation">)</span>
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="優化策略：">優化策略：</h3>
+<p><strong>1. 向下推送過濾</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ❌ 差：連接後過濾 */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users u
+<span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>created_at <span class="token operator">&gt;</span> <span class="token string">'2025-01-01'</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ 好：連接前過濾（PostgreSQL 自動執行） */</span>
+<span class="token comment">/* 規劃器將過濾向下推送到 users 掃描 */</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 信任但驗證</p><div class="admonition-content"><p>PostgreSQL 的規劃器擅長向下推送過濾，但<strong>不總是最佳</strong>。使用 <code>EXPLAIN (ANALYZE, BUFFERS)</code> 驗證：</p>
+<ul>
+<li>過濾出現在昂貴操作<strong>之前</strong>（Join、Sort、Aggregate）</li>
+<li><code>Rows Removed by Filter</code> 合理（不是掃描數百萬只過濾掉 99%）</li>
+</ul>
+<p>如果規劃器出錯，嘗試：</p>
+<ul>
+<li><strong>CTE</strong>（在 PG14+ 中，它們作為優化柵欄）</li>
+<li><strong>子查詢</strong> 強制評估順序</li>
+<li><strong>部分索引</strong> 使過濾掃描更便宜</li>
+</ul>
+</div></div>
+<hr>
+<p><strong>2. 使用索引減少列</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ❌ 差：大表上的順序掃描 */</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span> <span class="token keyword">WHERE</span> user_id <span class="token operator">=</span> <span class="token number">42</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ 好：索引掃描 */</span>
+<span class="token keyword">CREATE</span> <span class="token keyword">INDEX</span> <span class="token keyword">ON</span> <span class="token keyword">transactions</span><span class="token punctuation">(</span>user_id<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<p><strong>3. 避免不必要的阻塞運算子</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* ❌ 差：大結果上的 DISTINCT */</span>
+<span class="token keyword">SELECT</span> <span class="token keyword">DISTINCT</span> category <span class="token keyword">FROM</span> million_row_table<span class="token punctuation">;</span>
+
+<span class="token comment">/* ✅ 好：GROUP BY（相同結果，更清晰的意圖） */</span>
+<span class="token keyword">SELECT</span> category <span class="token keyword">FROM</span> million_row_table <span class="token keyword">GROUP</span> <span class="token keyword">BY</span> category<span class="token punctuation">;</span></code></pre>
+<p><strong>4. 利用並行查詢</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">/* 啟用並行查詢 */</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token comment">/* 並行順序掃描 + 哈希聚合 */</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> large_table<span class="token punctuation">;</span></code></pre>
+<hr>
+<h2 id="10-未來：向量化會來到-PostgreSQL-嗎？">10 未來：向量化會來到 PostgreSQL 嗎？</h2>
+<p><strong>簡短答案：</strong> 不會到核心，但擴充功能正在實驗。</p>
+<h3 id="當前努力：">當前努力：</h3>
+<table>
+<thead>
+<tr>
+<th>專案</th>
+<th>方法</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Citus Columnar</strong></td>
+<td>帶逐列執行的列式儲存</td>
+<td>生產</td>
+</tr>
+<tr>
+<td><strong>Hydra</strong></td>
+<td>用於分析的列式儲存</td>
+<td>生產</td>
+</tr>
+<tr>
+<td><strong>pg_vectorize</strong></td>
+<td>向量化表達式評估</td>
+<td>實驗</td>
+</tr>
+<tr>
+<td><strong>LLVM JIT</strong></td>
+<td>編譯表達式（未向量化）</td>
+<td>生產 (PG11+)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="為什麼核心不會很快變更：">為什麼核心不會很快變更：</h3>
+<ol>
+<li><strong>向後相容</strong> — 擴充功能依賴當前執行器 API</li>
+<li><strong>複雜性</strong> — 重寫 50+ 個節點類型是巨大的工作</li>
+<li><strong>權衡</strong> — 向量化幫助分析，傷害 OLTP 延遲</li>
+<li><strong>哲學</strong> — PostgreSQL 偏好穩定、漸進的改進</li>
+</ol>
+<p><strong>最可能的路徑：</strong> 通過擴充功能向量化，不是核心變更。</p>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📌 這對你意味著什麼</p><div class="admonition-content"><p>不要等待 PostgreSQL 核心的向量化。相反：</p>
+<ul>
+<li><strong>對於 OLTP：</strong> Volcano 運作良好—專注於索引和查詢設計</li>
+<li><strong>對於分析：</strong> 使用擴充功能（Citus Columnar、Hydra）或專用工具（DuckDB、ClickHouse）</li>
+<li><strong>對於混合工作負載：</strong> 利用 JIT 編譯和並行查詢</li>
+</ul>
+<p>正確的工具取決於你的查詢模式，不僅僅是原始效能基準。</p>
+</div></div>
+<hr>
+<h2 id="總結：一張圖中的-Volcano-模型">總結：一張圖中的 Volcano 模型</h2>
+<div class="mermaid">flowchart LR
+    subgraph "查詢計劃"
+        A[限制：10] --&gt; B[排序：ORDER BY]
+        B --&gt; C[聚合：GROUP BY]
+        C --&gt; D[哈希連接]
+        D --&gt; E[順序掃描：users]
+        D --&gt; F[順序掃描：orders]
+    end
+    
+    subgraph "執行 (Volcano 模型)"
+        G["客戶端：Next()"] --&gt; H["限制：Next()"]
+        H --&gt; I["排序：Next() — 緩衝所有"]
+        I --&gt; J["聚合：Next() — 每分組"]
+        J --&gt; K["哈希連接：Next() — 探測階段"]
+        K --&gt; L["順序掃描：Next() — 返回列"]
+    end
+    
+    style A fill:#fce4ec,stroke:#c2185b
+    style B fill:#fff3e0,stroke:#f57c00
+    style C fill:#e8f5e9,stroke:#388e3c
+    style G fill:#e3f2fd,stroke:#1976d2</div>
+<p><strong>關鍵要點：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>Volcano 模型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>介面</strong></td>
+<td><code>Next()</code> / <code>GetNext()</code> — 一次一列</td>
+</tr>
+<tr>
+<td><strong>結構</strong></td>
+<td>運算子樹</td>
+</tr>
+<tr>
+<td><strong>數據流</strong></td>
+<td>基於拉取（子 → 父）</td>
+</tr>
+<tr>
+<td><strong>記憶體</strong></td>
+<td>串流 O(1)，阻塞運算子 O(N)</td>
+</tr>
+<tr>
+<td><strong>最適合</strong></td>
+<td>OLTP、選擇性查詢、串流</td>
+</tr>
+<tr>
+<td><strong>最不適合</strong></td>
+<td>分析、全掃描、批量聚合</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL 狀態</strong></td>
+<td>自成立以來的核心執行模型</td>
+</tr>
+</tbody>
+</table>
+<p>Volcano 模型不完美——但經過 40+ 年，它仍然是大多數 SQL 資料庫的基礎。理解它幫助你編寫<em>與</em> PostgreSQL 架構合作而不是對抗的查詢。</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 關鍵要點</p><div class="admonition-content"><p>Volcano 模型是<strong>權衡</strong>，不是錯誤：</p>
+<ul>
+<li><strong>收益：</strong> 簡單性、可擴展性、串流、提前終止</li>
+<li><strong>損失：</strong> 函數調用開銷、無 SIMD、快取效率低</li>
+</ul>
+<p>對於 OLTP 和混合工作負載，收益大於損失。對於純分析，考慮列式/向量化替代方案。</p>
+<p><strong>你作為 PostgreSQL 用戶的工作：</strong> 知道哪些查詢發揮 Volcano 的優勢——哪些與它對抗。</p>
+</div></div>
+<hr>
+<p><strong>進一步閱讀：</strong></p>
+<ul>
+<li>Graefe, Goetz. <a target="_blank" rel="noopener" href="https://www.cs.du.edu/~snarayan/courses/comp_db/lecture11.pdf">“Volcano—An Extensible and Parallel Query Evaluation System”</a> (1994) — 原始論文</li>
+<li>PostgreSQL 原始碼：<a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/tree/master/src/backend/executor"><code>src/backend/executor/</code></a> — 實際實作</li>
+<li>“PostgreSQL Internals” by Egor Rogov — 深入探討執行器架構</li>
+<li>DuckDB 文件：<a target="_blank" rel="noopener" href="https://duckdb.org/docs/internals/vectorized_execution">“Vectorized Execution”</a> — 替代方法</li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/" data-id="24717e8b" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "深入理解 PostgreSQL 的 Volcano 模型：迭代器執行架構",
+        "image": "https://neo01.com/assets/architecture/volcano-thumbnail.png",
+        "keywords": "Database Internals Performance PostgreSQL",
+        "genre": "Architecture",
+        "datePublished": "2026-02-15",
+        "dateCreated": "2026-02-15",
+        "dateModified": "2026-03-11",
+        "url": "https://neo01.com//zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/",
+        "description": "深入探討 Volcano 模型——PostgreSQL 的基礎執行架構。了解 Next()/GetNext() 如何驅動每個查詢、為什麼逐列處理很重要，以及向量化何時打破規則。",
+        "wordCount": 2726
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/volcano-thumbnail_80.png)" alt="深入理解 PostgreSQL 的 Volcano 模型：迭代器執行架構" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">架構</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/02/Understanding-PostgreSQL-Volcano-Model/" class="title">深入理解 PostgreSQL 的 Volcano 模型：迭代器執行架構</a></p>
+                            <p class="item-date"><time datetime="2026-02-14T16:00:00.000Z" itemprop="datePublished">2026-02-15</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/01/Architecture-Decision-Log-Advanced-Topics/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/thumbnail1_80.png)" alt="架構決策記錄：進階主題（第二部分）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">架構</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/01/Architecture-Decision-Log-Advanced-Topics/" class="title">架構決策記錄：進階主題（第二部分）</a></p>
+                            <p class="item-date"><time datetime="2026-01-19T16:00:00.000Z" itemprop="datePublished">2026-01-20</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/01/Architecture-Decision-Log-Guide/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/thumbnail1_80.png)" alt="架構決策記錄：實用指南（第一部分）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">架構</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/01/Architecture-Decision-Log-Guide/" class="title">架構決策記錄：實用指南（第一部分）</a></p>
+                            <p class="item-date"><time datetime="2026-01-14T16:00:00.000Z" itemprop="datePublished">2026-01-15</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/12/Understanding-RTGS-Finance-Concepts/" class="thumbnail">
+        <span style="background-image:url(/assets/rtgs/thumbnail_80.jpg)" alt="理解 RTGS：IT 專業人員必知的核心金融概念" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">雜項</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/12/Understanding-RTGS-Finance-Concepts/" class="title">理解 RTGS：IT 專業人員必知的核心金融概念</a></p>
+                            <p class="item-date"><time datetime="2025-12-01T16:00:00.000Z" itemprop="datePublished">2025-12-02</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2025/12/Understanding-RTGS-From-Batch-Nightmares-To-Continuous-Settlement/" class="thumbnail">
+        <span style="background-image:url(/assets/rtgs/thumbnail_80.jpg)" alt="理解 RTGS：從批次作業噩夢到連續結算" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">雜項</a></p>
+                            <p class="item-title"><a href="/zh-TW/2025/12/Understanding-RTGS-From-Batch-Nightmares-To-Continuous-Settlement/" class="title">理解 RTGS：從批次作業噩夢到連續結算</a></p>
+                            <p class="item-date"><time datetime="2025-11-30T16:00:00.000Z" itemprop="datePublished">2025-12-01</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2026/">2026</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">77</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#04fd9bb8</div>
+                <img src="/qr/qr-c1eb830ecd4af6eac3aa3246973b82f0.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#04fd9bb8">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
