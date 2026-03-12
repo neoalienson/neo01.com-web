@@ -1,0 +1,2054 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>使用 Rust 构建 PostgreSQL 兼容数据库：页式存储与缓冲池 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Database Internals,PostgreSQL,Rust">
+    
+    
+    <meta name="description" content="为何我要用 Rust 构建 Vaultgres——一个 PostgreSQL 兼容数据库——来探索数据库内部机制。深入探讨页式存储、缓冲池管理，以及在 AI 辅助开发下实现 WAL 兼容存储的挑战。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 Rust 构建 PostgreSQL 兼容数据库：页式存储与缓冲池">
+<meta property="og:url" content="https://neo01.com/zh-CN/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="为何我要用 Rust 构建 Vaultgres——一个 PostgreSQL 兼容数据库——来探索数据库内部机制。深入探讨页式存储、缓冲池管理，以及在 AI 辅助开发下实现 WAL 兼容存储的挑战。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+<meta property="article:published_time" content="2026-02-28T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-12T16:32:42.793Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Database Internals">
+<meta property="article:tag" content="PostgreSQL">
+<meta property="article:tag" content="Rust">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me/">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        使用 Rust 构建 PostgreSQL 兼容数据库：页式存储与缓冲池
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-02-28T16:00:00.000Z" itemprop="datePublished">2026-03-01</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-12T16:32:42.793Z" itemprop="datePublished">2026-03-13</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/zh-CN/tags/Database-Internals/">Database Internals</a> <a class="tag-link" href="/zh-CN/tags/Rust/">Rust</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81%E9%A1%B5%E5%BC%8F%E5%AD%98%E5%82%A8%EF%BC%9F"><span class="toc-text">1 为什么需要页式存储？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E9%A1%B5%E9%9D%A2%E5%B8%83%E5%B1%80%EF%BC%9A8KB-%E9%A1%B5%E9%9D%A2%E5%86%85%E9%83%A8"><span class="toc-text">2 页面布局：8KB 页面内部</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E7%BC%93%E5%86%B2%E6%B1%A0%EF%BC%9A%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E7%BC%93%E5%AD%98%E9%A1%B5%E9%9D%A2"><span class="toc-text">3 缓冲池：在内存中缓存页面</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E7%A3%81%E7%9B%98%E7%AE%A1%E7%90%86%E5%99%A8%EF%BC%9A%E6%8A%BD%E8%B1%A1%E5%8C%96%E6%96%87%E4%BB%B6-I-O"><span class="toc-text">4 磁盘管理器：抽象化文件 I/O</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E9%A2%84%E5%86%99%E6%97%A5%E5%BF%97-WAL-%EF%BC%9A%E7%A1%AE%E4%BF%9D%E6%8C%81%E4%B9%85%E6%80%A7"><span class="toc-text">5 预写日志 (WAL)：确保持久性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E7%94%A8-Rust-%E6%9E%84%E5%BB%BA%E7%9A%84%E6%8C%91%E6%88%98"><span class="toc-text">6 用 Rust 构建的挑战</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-AI-%E5%A6%82%E4%BD%95%E5%8A%A0%E9%80%9F%E5%AD%A6%E4%B9%A0"><span class="toc-text">7 AI 如何加速学习</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93%EF%BC%9A%E9%A1%B5%E5%BC%8F%E5%AD%98%E5%82%A8%E4%B8%80%E5%BC%A0%E5%9B%BE"><span class="toc-text">总结：页式存储一张图</span></a></li></ol>
+            <p>简单的网站已无法满足我对知识的渴望。</p>
+<p>多年来，我一直在构建 Web 应用程序——REST API、GraphQL 服务、带有 AI 和 Agentic AI 的微服务——但我遇到了瓶颈。我能流利地<em>使用</em>数据库，却无法<em>构建</em>一个。内部机制对我来说仍是个黑盒子：PostgreSQL 究竟如何将数据存储在磁盘上？缓冲池如何管理内存？WAL 如何确保持久性？</p>
+<p>因此，我开始构建 <strong><a target="_blank" rel="noopener" href="https://github.com/neoalienson/Vaultgres">Vaultgres</a></strong>——一个用 Rust 实现的 PostgreSQL 兼容数据库。</p>
+<p>这不是另一个玩具级的键值存储。我们的目标是 PostgreSQL 兼容性：通信协议、查询语言，最终还包括存储格式。为什么？因为 PostgreSQL 的架构经过实战验证，兼容性意味着真正的应用程序可以（理论上）无需修改就能连接。</p>
+<p>这个系列记录了这段旅程：设计决策、错误、那些“啊哈！”的顿悟时刻，以及我如何利用 AI 加速学习，同时仍然亲自完成艰苦的工作。</p>
+<p>今天的主题：<strong>页式存储和缓冲池</strong>——每个数据库创建的基础。</p>
+<hr>
+<h2 id="1-为什么需要页式存储？">1 为什么需要页式存储？</h2>
+<h3 id="问题：原始字节很混乱">问题：原始字节很混乱</h3>
+<p>想象一下将数据作为连续流直接存储到磁盘：</p>
+<pre class="language-none"><code class="language-none">Table: users
+┌────────────────────────────────────────────────────────────┐
+│ id=1,name=Alice,id=2,name=Bob,id=3,name=Charlie...         │
+└────────────────────────────────────────────────────────────┘
+
+Table: orders
+┌────────────────────────────────────────────────────────────┐
+│ id=101,user_id=1,amount=99.99,id=102,user_id=2,amount=...  │
+└────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>问题：</strong></p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>为什么重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>没有结构</strong></td>
+<td>无法找到第 N 列，必须从头开始扫描</td>
+</tr>
+<tr>
+<td><strong>没有并发性</strong></td>
+<td>一个写入者锁定整个文件</td>
+</tr>
+<tr>
+<td><strong>没有崩溃恢复</strong></td>
+<td>部分写入会破坏所有内容</td>
+</tr>
+<tr>
+<td><strong>没有缓存</strong></td>
+<td>必须读取整个文件才能访问一列</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="解决方案：固定大小页面">解决方案：固定大小页面</h3>
+<p>PostgreSQL 将数据划分为<strong>固定大小的页面</strong>（通常为 8KB）：</p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│  Page 0 (8KB)  │  Page 1 (8KB)  │  Page 2 (8KB)  │  ...    │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>每个页面包含：</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│ PageHeader (24 bytes)                                       │
+├─────────────────────────────────────────────────────────────┤
+│ ItemId array (4 bytes each)                                 │
+├─────────────────────────────────────────────────────────────┤
+│ Free space                                                  │
+├─────────────────────────────────────────────────────────────┤
+│ Items (actual row data, grows upward)                       │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>优势：</strong></p>
+<table>
+<thead>
+<tr>
+<th>优势</th>
+<th>为什么重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>随机访问</strong></td>
+<td>直接读取第 N 页：<code>seek(N * 8KB)</code></td>
+</tr>
+<tr>
+<td><strong>细粒度锁定</strong></td>
+<td>锁定单个页面，而非整个表</td>
+</tr>
+<tr>
+<td><strong>高效缓存</strong></td>
+<td>将热门页面缓存在内存中（缓冲池）</td>
+</tr>
+<tr>
+<td><strong>崩溃恢复</strong></td>
+<td>WAL 记录参考特定页面</td>
+</tr>
+<tr>
+<td><strong>标准化</strong></td>
+<td>所有页面大小相同——简化内存管理</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📌 为什么是 8KB？</p><div class="admonition-content"><p>PostgreSQL 默认使用 8KB 页面（编译时可用 <code>BLCKSZ</code> 配置）。</p>
+<p><strong>权衡：</strong></p>
+</div></div>
+<table>
+<thead>
+<tr>
+<th>页面大小</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>小 (4KB)</td>
+<td>较少内部碎片，更细的锁定</td>
+<td>更多页面需管理，更大的标头</td>
+</tr>
+<tr>
+<td>中 (8KB)</td>
+<td>平衡</td>
+<td>默认值是有原因的</td>
+</tr>
+<tr>
+<td>大 (32KB+)</td>
+<td>更少页面，更好的顺序扫描</td>
+<td>每个页面浪费更多空间</td>
+</tr>
+</tbody>
+</table>
+<p>Vaultgres 使用 8KB 以匹配 PostgreSQL——兼容性优先于优化。</p>
+<hr>
+<h2 id="2-页面布局：8KB-页面内部">2 页面布局：8KB 页面内部</h2>
+<h3 id="PostgreSQL-PageHeader">PostgreSQL PageHeader</h3>
+<p>每个页面都以标头开始：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from PostgreSQL src/include/storage/bufpage.h */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">PageHeaderData</span> <span class="token punctuation">{</span>
+    uint16      pd_lower<span class="token punctuation">;</span>     <span class="token comment">/* Offset to start of free space */</span>
+    uint16      pd_upper<span class="token punctuation">;</span>     <span class="token comment">/* Offset to end of free space */</span>
+    uint16      pd_special<span class="token punctuation">;</span>   <span class="token comment">/* Offset to start of special space */</span>
+    uint16      pd_pagesize_version<span class="token punctuation">;</span>  <span class="token comment">/* Page size and version */</span>
+    uint32      pd_checksum<span class="token punctuation">;</span>  <span class="token comment">/* Page checksum (optional) */</span>
+    <span class="token comment">/* ... more fields ... */</span>
+<span class="token punctuation">}</span> PageHeaderData<span class="token punctuation">;</span></code></pre>
+<p><strong>视觉布局：</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│ 0                   PageHeader (24 bytes)                   │
+│ ├── pd_lower ──┐                                            │
+│ │              ▼                                            │
+│ ├── ItemId[0]  │                                            │
+│ ├── ItemId[1]  │  ItemId array (4 bytes each)               │
+│ ├── ItemId[2]  │  (points to actual items below)            │
+│ │              │                                            │
+│ │         pd_upper ──┐                                      │
+│ │                    ▼                                      │
+│ │              ┌─────────────┐                              │
+│ │              │  Free Space │  (grows/shrinks)             │
+│ │              └─────────────┘                              │
+│ │                    ▲                                      │
+│ │              pd_special ──┘                               │
+│ │                                                           │
+│ │    ┌─────────────────────────────────┐                    │
+│ └─►  │  Item 2 (row data)              │  Items grow UP     │
+│      ├─────────────────────────────────┤                    │
+│      │  Item 1 (row data)              │                    │
+│      ├─────────────────────────────────┤                    │
+│      │  Item 0 (row data)              │                    │
+│      └─────────────────────────────────┘                    │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>关键洞察：</strong> 项目从底部<strong>向上</strong>增长，ItemId 数组从顶部<strong>向下</strong>增长。空闲空间在中间。这最大化了空间利用率。</p>
+<hr>
+<h3 id="ItemId：指向行数据的指针">ItemId：指向行数据的指针</h3>
+<p>每个 <code>ItemId</code> 是一个 4 字节的指针：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">ItemIdData</span> <span class="token punctuation">{</span>
+    uint16      lp_off<span class="token punctuation">;</span>     <span class="token comment">/* Offset to item (from page start) */</span>
+    uint16      lp_len<span class="token punctuation">;</span>     <span class="token comment">/* Length of item (including header) */</span>
+    <span class="token comment">/* ... flags ... */</span>
+<span class="token punctuation">}</span> ItemIdData<span class="token punctuation">;</span></code></pre>
+<p><strong>为什么需要间接？</strong></p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>移动项目而不改变引用</strong></td>
+<td>当项目移动时更新 <code>lp_off</code></td>
+</tr>
+<tr>
+<td><strong>标记项目为已删除</strong></td>
+<td>设置 <code>lp_len = 0</code> 而不覆盖数据</td>
+</tr>
+<tr>
+<td><strong>支持 HOT (Heap Only Tuple)</strong></td>
+<td>对 PostgreSQL 性能至关重要</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Rust-实现：Page-结构体">Rust 实现：Page 结构体</h3>
+<p>以下是 Vaultgres 表示页面的方式：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/page.rs</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span></span>mem<span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">PAGE_SIZE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token number">8192</span><span class="token punctuation">;</span>  <span class="token comment">// 8KB</span>
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">PAGE_HEADER_SIZE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token number">24</span><span class="token punctuation">;</span>
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">ITEM_ID_SIZE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token attribute attr-name">#[derive(Debug, Clone, Copy)]</span>
+<span class="token attribute attr-name">#[repr(C)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">ItemId</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>  <span class="token comment">// Offset to item data</span>
+    <span class="token keyword">pub</span> length<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>  <span class="token comment">// Length of item</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">ItemId</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span>offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span> length<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span> offset<span class="token punctuation">,</span> length <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">is_unused</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">bool</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>length <span class="token operator">==</span> <span class="token number">0</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[repr(C)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">PageHeader</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> pd_lower<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>      <span class="token comment">// Start of free space (after ItemIds)</span>
+    <span class="token keyword">pub</span> pd_upper<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>      <span class="token comment">// End of free space (before items)</span>
+    <span class="token keyword">pub</span> pd_special<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>    <span class="token comment">// Start of special space (usually PAGE_SIZE)</span>
+    <span class="token keyword">pub</span> version<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> checksum<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    <span class="token comment">// Padding to reach 24 bytes</span>
+    _padding<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">;</span> <span class="token number">12</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">Page</span> <span class="token punctuation">{</span>
+    data<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">;</span> <span class="token constant">PAGE_SIZE</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Page</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> data <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">0u8</span><span class="token punctuation">;</span> <span class="token constant">PAGE_SIZE</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Initialize header</span>
+        <span class="token keyword">let</span> header <span class="token operator">=</span> <span class="token class-name">PageHeader</span> <span class="token punctuation">{</span>
+            pd_lower<span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token constant">PAGE_HEADER_SIZE</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+            pd_upper<span class="token punctuation">:</span> <span class="token constant">PAGE_SIZE</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+            pd_special<span class="token punctuation">:</span> <span class="token constant">PAGE_SIZE</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+            version<span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+            checksum<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            _padding<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">;</span> <span class="token number">12</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Write header to data</span>
+        <span class="token keyword">unsafe</span> <span class="token punctuation">{</span>
+            <span class="token namespace">std<span class="token punctuation">::</span>ptr<span class="token punctuation">::</span></span><span class="token function">write_unaligned</span><span class="token punctuation">(</span>
+                data<span class="token punctuation">.</span><span class="token function">as_mut_ptr</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token operator">*</span><span class="token keyword">mut</span> <span class="token class-name">PageHeader</span><span class="token punctuation">,</span>
+                header<span class="token punctuation">,</span>
+            <span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span> data <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">header</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">&amp;</span><span class="token class-name">PageHeader</span> <span class="token punctuation">{</span>
+        <span class="token keyword">unsafe</span> <span class="token punctuation">{</span> <span class="token operator">&amp;</span><span class="token operator">*</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>data<span class="token punctuation">.</span><span class="token function">as_ptr</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token operator">*</span><span class="token keyword">const</span> <span class="token class-name">PageHeader</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">header_mut</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">PageHeader</span> <span class="token punctuation">{</span>
+        <span class="token keyword">unsafe</span> <span class="token punctuation">{</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token operator">*</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>data<span class="token punctuation">.</span><span class="token function">as_mut_ptr</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token operator">*</span><span class="token keyword">mut</span> <span class="token class-name">PageHeader</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">free_space</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">usize</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> header <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">header</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        header<span class="token punctuation">.</span>pd_upper <span class="token keyword">as</span> <span class="token keyword">usize</span> <span class="token operator">-</span> header<span class="token punctuation">.</span>pd_lower <span class="token keyword">as</span> <span class="token keyword">usize</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">insert</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">,</span> item_data<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">u16</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Check if we have enough space</span>
+        <span class="token keyword">let</span> required <span class="token operator">=</span> item_data<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token constant">ITEM_ID_SIZE</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">free_space</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> required <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token class-name">None</span><span class="token punctuation">;</span>  <span class="token comment">// Page full</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">let</span> header <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">header_mut</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Calculate where to place the item (from bottom, growing up)</span>
+        <span class="token keyword">let</span> item_offset <span class="token operator">=</span> header<span class="token punctuation">.</span>pd_upper <span class="token operator">-</span> item_data<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Write item data</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>data<span class="token punctuation">[</span>item_offset <span class="token keyword">as</span> <span class="token keyword">usize</span><span class="token punctuation">..</span>item_offset <span class="token keyword">as</span> <span class="token keyword">usize</span> <span class="token operator">+</span> item_data<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+            <span class="token punctuation">.</span><span class="token function">copy_from_slice</span><span class="token punctuation">(</span>item_data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Create ItemId</span>
+        <span class="token keyword">let</span> item_id_offset <span class="token operator">=</span> header<span class="token punctuation">.</span>pd_lower <span class="token keyword">as</span> <span class="token keyword">usize</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> item_id <span class="token operator">=</span> <span class="token class-name">ItemId</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span>item_offset<span class="token punctuation">,</span> item_data<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">unsafe</span> <span class="token punctuation">{</span>
+            <span class="token namespace">std<span class="token punctuation">::</span>ptr<span class="token punctuation">::</span></span><span class="token function">write_unaligned</span><span class="token punctuation">(</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>data<span class="token punctuation">[</span>item_id_offset<span class="token punctuation">..</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">as_mut_ptr</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token operator">*</span><span class="token keyword">mut</span> <span class="token class-name">ItemId</span><span class="token punctuation">,</span>
+                item_id<span class="token punctuation">,</span>
+            <span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Update header</span>
+        header<span class="token punctuation">.</span>pd_lower <span class="token operator">+=</span> <span class="token constant">ITEM_ID_SIZE</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">;</span>
+        header<span class="token punctuation">.</span>pd_upper <span class="token operator">=</span> item_offset<span class="token punctuation">;</span>
+
+        <span class="token comment">// Return ItemId index (0-based)</span>
+        <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token punctuation">(</span>item_id_offset <span class="token operator">-</span> <span class="token constant">PAGE_HEADER_SIZE</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token constant">ITEM_ID_SIZE</span> <span class="token keyword">as</span> <span class="token keyword">usize</span> <span class="token keyword">as</span> <span class="token keyword">u16</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 为了性能使用 Unsafe Rust</p><div class="admonition-content"><p>是的，这里使用了 <code>unsafe</code>。为什么？</p>
+<ul>
+<li><strong>零拷贝访问</strong> 页面数据</li>
+<li><strong>精确的内存布局</strong> 匹配 PostgreSQL 的磁盘上格式</li>
+<li><strong>性能</strong> 至关重要——页面被访问数百万次</li>
+</ul>
+<p><strong>安全保证：</strong></p>
+<ul>
+<li><code>#[repr(C)]</code> 确保可预测的布局</li>
+<li>所有访问都在范围内（由 <code>free_space()</code> 检查）</li>
+<li>页面在使用前总是已初始化</li>
+</ul>
+<p>这就是 AI 辅助无价的地方：我可以问“这个 <code>unsafe</code> 区块是否可靠？”并得到详细分析。</p>
+</div></div>
+<hr>
+<h2 id="3-缓冲池：在内存中缓存页面">3 缓冲池：在内存中缓存页面</h2>
+<h3 id="问题：磁盘很慢">问题：磁盘很慢</h3>
+<table>
+<thead>
+<tr>
+<th>存储</th>
+<th>延迟</th>
+<th>相对速度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU 缓存 (L1)</td>
+<td>~1ns</td>
+<td>1x</td>
+</tr>
+<tr>
+<td>RAM</td>
+<td>~100ns</td>
+<td>100x 更慢</td>
+</tr>
+<tr>
+<td>NVMe SSD</td>
+<td>~100μs</td>
+<td>100,000x 更慢</td>
+</tr>
+<tr>
+<td>HDD</td>
+<td>~10ms</td>
+<td>10,000,000x 更慢</td>
+</tr>
+</tbody>
+</table>
+<p><strong>没有缓冲池：</strong></p>
+<pre class="language-none"><code class="language-none">Query: SELECT * FROM users WHERE id = 42
+
+1. Read page containing id=42 from disk (100μs on NVMe)
+2. Parse page, find row
+3. Return result
+
+Next query: SELECT * FROM users WHERE id = 42
+
+1. Read page from disk AGAIN (100μs)  ← Wasteful!
+2. Parse page, find row
+3. Return result</code></pre>
+<hr>
+<h3 id="解决方案：缓冲池">解决方案：缓冲池</h3>
+<p><strong>缓冲池</strong> 将经常访问的页面缓存在 RAM 中：</p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│                    Buffer Pool (RAM)                        │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐            │
+│  │ Page 0  │ │ Page 5  │ │ Page 3  │ │ Page 7  │  ...       │
+│  │ (dirty) │ │ (clean) │ │ (dirty) │ │ (clean) │            │
+│  └─────────┘ └─────────┘ └─────────┘ └─────────┘            │
+└─────────────────────────────────────────────────────────────┘
+         │              │              │
+         ▼              ▼              ▼
+    ┌─────────┐    ┌─────────┐    ┌─────────┐
+    │ Disk    │    │ Disk    │    │ Disk    │
+    │ Page 0  │    │ Page 5  │    │ Page 3  │
+    └─────────┘    └─────────┘    └─────────┘</code></pre>
+<p><strong>使用缓冲池：</strong></p>
+<pre class="language-none"><code class="language-none">Query: SELECT * FROM users WHERE id = 42
+
+1. Check buffer pool for page containing id=42
+2. If hit: Return from RAM (~100ns)  ← 1000x faster!
+3. If miss: Read from disk, cache in pool, return
+
+Next query: SELECT * FROM users WHERE id = 42
+
+1. Check buffer pool (HIT!)
+2. Return from RAM (~100ns)  ← Cached!</code></pre>
+<hr>
+<h3 id="缓冲池架构">缓冲池架构</h3>
+<div class="mermaid">flowchart BT
+    subgraph "Buffer Pool Manager"
+        A[Page Request] --&gt; B{In Pool?}
+        B --&gt;|Hit| C[Return Cached Page]
+        B --&gt;|Miss| D[Find Victim Page]
+        D --&gt; E{Dirty?}
+        E --&gt;|Yes| F[Write to Disk]
+        E --&gt;|No| G[Skip Write]
+        F --&gt; H[Read New Page]
+        G --&gt; H
+        H --&gt; I[Update LRU List]
+        I --&gt; J[Return New Page]
+    end
+
+    subgraph "Memory"
+        C --&gt; K[Buffer Frame]
+        J --&gt; K
+    end
+
+    subgraph "Disk"
+        F --&gt; L[Write Page]
+        H --&gt; M[Read Page]
+    end
+
+    style B fill:#fff3e0,stroke:#f57c00
+    style E fill:#fff3e0,stroke:#f57c00
+    style K fill:#e3f2fd,stroke:#1976d2</div>
+<p><strong>组件：</strong></p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>缓冲帧 (Buffer Frames)</strong></td>
+<td>固定大小的槽位持有页面（例如 1024 帧 × 8KB = 8MB）</td>
+</tr>
+<tr>
+<td><strong>页表 (Page Table)</strong></td>
+<td>映射页面 ID → 缓冲帧（哈希表）</td>
+</tr>
+<tr>
+<td><strong>LRU 列表</strong></td>
+<td>跟踪访问顺序以进行淘汰</td>
+</tr>
+<tr>
+<td><strong>脏位 (Dirty Bit)</strong></td>
+<td>标记需要写回的页面</td>
+</tr>
+<tr>
+<td><strong>钉选计数 (Pin Count)</strong></td>
+<td>防止使用中页面被淘汰</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Rust-实现：缓冲池">Rust 实现：缓冲池</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/buffer_pool.rs</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>collections<span class="token punctuation">::</span></span><span class="token class-name">HashMap</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>sync<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">Arc</span><span class="token punctuation">,</span> <span class="token class-name">Mutex</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token keyword">crate</span><span class="token module-declaration namespace"><span class="token punctuation">::</span>storage<span class="token punctuation">::</span>page<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">Page</span><span class="token punctuation">,</span> <span class="token constant">PAGE_SIZE</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BufferFrame</span> <span class="token punctuation">{</span>
+    page<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">Page</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    page_id<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    pin_count<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    is_dirty<span class="token punctuation">:</span> <span class="token keyword">bool</span><span class="token punctuation">,</span>
+    last_accessed<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>  <span class="token comment">// For LRU</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BufferPool</span> <span class="token punctuation">{</span>
+    frames<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">BufferFrame</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">,</span>
+    page_table<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token punctuation">,</span> <span class="token keyword">usize</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// page_id → frame_index</span>
+    lru_list<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">usize</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// frame indices, front = MRU</span>
+    disk<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">DiskManager</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    access_counter<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">BufferPool</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span>num_frames<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">,</span> disk<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">DiskManager</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> frames <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">..</span>num_frames<span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>_<span class="token closure-punctuation punctuation">|</span></span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token class-name">BufferFrame</span> <span class="token punctuation">{</span>
+                page<span class="token punctuation">:</span> <span class="token class-name">None</span><span class="token punctuation">,</span>
+                page_id<span class="token punctuation">:</span> <span class="token class-name">None</span><span class="token punctuation">,</span>
+                pin_count<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+                is_dirty<span class="token punctuation">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+                last_accessed<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">collect</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+            frames<span class="token punctuation">,</span>
+            page_table<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token class-name">HashMap</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            lru_list<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token class-name">Vec</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            disk<span class="token punctuation">,</span>
+            access_counter<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">get_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">Page</span><span class="token operator">&gt;&gt;</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Check if page is in pool</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> page_table <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>page_table<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>frame_idx<span class="token punctuation">)</span> <span class="token operator">=</span> page_table<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>page_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token comment">// Cache hit</span>
+            <span class="token keyword">let</span> <span class="token keyword">mut</span> frame <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">[</span>frame_idx<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            frame<span class="token punctuation">.</span>pin_count <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+            frame<span class="token punctuation">.</span>last_accessed <span class="token operator">=</span> <span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>access_counter<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// Move to front of LRU</span>
+            <span class="token keyword">let</span> <span class="token keyword">mut</span> lru <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>lru_list<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>pos<span class="token punctuation">)</span> <span class="token operator">=</span> lru<span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">position</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span><span class="token operator">&amp;</span>x<span class="token closure-punctuation punctuation">|</span></span> x <span class="token operator">==</span> frame_idx<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                lru<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>pos<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                lru<span class="token punctuation">.</span><span class="token function">push_front</span><span class="token punctuation">(</span>frame_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+
+            <span class="token keyword">return</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">Arc</span><span class="token punctuation">::</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>frame<span class="token punctuation">.</span>page<span class="token punctuation">.</span><span class="token function">as_ref</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token function">drop</span><span class="token punctuation">(</span>page_table<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Cache miss - need to load from disk</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">load_page</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">load_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">Page</span><span class="token operator">&gt;&gt;</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Find victim frame using LRU</span>
+        <span class="token keyword">let</span> victim_idx <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">find_victim</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> frame <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">[</span>victim_idx<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Write back if dirty</span>
+        <span class="token keyword">if</span> frame<span class="token punctuation">.</span>is_dirty <span class="token punctuation">{</span>
+            <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>old_page_id<span class="token punctuation">)</span> <span class="token operator">=</span> frame<span class="token punctuation">.</span>page_id <span class="token punctuation">{</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>disk<span class="token punctuation">.</span><span class="token function">write_page</span><span class="token punctuation">(</span>old_page_id<span class="token punctuation">,</span> frame<span class="token punctuation">.</span>page<span class="token punctuation">.</span><span class="token function">as_ref</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">ok</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+            frame<span class="token punctuation">.</span>is_dirty <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Read new page from disk</span>
+        <span class="token keyword">let</span> new_page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>disk<span class="token punctuation">.</span><span class="token function">read_page</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">ok</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Update frame</span>
+        frame<span class="token punctuation">.</span>page <span class="token operator">=</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>new_page<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        frame<span class="token punctuation">.</span>page_id <span class="token operator">=</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        frame<span class="token punctuation">.</span>pin_count <span class="token operator">=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+        frame<span class="token punctuation">.</span>last_accessed <span class="token operator">=</span> <span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>access_counter<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Update page table</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> page_table <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>page_table<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        page_table<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>page_id<span class="token punctuation">,</span> victim_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Update LRU</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> lru <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>lru_list<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        lru<span class="token punctuation">.</span><span class="token function">push_front</span><span class="token punctuation">(</span>victim_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">Arc</span><span class="token punctuation">::</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>frame<span class="token punctuation">.</span>page<span class="token punctuation">.</span><span class="token function">as_ref</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">find_victim</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">usize</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> lru <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>lru_list<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Find unpinned page from back (LRU)</span>
+        <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">..</span>lru<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">rev</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> frame_idx <span class="token operator">=</span> lru<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">;</span>
+            <span class="token keyword">let</span> frame <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">[</span>frame_idx<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> frame<span class="token punctuation">.</span>pin_count <span class="token operator">==</span> <span class="token number">0</span> <span class="token punctuation">{</span>
+                lru<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>frame_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// All pages pinned - need to wait or allocate more frames</span>
+        <span class="token class-name">None</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">mark_dirty</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> page_table <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>page_table<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>frame_idx<span class="token punctuation">)</span> <span class="token operator">=</span> page_table<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>page_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> <span class="token keyword">mut</span> frame <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">[</span>frame_idx<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            frame<span class="token punctuation">.</span>is_dirty <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">unpin_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> page_table <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>page_table<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>frame_idx<span class="token punctuation">)</span> <span class="token operator">=</span> page_table<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>page_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> <span class="token keyword">mut</span> frame <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">[</span>frame_idx<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            frame<span class="token punctuation">.</span>pin_count <span class="token operator">=</span> frame<span class="token punctuation">.</span>pin_count<span class="token punctuation">.</span><span class="token function">saturating_sub</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">flush_all</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">for</span> frame <span class="token keyword">in</span> <span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">.</span>frames <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> <span class="token keyword">mut</span> f <span class="token operator">=</span> frame<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">if</span> f<span class="token punctuation">.</span>is_dirty <span class="token punctuation">{</span>
+                <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span> <span class="token operator">=</span> f<span class="token punctuation">.</span>page_id <span class="token punctuation">{</span>
+                    <span class="token keyword">self</span><span class="token punctuation">.</span>disk<span class="token punctuation">.</span><span class="token function">write_page</span><span class="token punctuation">(</span>page_id<span class="token punctuation">,</span> f<span class="token punctuation">.</span>page<span class="token punctuation">.</span><span class="token function">as_ref</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+                <span class="token punctuation">}</span>
+                f<span class="token punctuation">.</span>is_dirty <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 关键设计决策</p><div class="admonition-content"><p><strong>1. 细粒度锁定：</strong> 每个 <code>BufferFrame</code> 都有自己的 <code>Mutex</code>，而不是整个池只有一把锁。</p>
+<p><strong>2. ARC 用于共享访问：</strong> <code>Arc&lt;Mutex&lt;Page&gt;&gt;</code> 允许多个线程持有同一页面。</p>
+<p><strong>3. 钉选计数：</strong> 防止线程使用页面时被淘汰。</p>
+<p><strong>4. LRU 淘汰：</strong> 最近最少使用的页面优先被淘汰。</p>
+<p>这些决策来自于询问 AI：“如何在 Rust 中设计线程安全的缓冲池？”然后根据 PostgreSQL 的实际实现迭代答案。</p>
+</div></div>
+<hr>
+<h2 id="4-磁盘管理器：抽象化文件-I-O">4 磁盘管理器：抽象化文件 I/O</h2>
+<h3 id="单一文件-vs-多个文件">单一文件 vs. 多个文件</h3>
+<p>PostgreSQL 将每个表/索引存储在单独的文件中：</p>
+<pre class="language-none"><code class="language-none">$PGDATA/base/16384/      # Database OID
+├── 16385                # Table: users
+├── 16386                # Table: orders
+├── 16387_idx            # Index: users_email_idx
+└── ...</code></pre>
+<p>Vaultgres 遵循相同的模式：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/disk.rs</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>collections<span class="token punctuation">::</span></span><span class="token class-name">HashMap</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>fs<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">File</span><span class="token punctuation">,</span> <span class="token class-name">OpenOptions</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">Read</span><span class="token punctuation">,</span> <span class="token class-name">Seek</span><span class="token punctuation">,</span> <span class="token class-name">SeekFrom</span><span class="token punctuation">,</span> <span class="token class-name">Write</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>path<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">Path</span><span class="token punctuation">,</span> <span class="token class-name">PathBuf</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>sync<span class="token punctuation">::</span></span><span class="token class-name">Mutex</span><span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">DiskManager</span> <span class="token punctuation">{</span>
+    data_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">,</span>
+    files<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token punctuation">,</span> <span class="token class-name">File</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">,</span>  # table_id → <span class="token class-name">File</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">DiskManager</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span>data_dir<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">str</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token keyword">Self</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token namespace">std<span class="token punctuation">::</span>fs<span class="token punctuation">::</span></span><span class="token function">create_dir_all</span><span class="token punctuation">(</span>data_dir<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token keyword">Self</span> <span class="token punctuation">{</span>
+            data_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">::</span><span class="token function">from</span><span class="token punctuation">(</span>data_dir<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            files<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token class-name">HashMap</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">get_file</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> table_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token namespace">std<span class="token punctuation">::</span>fs<span class="token punctuation">::</span></span><span class="token class-name">File</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> files <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>files<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span> <span class="token operator">=</span> files<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>table_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token comment">// File already open - need to handle this differently</span>
+            <span class="token comment">// (simplified for example)</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token keyword">let</span> path <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>data_dir<span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span>table_id<span class="token punctuation">.</span><span class="token function">to_string</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> file <span class="token operator">=</span> <span class="token class-name">OpenOptions</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">open</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>path<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        files<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>table_id<span class="token punctuation">,</span> file<span class="token punctuation">.</span><span class="token function">try_clone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span>file<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">read_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">Page</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> table_id <span class="token operator">=</span> page_id <span class="token operator">&gt;&gt;</span> <span class="token number">32</span><span class="token punctuation">;</span>  # <span class="token class-name">High</span> <span class="token number">32</span> bits
+        <span class="token keyword">let</span> page_num <span class="token operator">=</span> page_id <span class="token keyword">as</span> <span class="token keyword">u32</span><span class="token punctuation">;</span>  # <span class="token class-name">Low</span> <span class="token number">32</span> bits
+
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> file <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_file</span><span class="token punctuation">(</span>table_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> data <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">0u8</span><span class="token punctuation">;</span> <span class="token constant">PAGE_SIZE</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+        file<span class="token punctuation">.</span><span class="token function">seek</span><span class="token punctuation">(</span><span class="token class-name">SeekFrom</span><span class="token punctuation">::</span><span class="token class-name">Start</span><span class="token punctuation">(</span>page_num <span class="token keyword">as</span> <span class="token keyword">u64</span> <span class="token operator">*</span> <span class="token constant">PAGE_SIZE</span> <span class="token keyword">as</span> <span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        file<span class="token punctuation">.</span><span class="token function">read_exact</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">Page</span><span class="token punctuation">::</span><span class="token function">from_data</span><span class="token punctuation">(</span>data<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">write_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span> page<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Page</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> table_id <span class="token operator">=</span> page_id <span class="token operator">&gt;&gt;</span> <span class="token number">32</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> page_num <span class="token operator">=</span> page_id <span class="token keyword">as</span> <span class="token keyword">u32</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> file <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_file</span><span class="token punctuation">(</span>table_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        file<span class="token punctuation">.</span><span class="token function">seek</span><span class="token punctuation">(</span><span class="token class-name">SeekFrom</span><span class="token punctuation">::</span><span class="token class-name">Start</span><span class="token punctuation">(</span>page_num <span class="token keyword">as</span> <span class="token keyword">u64</span> <span class="token operator">*</span> <span class="token constant">PAGE_SIZE</span> <span class="token keyword">as</span> <span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        file<span class="token punctuation">.</span><span class="token function">write_all</span><span class="token punctuation">(</span>page<span class="token punctuation">.</span><span class="token function">as_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        file<span class="token punctuation">.</span><span class="token function">sync_all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>  # <span class="token class-name">Force</span> to disk
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="页面-ID-编码">页面 ID 编码</h3>
+<p>Vaultgres 将表 ID 和页面编号编码为单个 <code>u64</code>：</p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│  Page ID (u64)                                              │
+│  ┌─────────────────┬─────────────────┐                      │
+│  │  Table ID (32)  │  Page Num (32)  │                      │
+│  └─────────────────┴─────────────────┘                      │
+└─────────────────────────────────────────────────────────────┘
+
+Example: page_id = 0x0000000100000005
+  Table ID: 1
+  Page Number: 5</code></pre>
+<p><strong>为什么？</strong></p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>单一标识符</strong></td>
+<td>简化缓冲池和页表</td>
+</tr>
+<tr>
+<td><strong>高效哈希</strong></td>
+<td><code>u64</code> 比 <code>(u32, u32)</code> 元组更快</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL 兼容</strong></td>
+<td>类似于 PostgreSQL 的 <code>BlockId</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-预写日志-WAL-：确保持久性">5 预写日志 (WAL)：确保持久性</h2>
+<h3 id="问题：崩溃会破坏数据">问题：崩溃会破坏数据</h3>
+<p>没有 WAL：</p>
+<pre class="language-none"><code class="language-none">1. Buffer pool modifies page in memory
+2. Before page is written to disk... CRASH!
+3. Data lost forever</code></pre>
+<p><strong>更糟的是：</strong></p>
+<pre class="language-none"><code class="language-none">1. Write page to disk (50% complete)... CRASH!
+2. Page is now corrupted (torn page)</code></pre>
+<hr>
+<h3 id="解决方案：预写日志">解决方案：预写日志</h3>
+<p><strong>WAL 原则：</strong> 在修改页面之前，先将变更写入日志：</p>
+<pre class="language-none"><code class="language-none">Transaction: UPDATE users SET balance = 100 WHERE id = 42
+
+1. Write WAL record: "Page X, Offset Y, Old Value Z, New Value W"
+2. Flush WAL to disk (fsync)
+3. Modify page in buffer pool (mark dirty)
+4. ACK to client
+5. Later: Checkpoint writes dirty pages to disk</code></pre>
+<p><strong>崩溃后：</strong></p>
+<pre class="language-none"><code class="language-none">1. Read last checkpoint position
+2. Replay WAL records from checkpoint to end
+3. Database is consistent</code></pre>
+<hr>
+<h3 id="WAL-记录格式">WAL 记录格式</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/wal.rs</span>
+<span class="token attribute attr-name">#[derive(Debug, Clone)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalRecord</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> lsn<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>              <span class="token comment">// Log Sequence Number</span>
+    <span class="token keyword">pub</span> table_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> page_num<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>           <span class="token comment">// Offset within page</span>
+    <span class="token keyword">pub</span> old_data<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>     <span class="token comment">// Before image (for undo)</span>
+    <span class="token keyword">pub</span> new_data<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>     <span class="token comment">// After image (for redo)</span>
+    <span class="token keyword">pub</span> transaction_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> record_type<span class="token punctuation">:</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[derive(Debug, Clone)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">WalRecordType</span> <span class="token punctuation">{</span>
+    <span class="token class-name">Insert</span><span class="token punctuation">,</span>
+    <span class="token class-name">Update</span><span class="token punctuation">,</span>
+    <span class="token class-name">Delete</span><span class="token punctuation">,</span>
+    <span class="token class-name">Checkpoint</span><span class="token punctuation">,</span>
+    <span class="token class-name">Commit</span><span class="token punctuation">,</span>
+    <span class="token class-name">Abort</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalManager</span> <span class="token punctuation">{</span>
+    wal_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">,</span>
+    current_lsn<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    current_file<span class="token punctuation">:</span> <span class="token class-name">File</span><span class="token punctuation">,</span>
+    flush_lsn<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>  <span class="token comment">// Last flushed LSN</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">WalManager</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">log_change</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">,</span> record<span class="token punctuation">:</span> <span class="token class-name">WalRecord</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Serialize record</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> data <span class="token operator">=</span> <span class="token class-name">Vec</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        data<span class="token punctuation">.</span><span class="token function">extend_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">.</span>lsn<span class="token punctuation">.</span><span class="token function">to_le_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        data<span class="token punctuation">.</span><span class="token function">extend_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>table_id<span class="token punctuation">.</span><span class="token function">to_le_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// ... more fields</span>
+
+        <span class="token comment">// Write to WAL file</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>current_file<span class="token punctuation">.</span><span class="token function">write_all</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Update LSN</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>current_lsn <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>lsn<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">flush</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>current_file<span class="token punctuation">.</span><span class="token function">sync_all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>flush_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_lsn<span class="token punctuation">;</span>
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">replay_from</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">,</span> lsn<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span> buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Seek to LSN</span>
+        <span class="token comment">// Read records</span>
+        <span class="token comment">// For each record:</span>
+        <span class="token comment">//   - Get page from buffer pool</span>
+        <span class="token comment">//   - Apply new_data to page</span>
+        <span class="token comment">//   - Mark page dirty</span>
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ WAL 很难</p><div class="admonition-content"><p>正确实现 WAL 是构建数据库最困难的部分之一：</p>
+<ul>
+<li><strong>逻辑 vs. 实体 WAL：</strong> 记录操作（INSERT 行）还是页面变更（字节 X→Y）？</li>
+<li>**AR... [截断]</li>
+<li><strong>检查点：</strong> 多久一次？模糊还是清晰？</li>
+<li><strong>日志截断：</strong> 何时可以删除旧的 WAL 文件？</li>
+</ul>
+<p>Vaultgres 将从简单的实体 WAL（页面映像）开始，然后逐步演进。AI 对于理解这里的权衡取舍非常有帮助。</p>
+</div></div>
+<hr>
+<h2 id="6-用-Rust-构建的挑战">6 用 Rust 构建的挑战</h2>
+<h3 id="挑战-1：所有权-vs-共享访问">挑战 1：所有权 vs. 共享访问</h3>
+<p><strong>问题：</strong> 缓冲池需要在线程间共享页面，但 Rust 的所有权系统与此相抗。</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Doesn't work</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">get_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Page</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Can't return owned Page - buffer pool needs to keep it</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// ✅ Solution: Arc&lt;Mutex&lt;T&gt;&gt;</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">get_page</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">Page</span><span class="token operator">&gt;&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Shared ownership, interior mutability</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>权衡：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code></td>
+<td>安全、熟悉</td>
+<td>锁定竞争</td>
+</tr>
+<tr>
+<td><code>RwLock&lt;T&gt;</code></td>
+<td>更适合读取负载</td>
+<td>写入饥饿</td>
+</tr>
+<tr>
+<td>Lock-free (unsafe)</td>
+<td>最大性能</td>
+<td>复杂、易出错</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="挑战-2：零拷贝-vs-安全">挑战 2：零拷贝 vs. 安全</h3>
+<p><strong>问题：</strong> PostgreSQL 使用原始指针进行页面访问。Rust 想要边界检查。</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// PostgreSQL (C)</span>
+<span class="token class-name">Page</span> page <span class="token operator">=</span> buffer_pool<span class="token punctuation">-&gt;</span>pages<span class="token punctuation">[</span>frame_id<span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token class-name">Item</span> item <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token class-name">Item</span><span class="token punctuation">)</span><span class="token punctuation">(</span>page <span class="token operator">+</span> item_offset<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// No bounds check!</span>
+
+<span class="token comment">// Rust (safe)</span>
+<span class="token keyword">let</span> item <span class="token operator">=</span> <span class="token operator">&amp;</span>page<span class="token punctuation">.</span>data<span class="token punctuation">[</span>item_offset<span class="token punctuation">..</span>item_offset <span class="token operator">+</span> item_len<span class="token punctuation">]</span><span class="token punctuation">;</span>  <span class="token comment">// Bounds checked</span>
+
+<span class="token comment">// Rust (unsafe, zero-copy)</span>
+<span class="token keyword">let</span> item <span class="token operator">=</span> <span class="token keyword">unsafe</span> <span class="token punctuation">{</span>
+    <span class="token operator">&amp;</span><span class="token operator">*</span><span class="token punctuation">(</span>page<span class="token punctuation">.</span>data<span class="token punctuation">.</span><span class="token function">as_ptr</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>item_offset<span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token operator">*</span><span class="token keyword">const</span> <span class="token class-name">Item</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>  <span class="token comment">// Fast but requires safety analysis</span></code></pre>
+<p><strong>Vaultgres 方法：</strong> 从安全开始，在性能分析后用 <code>unsafe</code> 优化热点路径。</p>
+<hr>
+<h3 id="挑战-3：错误处理">挑战 3：错误处理</h3>
+<p><strong>问题：</strong> PostgreSQL 使用 <code>elog(ERROR, ...)</code>。Rust 使用 <code>Result&lt;T, E&gt;</code>。</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// PostgreSQL</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span>page_full<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token function">elog</span><span class="token punctuation">(</span><span class="token constant">ERROR</span><span class="token punctuation">,</span> <span class="token string">"page is full"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Longjmp out</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// Rust</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span>page_full<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token class-name">Err</span><span class="token punctuation">(</span><span class="token class-name">PageError</span><span class="token punctuation">::</span><span class="token class-name">Full</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Propagate up</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>影响：</strong> 每个函数签名都改变了。调用链变成 <code>Result</code> 金字塔。</p>
+<p><strong>解决方案：</strong> 大量使用 <code>?</code> 运算符，定义明确的错误类型：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token attribute attr-name">#[derive(Debug)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">StorageError</span> <span class="token punctuation">{</span>
+    <span class="token class-name">PageFull</span><span class="token punctuation">,</span>
+    <span class="token class-name">PageNotFound</span><span class="token punctuation">(</span><span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token class-name">IoError</span><span class="token punctuation">(</span><span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Error</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token class-name">CorruptedPage</span><span class="token punctuation">(</span><span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">From</span><span class="token operator">&lt;</span><span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Error</span><span class="token operator">&gt;</span> <span class="token keyword">for</span> <span class="token class-name">StorageError</span> <span class="token punctuation">{</span>
+    <span class="token keyword">fn</span> <span class="token function-definition function">from</span><span class="token punctuation">(</span>err<span class="token punctuation">:</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token class-name">Error</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token class-name">StorageError</span><span class="token punctuation">::</span><span class="token class-name">IoError</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">insert</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">,</span> data<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token keyword">u16</span><span class="token punctuation">,</span> <span class="token class-name">StorageError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">free_space</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> data<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token class-name">Err</span><span class="token punctuation">(</span><span class="token class-name">StorageError</span><span class="token punctuation">::</span><span class="token class-name">PageFull</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token comment">// ...</span>
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span>item_id<span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="7-AI-如何加速学习">7 AI 如何加速学习</h2>
+<h3 id="AI-擅长什么">AI 擅长什么</h3>
+<table>
+<thead>
+<tr>
+<th>任务</th>
+<th>我如何使用 AI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>解释概念</strong></td>
+<td>“解释 PostgreSQL 的缓冲池替换策略”</td>
+</tr>
+<tr>
+<td><strong>代码审查</strong></td>
+<td>“这个 unsafe 区块是否可靠？什么可能出错？”</td>
+</tr>
+<tr>
+<td><strong>产生样板</strong></td>
+<td>“为 PostgreSQL PageHeader 产生 Rust 结构体”</td>
+</tr>
+<tr>
+<td><strong>除错协助</strong></td>
+<td>“为什么会死锁？这是我的锁定顺序…”</td>
+</tr>
+<tr>
+<td><strong>比较方法</strong></td>
+<td>“LRU vs. Clock vs. FIFO 用于缓冲池淘汰”</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="AI-无法替代什么">AI 无法替代什么</h3>
+<table>
+<thead>
+<tr>
+<th>技能</th>
+<th>为什么仍取决于我</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>系统设计</strong></td>
+<td>AI 无法决定整体架构</td>
+</tr>
+<tr>
+<td><strong>权衡分析</strong></td>
+<td>“我应该优先考虑兼容性还是性能？”</td>
+</tr>
+<tr>
+<td><strong>测试</strong></td>
+<td>AI 无法执行基准测试或寻找竞争条件</td>
+</tr>
+<tr>
+<td><strong>除错</strong></td>
+<td>AI 无法附加 gdb 或读取核心转储</td>
+</tr>
+<tr>
+<td><strong>学习</strong></td>
+<td>我仍然必须理解 AI 产生的每一行代码</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="范例：学习缓冲池淘汰">范例：学习缓冲池淘汰</h3>
+<p><strong>我问 AI 的问题：</strong></p>
+<blockquote>
+<p>“PostgreSQL 使用 clock-sweep 算法进行缓冲池淘汰，而不是纯 LRU。为什么？有什么权衡取舍？”</p>
+</blockquote>
+<p><strong>我学到的：</strong></p>
+<ol>
+<li><strong>LRU 问题：</strong> 顺序扫描会淘汰所有内容（扫描抵抗）</li>
+<li><strong>Clock-sweep：</strong> 近似 LRU 但更便宜（不需要链表更新）</li>
+<li><strong>使用计数：</strong> 页面在淘汰前获得多次机会</li>
+<li><strong>PostgreSQL 的变体：</strong> 还考虑钉选计数和脏页状态</li>
+</ol>
+<p><strong>结果：</strong> 我在 Vaultgres 中实现了 clock-sweep 而不是 LRU：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">find_victim</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">usize</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> clock_hand <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>clock_hand<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> frames <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> _ <span class="token keyword">in</span> <span class="token number">0</span><span class="token punctuation">..</span>frames <span class="token operator">*</span> <span class="token number">2</span> <span class="token punctuation">{</span>  <span class="token comment">// Sweep at most twice</span>
+        <span class="token keyword">let</span> idx <span class="token operator">=</span> <span class="token operator">*</span>clock_hand <span class="token keyword">as</span> <span class="token keyword">usize</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> frame <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>frames<span class="token punctuation">[</span>idx<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">if</span> frame<span class="token punctuation">.</span>pin_count <span class="token operator">==</span> <span class="token number">0</span> <span class="token punctuation">{</span>
+            <span class="token keyword">if</span> frame<span class="token punctuation">.</span>usage_count <span class="token operator">&gt;</span> <span class="token number">0</span> <span class="token punctuation">{</span>
+                frame<span class="token punctuation">.</span>usage_count <span class="token operator">-=</span> <span class="token number">1</span><span class="token punctuation">;</span>  <span class="token comment">// Second chance</span>
+            <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+                <span class="token operator">*</span>clock_hand <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token operator">*</span>clock_hand <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">%</span> frames <span class="token keyword">as</span> <span class="token keyword">u32</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Evict this one</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token function">drop</span><span class="token punctuation">(</span>frame<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token operator">*</span>clock_hand <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token operator">*</span>clock_hand <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">%</span> frames <span class="token keyword">as</span> <span class="token keyword">u32</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token class-name">None</span>  <span class="token comment">// All pages pinned</span>
+<span class="token punctuation">}</span></code></pre>
+<p>这就是模式：AI 解释，我实现，我测试，我学习。</p>
+<h2 id="总结：页式存储一张图">总结：页式存储一张图</h2>
+<div class="mermaid">flowchart BT
+    subgraph "Buffer Pool RAM"
+        A[Frame 0: Page 5] --&gt; B[Frame 1: Page 3]
+        B --&gt; C[Frame 2: Page 7]
+        C --&gt; D[...]
+    end
+
+    subgraph "Page Structure"
+        E[PageHeader 24B] --&gt; F[ItemId array]
+        F --&gt; G[Free space]
+        G --&gt; H[Items grow up]
+    end
+
+    subgraph "Disk"
+        I[Table 1 / Page 0] --&gt; J[Table 1 / Page 1]
+        J --&gt; K[Table 2 / Page 0]
+    end
+
+    subgraph "WAL"
+        L[WAL Record 1] --&gt; M[WAL Record 2]
+        M --&gt; N[WAL Record 3]
+    end
+
+    B --&gt; E
+    E --&gt; I
+    N --&gt; B
+
+    style E fill:#e3f2fd,stroke:#1976d2
+    style L fill:#fff3e0,stroke:#f57c00
+    style A fill:#e8f5e9,stroke:#388e3c</div>
+<p><strong>关键要点：</strong></p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>为什么重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>页式存储</strong></td>
+<td>随机访问、细粒度锁定、高效缓存</td>
+</tr>
+<tr>
+<td><strong>缓冲池</strong></td>
+<td>热门页面比磁盘访问快 1000 倍</td>
+</tr>
+<tr>
+<td><strong>LRU/Clock 淘汰</strong></td>
+<td>保留常用页面，淘汰冷页面</td>
+</tr>
+<tr>
+<td><strong>WAL</strong></td>
+<td>不牺牲性能的持久性</td>
+</tr>
+<tr>
+<td><strong>Rust 挑战</strong></td>
+<td>所有权、安全、零拷贝——到处都是权衡取舍</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>进一步阅读：</strong></p>
+<ul>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/blob/master/src/include/storage/bufpage.h"><code>src/include/storage/bufpage.h</code></a></li>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/tree/master/src/backend/storage/buffer"><code>src/backend/storage/buffer/</code></a></li>
+<li>“Database Management Systems” by Ramakrishnan &amp; Gehrke (Ch. 9: Storage and Indexing)</li>
+<li>“Readings in Database Systems” (Red Book) - Buffer Pool chapter</li>
+<li>Vaultgres Repository: <a target="_blank" rel="noopener" href="https://github.com/neoalienson/Vaultgres">github.com/neoalienson/Vaultgres</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/" data-id="4bfaf707" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "使用 Rust 构建 PostgreSQL 兼容数据库：页式存储与缓冲池",
+        "image": "https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg",
+        "keywords": "Database Internals PostgreSQL Rust",
+        "genre": "Development",
+        "datePublished": "2026-03-01",
+        "dateCreated": "2026-03-01",
+        "dateModified": "2026-03-13",
+        "url": "https://neo01.com//zh-CN/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/",
+        "description": "为何我要用 Rust 构建 Vaultgres——一个 PostgreSQL 兼容数据库——来探索数据库内部机制。深入探讨页式存储、缓冲池管理，以及在 AI 辅助开发下实现 WAL 兼容存储的挑战。",
+        "wordCount": 10645
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：综合 SQL 解析器（DDL、DML、查询）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-SQL-Parser/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：综合 SQL 解析器（DDL、DML、查询）</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：通信协议与结果集序列化" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：通信协议与结果集序列化</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：WAL 与 ARIES 崩溃恢复" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：WAL 与 ARIES 崩溃恢复</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：MVCC 与事务管理" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：MVCC 与事务管理</a></p>
+                            <p class="item-date"><time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Rust 构建数据库：B+Tree 索引与并发访问" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="title">Rust 构建数据库：B+Tree 索引与并发访问</a></p>
+                            <p class="item-date"><time datetime="2026-03-01T16:00:00.000Z" itemprop="datePublished">2026-03-02</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2026/">2026</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">76</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#73cc4bea</div>
+                <img src="/qr/qr-8b3bb275b522fb1439ef04a275b79f54.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#73cc4bea">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

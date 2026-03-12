@@ -1,0 +1,1655 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Database Internals,PostgreSQL,Rust">
+    
+    
+    <meta name="description" content="Vaultgres 旅程第三部分：實作 MVCC 以實現非阻塞讀取和快照隔離。深入探討交易 ID、可見性規則、VACUUM，以及交易 ID 環繞的噩夢。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理">
+<meta property="og:url" content="https://neo01.com/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Vaultgres 旅程第三部分：實作 MVCC 以實現非阻塞讀取和快照隔離。深入探討交易 ID、可見性規則、VACUUM，以及交易 ID 環繞的噩夢。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+<meta property="article:published_time" content="2026-03-02T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-12T17:34:44.677Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Database Internals">
+<meta property="article:tag" content="PostgreSQL">
+<meta property="article:tag" content="Rust">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/03/Database-Rust-MVCC-Transaction-Manager/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/03/Database-Rust-MVCC-Transaction-Manager/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/03/Database-Rust-MVCC-Transaction-Manager/">
+<style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-TW';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me/">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/03/Database-Rust-MVCC-Transaction-Manager-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-12T17:34:44.677Z" itemprop="datePublished">2026-03-13</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/Database-Internals/">Database Internals</a> <a class="tag-link" href="/zh-TW/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/zh-TW/tags/Rust/">Rust</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-MVCC-%E7%9A%84%E6%B4%9E%E5%AF%9F"><span class="toc-text">1 MVCC 的洞察</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E4%BA%A4%E6%98%93-ID-%E5%92%8C%E5%BF%AB%E7%85%A7"><span class="toc-text">2 交易 ID 和快照</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E5%B8%B6-MVCC-%E7%9A%84%E5%88%97%E4%BD%88%E5%B1%80"><span class="toc-text">3 帶 MVCC 的列佈局</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E4%BA%A4%E6%98%93%E7%8B%80%E6%85%8B%E5%92%8C%E5%8F%AF%E8%A6%8B%E6%80%A7"><span class="toc-text">4 交易狀態和可見性</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-VACUUM%EF%BC%9A%E6%B8%85%E7%90%86%E6%AD%BB%E7%89%88%E6%9C%AC"><span class="toc-text">5 VACUUM：清理死版本</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E4%BA%A4%E6%98%93-ID-%E7%92%B0%E7%B9%9E%EF%BC%9A40-%E5%84%84%E5%88%97%E5%95%8F%E9%A1%8C"><span class="toc-text">6 交易 ID 環繞：40 億列問題</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E9%9A%94%E9%9B%A2%E7%B4%9A%E5%88%A5"><span class="toc-text">7 隔離級別</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E7%94%A8-Rust-%E5%BB%BA%E6%A7%8B%E7%9A%84%E6%8C%91%E6%88%B0"><span class="toc-text">8 用 Rust 建構的挑戰</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-AI-%E5%A6%82%E4%BD%95%E5%8A%A0%E9%80%9F%E9%80%99%E9%A0%85%E5%B7%A5%E4%BD%9C"><span class="toc-text">9 AI 如何加速這項工作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B8%BD%E7%B5%90%EF%BC%9AMVCC-%E4%B8%80%E5%BC%B5%E5%9C%96"><span class="toc-text">總結：MVCC 一張圖</span></a></li></ol>
+            <p>在 <a href="/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/">第二部分</a> 中，我們建構了併發 B+Tree 索引。但我們的方法有個根本問題。</p>
+<p><strong>讀者阻塞寫入者。寫入者阻塞讀者。</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Current implementation</span>
+<span class="token keyword">let</span> lock <span class="token operator">=</span> page<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Reader acquires lock</span>
+<span class="token comment">// Writer waits... and waits... and waits...</span>
+<span class="token comment">// Reader still holding lock (maybe computing something expensive)</span>
+<span class="token comment">// Writer: 😭</span></code></pre>
+<p>這對真正的資料庫來說是無法接受的。PostgreSQL 處理<strong>數千個併發交易</strong>，讀者永遠不會阻塞寫入者。如何做到？</p>
+<p><strong>MVCC：多版本併發控制。</strong></p>
+<p>今天：在 Rust 中實作帶快照隔離的 MVCC、交易管理，並面對交易 ID 環繞的噩夢。</p>
+<hr>
+<h2 id="1-MVCC-的洞察">1 MVCC 的洞察</h2>
+<h3 id="問題：鎖定太嚴格">問題：鎖定太嚴格</h3>
+<p><strong>傳統鎖定（2PL）：</strong></p>
+<pre class="language-none"><code class="language-none">Transaction A: SELECT * FROM users WHERE id = 1  -- Reads row X
+Transaction B: UPDATE users SET balance = 100 WHERE id = 1  -- Blocked!
+
+Transaction A: (still reading, maybe for 10 seconds)
+Transaction B: 😡 Still blocked!</code></pre>
+<p><strong>MVCC 方法：</strong></p>
+<pre class="language-none"><code class="language-none">Transaction A: SELECT * FROM users WHERE id = 1
+               -- 看見版本 1 的列 X（舊但一致）
+
+Transaction B: UPDATE users SET balance = 100 WHERE id = 1
+               -- 建立版本 2 的列 X
+               -- 不被阻塞！
+
+兩個交易互不阻塞。</code></pre>
+<hr>
+<h3 id="MVCC-如何運作">MVCC 如何運作</h3>
+<p><strong>每列有多個版本：</strong></p>
+<pre class="language-none"><code class="language-none">Row: users.id = 1
+
+Version 1: {id: 1, balance: 50,  xmin: 100, xmax: NULL}
+           ↑                    ↑       ↑
+           Data                Created  Still visible
+                             by txn 100  (not deleted)
+
+Version 2: {id: 1, balance: 100, xmin: 200, xmax: NULL}
+           ↑                     ↑
+           New data          Created by txn 200
+
+Version 3: {id: 1, balance: 150, xmin: 300, xmax: 400}
+           ↑                     ↑        ↑
+           Old data          Created   Deleted by
+                             by txn 300  txn 400</code></pre>
+<p><strong>交易中繼資料：</strong></p>
+<table>
+<thead>
+<tr>
+<th>欄位</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>xmin</code></td>
+<td>建立此版本的交易 ID</td>
+</tr>
+<tr>
+<td><code>xmax</code></td>
+<td>刪除此版本的交易 ID（NULL = 仍然存活）</td>
+</tr>
+<tr>
+<td><code>cmin</code></td>
+<td>交易內的命令 ID（用於語句級可見性）</td>
+</tr>
+<tr>
+<td><code>cmax</code></td>
+<td>刪除此版本的命令 ID</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-交易-ID-和快照">2 交易 ID 和快照</h2>
+<h3 id="交易-ID-分配">交易 ID 分配</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/transaction/txn_id.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">type</span> <span class="token type-definition class-name">TransactionId</span> <span class="token operator">=</span> <span class="token keyword">u32</span><span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">INVALID_XID</span><span class="token punctuation">:</span> <span class="token class-name">TransactionId</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">FIRST_NORMAL_XID</span><span class="token punctuation">:</span> <span class="token class-name">TransactionId</span> <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span>  <span class="token comment">// 0, 1, 2 are bootstrap</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">TransactionIdGenerator</span> <span class="token punctuation">{</span>
+    next_xid<span class="token punctuation">:</span> <span class="token class-name">AtomicU32</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">TransactionIdGenerator</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+            next_xid<span class="token punctuation">:</span> <span class="token class-name">AtomicU32</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token constant">FIRST_NORMAL_XID</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">next</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">TransactionId</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>next_xid<span class="token punctuation">.</span><span class="token function">fetch_add</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">SeqCst</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">current</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">TransactionId</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>next_xid<span class="token punctuation">.</span><span class="token function">load</span><span class="token punctuation">(</span><span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">SeqCst</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>問題：</strong> <code>u32</code> 在 40 億時會環繞。然後發生什麼？</p>
+<p><strong>答案：</strong> 災難。我們稍後處理。</p>
+<hr>
+<h3 id="快照：MVCC-的核心">快照：MVCC 的核心</h3>
+<p><strong>快照</strong> 捕捉哪些交易是可見的：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/transaction/snapshot.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">Snapshot</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> xmin<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>      <span class="token comment">// Oldest active transaction</span>
+    <span class="token keyword">pub</span> xmax<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>      <span class="token comment">// Next transaction ID (nothing &gt;= xmax is visible)</span>
+    <span class="token keyword">pub</span> active_transactions<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// Transactions in progress</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Snapshot</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">is_visible</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> row_xmin<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span> row_xmax<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">bool</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Row created by transaction &lt; xmin? Always visible</span>
+        <span class="token keyword">if</span> row_xmin <span class="token operator">&lt;</span> <span class="token keyword">self</span><span class="token punctuation">.</span>xmin <span class="token punctuation">{</span>
+            <span class="token comment">// Unless deleted by transaction &gt;= xmin</span>
+            <span class="token keyword">return</span> row_xmax<span class="token punctuation">.</span><span class="token function">map_or</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>xmax<span class="token closure-punctuation punctuation">|</span></span> xmax <span class="token operator">&gt;=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>xmax<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Row created by transaction &gt;= xmax? Never visible</span>
+        <span class="token keyword">if</span> row_xmin <span class="token operator">&gt;=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>xmax <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Row created by active transaction? Not visible (unless it's ours)</span>
+        <span class="token keyword">if</span> <span class="token keyword">self</span><span class="token punctuation">.</span>active_transactions<span class="token punctuation">.</span><span class="token function">contains</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>row_xmin<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Row deleted by active transaction? Still visible</span>
+        <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>xmax<span class="token punctuation">)</span> <span class="token operator">=</span> row_xmax <span class="token punctuation">{</span>
+            <span class="token keyword">if</span> xmax <span class="token operator">&lt;</span> <span class="token keyword">self</span><span class="token punctuation">.</span>xmax <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token keyword">self</span><span class="token punctuation">.</span>active_transactions<span class="token punctuation">.</span><span class="token function">contains</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>xmax<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token keyword">return</span> <span class="token boolean">false</span><span class="token punctuation">;</span>  <span class="token comment">// Deleted by committed transaction</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token boolean">true</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>視覺範例：</strong></p>
+<pre class="language-none"><code class="language-none">Time:     100    150    200    250    300    350
+          │      │      │      │      │      │
+Txn 100:  [====== committed ======]
+Txn 150:         [========= active =========]
+Txn 200:                [== committed ==]
+                          ↑
+                    Snapshot taken here
+                    xmin=150, xmax=251, active=[150, 200]
+
+Visibility rules:
+- Row created by txn 100: VISIBLE (committed before snapshot)
+- Row created by txn 150: NOT VISIBLE (still active)
+- Row created by txn 200: NOT VISIBLE (committed after snapshot started)
+- Row created by txn 250: NOT VISIBLE (&gt;= xmax)</code></pre>
+<hr>
+<h2 id="3-帶-MVCC-的列佈局">3 帶 MVCC 的列佈局</h2>
+<h3 id="擴展頁面標頭">擴展頁面標頭</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/mvcc_page.rs</span>
+<span class="token keyword">use</span> <span class="token keyword">crate</span><span class="token module-declaration namespace"><span class="token punctuation">::</span>transaction<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">TransactionId</span><span class="token punctuation">,</span> <span class="token class-name">CommandId</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">MVCC_ROW_HEADER_SIZE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token number">16</span><span class="token punctuation">;</span>
+
+<span class="token attribute attr-name">#[repr(C)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">MvccRowHeader</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> xmin<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>      <span class="token comment">// 4 bytes</span>
+    <span class="token keyword">pub</span> xmax<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>      <span class="token comment">// 4 bytes (0 = not deleted)</span>
+    <span class="token keyword">pub</span> cmin<span class="token punctuation">:</span> <span class="token class-name">CommandId</span><span class="token punctuation">,</span>          <span class="token comment">// 4 bytes</span>
+    <span class="token keyword">pub</span> cmax<span class="token punctuation">:</span> <span class="token class-name">CommandId</span><span class="token punctuation">,</span>          <span class="token comment">// 4 bytes</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">MvccRow</span> <span class="token punctuation">{</span>
+    header<span class="token punctuation">:</span> <span class="token class-name">MvccRowHeader</span><span class="token punctuation">,</span>
+    data<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">,</span>  <span class="token comment">// Variable length</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>帶 MVCC 的頁面佈局：</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│ PageHeader (24 bytes)                                       │
+├─────────────────────────────────────────────────────────────┤
+│ ItemId array (4 bytes each)                                 │
+├─────────────────────────────────────────────────────────────┤
+│ Free space                                                  │
+├─────────────────────────────────────────────────────────────┤
+│ Row 0: {xmin, xmax, cmin, cmax} + data                      │
+│ Row 1: {xmin, xmax, cmin, cmax} + data                      │
+│ Row 2: {xmin, xmax, cmin, cmax} + data                      │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<hr>
+<h3 id="插入：建立新版本">插入：建立新版本</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/transaction/mvcc_operations.rs</span>
+<span class="token keyword">impl</span> <span class="token class-name">MvccTable</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">insert</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Transaction</span><span class="token punctuation">,</span> data<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">TableError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Get a page with space</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_page_for_insert</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Create row with transaction metadata</span>
+        <span class="token keyword">let</span> header <span class="token operator">=</span> <span class="token class-name">MvccRowHeader</span> <span class="token punctuation">{</span>
+            xmin<span class="token punctuation">:</span> txn<span class="token punctuation">.</span>xid<span class="token punctuation">,</span>
+            xmax<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>  <span class="token comment">// Not deleted</span>
+            cmin<span class="token punctuation">:</span> txn<span class="token punctuation">.</span><span class="token function">current_command_id</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            cmax<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Insert into page</span>
+        <span class="token keyword">let</span> row_id <span class="token operator">=</span> page<span class="token punctuation">.</span><span class="token function">insert_mvcc_row</span><span class="token punctuation">(</span>header<span class="token punctuation">,</span> data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Mark page as dirty (needs WAL)</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>buffer_pool<span class="token punctuation">.</span><span class="token function">mark_dirty</span><span class="token punctuation">(</span>page<span class="token punctuation">.</span><span class="token function">id</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>插入的 WAL 記錄：</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token attribute attr-name">#[derive(Debug, Clone)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalRecordInsert</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> xmin<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> data<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="更新：建立新版本並標記舊版本">更新：建立新版本並標記舊版本</h3>
+<p><strong>更新實際上是刪除 + 插入：</strong></p>
+<div class="mermaid">flowchart TD
+    A[UPDATE users SET balance = 100 WHERE id = 1] --&gt; B[Find old version]
+    B --&gt; C[Mark old version as deleted]
+    C --&gt; D[Set xmax = current txn]
+    D --&gt; E[Set cmax = current command]
+    E --&gt; F[Insert new version]
+    F --&gt; G[New version has new xmin]
+    G --&gt; H[Commit: both versions visible until VACUUM]</div>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">impl</span> <span class="token class-name">MvccTable</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">update</span><span class="token operator">&lt;</span><span class="token class-name">F</span><span class="token operator">&gt;</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Transaction</span><span class="token punctuation">,</span> row_id<span class="token punctuation">:</span> <span class="token class-name">RowId</span><span class="token punctuation">,</span> modify<span class="token punctuation">:</span> <span class="token class-name">F</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">TableError</span><span class="token operator">&gt;</span>
+    <span class="token keyword">where</span>
+        <span class="token class-name">F</span><span class="token punctuation">:</span> <span class="token class-name">FnOnce</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span>
+        <span class="token comment">// 1. Find old version</span>
+        <span class="token keyword">let</span> old_row <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_row</span><span class="token punctuation">(</span>row_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 2. Check visibility (can only update visible rows)</span>
+        <span class="token keyword">if</span> <span class="token operator">!</span>txn<span class="token punctuation">.</span>snapshot<span class="token punctuation">.</span><span class="token function">is_visible</span><span class="token punctuation">(</span>old_row<span class="token punctuation">.</span>xmin<span class="token punctuation">,</span> old_row<span class="token punctuation">.</span>xmax<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token class-name">Err</span><span class="token punctuation">(</span><span class="token class-name">TableError</span><span class="token punctuation">::</span><span class="token class-name">RowNotVisible</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// 3. Mark old version as deleted</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> old_page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        old_page<span class="token punctuation">.</span><span class="token function">set_xmax</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> txn<span class="token punctuation">.</span>xid<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        old_page<span class="token punctuation">.</span><span class="token function">set_cmax</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> txn<span class="token punctuation">.</span><span class="token function">current_command_id</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 4. Create new version with updated data</span>
+        <span class="token keyword">let</span> new_data <span class="token operator">=</span> <span class="token function">modify</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>old_row<span class="token punctuation">.</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> new_row_id <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>txn<span class="token punctuation">,</span> <span class="token operator">&amp;</span>new_data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 5. Log to WAL</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">log_update</span><span class="token punctuation">(</span>old_row_id<span class="token punctuation">,</span> new_row_id<span class="token punctuation">,</span> txn<span class="token punctuation">.</span>xid<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="查詢：可見性檢查">查詢：可見性檢查</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">impl</span> <span class="token class-name">MvccTable</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">scan</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Transaction</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">impl</span> <span class="token class-name">Iterator</span><span class="token operator">&lt;</span><span class="token class-name">Item</span> <span class="token operator">=</span> <span class="token class-name">Row</span><span class="token operator">&gt;</span> <span class="token operator">+</span> <span class="token lifetime-annotation symbol">'_</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>pages<span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">flat_map</span><span class="token punctuation">(</span><span class="token keyword">move</span> <span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>page<span class="token closure-punctuation punctuation">|</span></span> <span class="token punctuation">{</span>
+            page<span class="token punctuation">.</span><span class="token function">rows</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">filter_map</span><span class="token punctuation">(</span><span class="token keyword">move</span> <span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>row<span class="token closure-punctuation punctuation">|</span></span> <span class="token punctuation">{</span>
+                <span class="token keyword">if</span> txn<span class="token punctuation">.</span>snapshot<span class="token punctuation">.</span><span class="token function">is_visible</span><span class="token punctuation">(</span>row<span class="token punctuation">.</span>xmin<span class="token punctuation">,</span> row<span class="token punctuation">.</span>xmax<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">Row</span> <span class="token punctuation">{</span> data<span class="token punctuation">:</span> row<span class="token punctuation">.</span>data <span class="token punctuation">}</span><span class="token punctuation">)</span>
+                <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+                    <span class="token class-name">None</span>  <span class="token comment">// Invisible version</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>範例情境：</strong></p>
+<pre class="language-none"><code class="language-none">Transaction A (xid=100):          Transaction B (xid=200):
+1. BEGIN;
+2. INSERT INTO users VALUES (1, 50);
+3. COMMIT;
+                                   4. BEGIN; (snapshot: xmin=201, xmax=201)
+                                   5. SELECT * FROM users;
+                                      → Sees version from txn 100 ✓
+6. BEGIN;
+7. UPDATE users SET balance = 100 WHERE id = 1;
+   (creates version 2, marks version 1 as deleted)
+8. (not committed yet)
+                                   9. SELECT * FROM users;
+                                      → Still sees version 1! (txn 200 not committed)
+10. COMMIT;
+                                   11. SELECT * FROM users;
+                                       → Now sees version 2 ✓</code></pre>
+<hr>
+<h2 id="4-交易狀態和可見性">4 交易狀態和可見性</h2>
+<h3 id="交易生命週期">交易生命週期</h3>
+<div class="mermaid">stateDiagram-v2
+    [*] --&gt; InProgress: BEGIN
+    InProgress --&gt; Committed: COMMIT
+    InProgress --&gt; Aborted: ROLLBACK
+    Committed --&gt; [*]
+    Aborted --&gt; [*]
+
+    note right of InProgress
+        xmin/xmax set to
+        transaction ID
+    end note
+
+    note right of Committed
+        Versions become
+        visible to new snapshots
+    end note
+
+    note right of Aborted
+        All versions marked
+        as never existed
+    end note</div>
+<h3 id="可見性矩陣">可見性矩陣</h3>
+<table>
+<thead>
+<tr>
+<th>列狀態</th>
+<th>交易狀態</th>
+<th>可見？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>xmin &lt; snapshot.xmin</code>, <code>xmax = 0</code></td>
+<td>Committed</td>
+<td>✅ 是</td>
+</tr>
+<tr>
+<td><code>xmin &lt; snapshot.xmin</code>, <code>xmax &lt; snapshot.xmin</code></td>
+<td>Committed</td>
+<td>❌ 否（已刪除）</td>
+</tr>
+<tr>
+<td><code>xmin &lt; snapshot.xmin</code>, <code>xmin in active</code></td>
+<td>In Progress</td>
+<td>❌ 否</td>
+</tr>
+<tr>
+<td><code>xmin &gt;= snapshot.xmax</code></td>
+<td>Any</td>
+<td>❌ 否（未來）</td>
+</tr>
+<tr>
+<td><code>xmin = current_txn</code></td>
+<td>Current</td>
+<td>✅ 是（自己的變更）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-VACUUM：清理死版本">5 VACUUM：清理死版本</h2>
+<h3 id="問題：死元組累積">問題：死元組累積</h3>
+<pre class="language-none"><code class="language-none">After many updates:
+
+Page:
+┌─────────────────────────────────────────────────────────────┐
+│ Row 0: {xmin: 100, xmax: 200} ← Dead (both committed)       │
+│ Row 1: {xmin: 300, xmax: 0}   ← Live                        │
+│ Row 2: {xmin: 150, xmax: 250} ← Dead                        │
+│ Row 3: {xmin: 400, xmax: 0}   ← Live                        │
+│ ...                                                         │
+│ 50% dead space!                                             │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>沒有 VACUUM：</strong> 表永遠增長。效能下降。</p>
+<hr>
+<h3 id="VACUUM-流程">VACUUM 流程</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/transaction/vacuum.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">VacuumWorker</span> <span class="token punctuation">{</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">BufferPool</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    transaction_manager<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">TransactionManager</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">VacuumWorker</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">vacuum_table</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> table_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">VacuumStats</span><span class="token punctuation">,</span> <span class="token class-name">VacuumError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> stats <span class="token operator">=</span> <span class="token class-name">VacuumStats</span><span class="token punctuation">::</span><span class="token function">default</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">for</span> page_id <span class="token keyword">in</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_table_pages</span><span class="token punctuation">(</span>table_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// Get global xmin (oldest active transaction)</span>
+            <span class="token keyword">let</span> global_xmin <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>transaction_manager<span class="token punctuation">.</span><span class="token function">get_global_xmin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// Scan all rows</span>
+            <span class="token keyword">for</span> row_id <span class="token keyword">in</span> page<span class="token punctuation">.</span><span class="token function">rows</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token keyword">let</span> row <span class="token operator">=</span> page<span class="token punctuation">.</span><span class="token function">get_row</span><span class="token punctuation">(</span>row_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Row is dead if xmax is committed</span>
+                <span class="token keyword">if</span> row<span class="token punctuation">.</span>xmax <span class="token operator">!=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> row<span class="token punctuation">.</span>xmax <span class="token operator">&lt;</span> global_xmin <span class="token punctuation">{</span>
+                    <span class="token comment">// Mark as reusable</span>
+                    page<span class="token punctuation">.</span><span class="token function">mark_row_free</span><span class="token punctuation">(</span>row_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                    stats<span class="token punctuation">.</span>dead_tuples_removed <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+
+            <span class="token keyword">self</span><span class="token punctuation">.</span>buffer_pool<span class="token punctuation">.</span><span class="token function">mark_dirty</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span>stats<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>VACUUM 不鎖定：</strong></p>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>鎖定級別</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Regular VACUUM</td>
+<td><code>ShareUpdateExclusiveLock</code>（允許讀取/寫入）</td>
+</tr>
+<tr>
+<td>VACUUM FULL</td>
+<td><code>AccessExclusiveLock</code>（阻塞所有）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="VACUUM-FULL-vs-Regular-VACUUM">VACUUM FULL vs. Regular VACUUM</h3>
+<pre class="language-none"><code class="language-none">Regular VACUUM:
+┌─────────────────────────────────────────────────────────────┐
+│ Before: [Dead][Live][Dead][Live][Dead][Live]               │
+│ After:  [Free][Live][Free][Live][Free][Live]               │
+│         (space reusable for new rows in same page)          │
+└─────────────────────────────────────────────────────────────┘
+
+VACUUM FULL:
+┌─────────────────────────────────────────────────────────────┐
+│ Before: [Dead][Live][Dead][Live][Dead][Live]               │
+│ After:  [Live][Live][Live][Free][Free][Free]               │
+│         (compacted, dead tuples physically removed)         │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">vacuum_full</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> table_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">VacuumError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Acquire exclusive lock</span>
+    <span class="token keyword">let</span> _lock <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">lock_table</span><span class="token punctuation">(</span>table_id<span class="token punctuation">,</span> <span class="token class-name">LockMode</span><span class="token punctuation">::</span><span class="token class-name">AccessExclusive</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 2. Create new table file</span>
+    <span class="token keyword">let</span> new_table_id <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">create_temp_table</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3. Copy only live tuples</span>
+    <span class="token keyword">for</span> row <span class="token keyword">in</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">scan_live_rows</span><span class="token punctuation">(</span>table_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">insert_into_table</span><span class="token punctuation">(</span>new_table_id<span class="token punctuation">,</span> row<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// 4. Swap tables (atomic rename)</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">swap_tables</span><span class="token punctuation">(</span>table_id<span class="token punctuation">,</span> new_table_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 5. Release lock</span>
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="6-交易-ID-環繞：40-億列問題">6 交易 ID 環繞：40 億列問題</h2>
+<h3 id="數學計算">數學計算</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token class-name">TransactionId</span> <span class="token operator">=</span> <span class="token keyword">u32</span>  <span class="token comment">// 0 to 4,294,967,295</span>
+
+<span class="token class-name">At</span> <span class="token number">1000</span> transactions<span class="token operator">/</span>second<span class="token punctuation">:</span>
+<span class="token number">4</span><span class="token punctuation">,</span><span class="token number">294</span><span class="token punctuation">,</span><span class="token number">967</span><span class="token punctuation">,</span><span class="token number">295</span> <span class="token operator">/</span> <span class="token number">1000</span> <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">,</span><span class="token number">294</span><span class="token punctuation">,</span><span class="token number">967</span> seconds <span class="token operator">=</span> ~<span class="token number">50</span> days
+
+<span class="token class-name">After</span> <span class="token number">50</span> days<span class="token punctuation">:</span> <span class="token macro property">OVERFLOW!</span> 😱</code></pre>
+<hr>
+<h3 id="環繞時發生什麼">環繞時發生什麼</h3>
+<pre class="language-none"><code class="language-none">Before wraparound:
+Transaction 4,294,967,294: INSERT INTO users VALUES (1, 100);
+Transaction 4,294,967,295: INSERT INTO users VALUES (2, 200);
+Transaction 0 (wrapped):   SELECT * FROM users;
+                           → Sees xid 4B as "older" than 0!
+                           → Wrong visibility! CORRUPTION!</code></pre>
+<p><strong>PostgreSQL 的解決方案：2 相位交易 ID</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Transaction ID comparison with wraparound handling</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">transaction_id_precedes</span><span class="token punctuation">(</span>id1<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span> id2<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">bool</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Treat as signed 32-bit integers</span>
+    <span class="token comment">// This makes the comparison wrap-aware</span>
+    <span class="token punctuation">(</span>id1 <span class="token keyword">as</span> <span class="token keyword">i32</span> <span class="token operator">-</span> id2 <span class="token keyword">as</span> <span class="token keyword">i32</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// Example:</span>
+<span class="token comment">// 4,294,967,294 as i32 = -2</span>
+<span class="token comment">// 0 as i32 = 0</span>
+<span class="token comment">// -2 &lt; 0 → true (4B precedes 0) ✓</span></code></pre>
+<hr>
+<h3 id="冷凍舊交易">冷凍舊交易</h3>
+<p><strong>Vacuum freeze：</strong> 標記非常舊的交易為「冷凍」</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">FROZEN_XID</span><span class="token punctuation">:</span> <span class="token class-name">TransactionId</span> <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>  <span class="token comment">// Special value</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">vacuum_freeze</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> table_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span> freeze_limit<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">VacuumError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> page_id <span class="token keyword">in</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_table_pages</span><span class="token punctuation">(</span>table_id<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">for</span> row_id <span class="token keyword">in</span> page<span class="token punctuation">.</span><span class="token function">rows</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> row <span class="token operator">=</span> page<span class="token punctuation">.</span><span class="token function">get_row</span><span class="token punctuation">(</span>row_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// If xmin is old enough, freeze it</span>
+            <span class="token keyword">if</span> row<span class="token punctuation">.</span>xmin <span class="token operator">&lt;</span> freeze_limit <span class="token operator">&amp;&amp;</span> row<span class="token punctuation">.</span>xmin <span class="token operator">!=</span> <span class="token constant">FROZEN_XID</span> <span class="token punctuation">{</span>
+                page<span class="token punctuation">.</span><span class="token function">set_xmin</span><span class="token punctuation">(</span>row_id<span class="token punctuation">,</span> <span class="token constant">FROZEN_XID</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+
+            <span class="token comment">// If xmax is old enough, freeze it</span>
+            <span class="token keyword">if</span> row<span class="token punctuation">.</span>xmax <span class="token operator">!=</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> row<span class="token punctuation">.</span>xmax <span class="token operator">&lt;</span> freeze_limit <span class="token operator">&amp;&amp;</span> row<span class="token punctuation">.</span>xmax <span class="token operator">!=</span> <span class="token constant">FROZEN_XID</span> <span class="token punctuation">{</span>
+                page<span class="token punctuation">.</span><span class="token function">set_xmax</span><span class="token punctuation">(</span>row_id<span class="token punctuation">,</span> <span class="token constant">FROZEN_XID</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>冷凍列永遠可見：</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">impl</span> <span class="token class-name">Snapshot</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">is_visible</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> row_xmin<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span> row_xmax<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">bool</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Frozen rows are always visible</span>
+        <span class="token keyword">if</span> row_xmin <span class="token operator">==</span> <span class="token constant">FROZEN_XID</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> row_xmax<span class="token punctuation">.</span><span class="token function">map_or</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>xmax<span class="token closure-punctuation punctuation">|</span></span> xmax <span class="token operator">==</span> <span class="token constant">FROZEN_XID</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// ... normal visibility logic ...</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Autovacuum：自動防止環繞">Autovacuum：自動防止環繞</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/transaction/autovacuum.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">AutovacuumLauncher</span> <span class="token punctuation">{</span>
+    transaction_manager<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">TransactionManager</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    vacuum_worker<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">VacuumWorker</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">AutovacuumLauncher</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">run</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">loop</span> <span class="token punctuation">{</span>
+            <span class="token comment">// Check how old the oldest transaction is</span>
+            <span class="token keyword">let</span> oldest_xmin <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>transaction_manager<span class="token punctuation">.</span><span class="token function">get_oldest_xmin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">let</span> current_xid <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>transaction_manager<span class="token punctuation">.</span><span class="token function">current_xid</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// Distance to wraparound</span>
+            <span class="token keyword">let</span> distance_to_wraparound <span class="token operator">=</span> <span class="token class-name">TransactionId</span><span class="token punctuation">::</span><span class="token constant">MAX</span> <span class="token operator">-</span> current_xid <span class="token operator">+</span> oldest_xmin<span class="token punctuation">;</span>
+
+            <span class="token comment">// If getting close, trigger vacuum</span>
+            <span class="token keyword">if</span> distance_to_wraparound <span class="token operator">&lt;</span> <span class="token constant">WRAPAROUND_EMERGENCY_THRESHOLD</span> <span class="token punctuation">{</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>vacuum_worker<span class="token punctuation">.</span><span class="token function">vacuum_freeze_all_tables</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+
+            <span class="token function">sleep</span><span class="token punctuation">(</span><span class="token class-name">Duration</span><span class="token punctuation">::</span><span class="token function">from_secs</span><span class="token punctuation">(</span><span class="token number">60</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>PostgreSQL 的預設閾值：</strong></p>
+<table>
+<thead>
+<tr>
+<th>參數</th>
+<th>預設值</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>autovacuum_vacuum_threshold</code></td>
+<td>50</td>
+<td>真空前的最小死元組</td>
+</tr>
+<tr>
+<td><code>autovacuum_vacuum_scale_factor</code></td>
+<td>0.2</td>
+<td>+表大小的 20%</td>
+</tr>
+<tr>
+<td><code>autovacuum_freeze_max_age</code></td>
+<td>200M</td>
+<td>強制冷凍前的最大交易數</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="7-隔離級別">7 隔離級別</h2>
+<h3 id="ANSI-SQL-隔離級別">ANSI SQL 隔離級別</h3>
+<table>
+<thead>
+<tr>
+<th>隔離級別</th>
+<th>髒讀</th>
+<th>不可重複讀</th>
+<th>幻影讀</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read Uncommitted</td>
+<td>可能</td>
+<td>可能</td>
+<td>可能</td>
+</tr>
+<tr>
+<td>Read Committed</td>
+<td>❌ 防止</td>
+<td>可能</td>
+<td>可能</td>
+</tr>
+<tr>
+<td>Repeatable Read</td>
+<td>❌ 防止</td>
+<td>❌ 防止</td>
+<td>可能</td>
+</tr>
+<tr>
+<td>Serializable</td>
+<td>❌ 防止</td>
+<td>❌ 防止</td>
+<td>❌ 防止</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="PostgreSQL-的實作">PostgreSQL 的實作</h3>
+<p><strong>PostgreSQL 對所有隔離級別使用 MVCC：</strong></p>
+<table>
+<thead>
+<tr>
+<th>隔離級別</th>
+<th>實作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Read Uncommitted</td>
+<td>同 Read Committed</td>
+</tr>
+<tr>
+<td>Read Committed</td>
+<td>每個語句新快照</td>
+</tr>
+<tr>
+<td>Repeatable Read</td>
+<td>每個交易單一笑快照</td>
+</tr>
+<tr>
+<td>Serializable</td>
+<td>單一笑快照 + 謂詞鎖定</td>
+</tr>
+</tbody>
+</table>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token attribute attr-name">#[derive(Debug, Clone, Copy)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">IsolationLevel</span> <span class="token punctuation">{</span>
+    <span class="token class-name">ReadCommitted</span><span class="token punctuation">,</span>
+    <span class="token class-name">RepeatableRead</span><span class="token punctuation">,</span>
+    <span class="token class-name">Serializable</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Transaction</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">get_snapshot</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Snapshot</span> <span class="token punctuation">{</span>
+        <span class="token keyword">match</span> <span class="token keyword">self</span><span class="token punctuation">.</span>isolation_level <span class="token punctuation">{</span>
+            <span class="token class-name">IsolationLevel</span><span class="token punctuation">::</span><span class="token class-name">ReadCommitted</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                <span class="token comment">// New snapshot for each statement</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>transaction_manager<span class="token punctuation">.</span><span class="token function">create_snapshot</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            <span class="token class-name">IsolationLevel</span><span class="token punctuation">::</span><span class="token class-name">RepeatableRead</span> <span class="token operator">|</span> <span class="token class-name">IsolationLevel</span><span class="token punctuation">::</span><span class="token class-name">Serializable</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Reuse same snapshot for entire transaction</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>cached_snapshot<span class="token punctuation">.</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="可序列化隔離：謂詞鎖定">可序列化隔離：謂詞鎖定</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Simplified predicate locking</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">SerializableTransaction</span> <span class="token punctuation">{</span>
+    txn<span class="token punctuation">:</span> <span class="token class-name">Transaction</span><span class="token punctuation">,</span>
+    read_predicates<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token class-name">Predicate</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// Ranges/conditions read</span>
+    write_set<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token class-name">RowId</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>            <span class="token comment">// Rows written</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">Predicate</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> key_range<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token class-name">BTreeKey</span><span class="token punctuation">,</span> <span class="token class-name">BTreeKey</span><span class="token punctuation">)</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// None = full scan</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">TransactionManager</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">check_serializable_conflict</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">SerializableTransaction</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">SerializationError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Check if any committed write conflicts with our reads</span>
+        <span class="token keyword">for</span> predicate <span class="token keyword">in</span> <span class="token operator">&amp;</span>txn<span class="token punctuation">.</span>read_predicates <span class="token punctuation">{</span>
+            <span class="token keyword">for</span> write <span class="token keyword">in</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">recent_writes</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token keyword">if</span> predicate<span class="token punctuation">.</span><span class="token function">matches</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>write<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> write<span class="token punctuation">.</span><span class="token function">committed_after</span><span class="token punctuation">(</span>txn<span class="token punctuation">.</span>snapshot<span class="token punctuation">.</span>xmax<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token keyword">return</span> <span class="token class-name">Err</span><span class="token punctuation">(</span><span class="token class-name">SerializationError</span><span class="token punctuation">::</span><span class="token class-name">ReadWriteConflict</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>衝突時：</strong> 中止一個交易，帶 <code>serialization_failure</code> 錯誤。</p>
+<hr>
+<h2 id="8-用-Rust-建構的挑戰">8 用 Rust 建構的挑戰</h2>
+<h3 id="挑戰-1：快照生命週期">挑戰 1：快照生命週期</h3>
+<p><strong>問題：</strong> 快照需要比建立它的交易更長壽。</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Doesn't work</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">begin_transaction</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Transaction</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> snapshot <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">create_snapshot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Borrowed from self</span>
+    <span class="token class-name">Transaction</span> <span class="token punctuation">{</span> snapshot<span class="token punctuation">,</span> <span class="token punctuation">...</span> <span class="token punctuation">}</span>  <span class="token comment">// Snapshot doesn't live long</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>解決方案： owned 快照</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ✅ Works</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">begin_transaction</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Transaction</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> snapshot <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">create_snapshot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Returns owned Snapshot</span>
+    <span class="token class-name">Transaction</span> <span class="token punctuation">{</span>
+        snapshot<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span>snapshot<span class="token punctuation">)</span><span class="token punctuation">,</span>  <span class="token comment">// Shareable across threads</span>
+        <span class="token punctuation">...</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="挑戰-2：原子交易狀態">挑戰 2：原子交易狀態</h3>
+<p><strong>問題：</strong> 多個執行緒需要看到一致的交易狀態。</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Race condition</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">commit</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">Transaction</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    txn<span class="token punctuation">.</span>state <span class="token operator">=</span> <span class="token class-name">TransactionState</span><span class="token punctuation">::</span><span class="token class-name">Committed</span><span class="token punctuation">;</span>  <span class="token comment">// Not atomic!</span>
+    <span class="token comment">// Other threads might see partial state</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>解決方案：帶適當順序的原子狀態</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ✅ Works</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">Transaction</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> xid<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> state<span class="token punctuation">:</span> <span class="token class-name">AtomicU8</span><span class="token punctuation">,</span>  <span class="token comment">// Use atomic for state</span>
+    <span class="token keyword">pub</span> snapshot<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">Snapshot</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Transaction</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">commit</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 1. Write WAL first (durable)</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">log_commit</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>xid<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 2. Then mark as committed (visible)</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>state<span class="token punctuation">.</span><span class="token function">store</span><span class="token punctuation">(</span><span class="token class-name">TransactionState</span><span class="token punctuation">::</span><span class="token class-name">Committed</span> <span class="token keyword">as</span> <span class="token keyword">u8</span><span class="token punctuation">,</span> <span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">Release</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 3. Notify waiting transactions</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>transaction_manager<span class="token punctuation">.</span><span class="token function">notify_committed</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>xid<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="挑戰-3：不阻塞的-VACUUM">挑戰 3：不阻塞的 VACUUM</h3>
+<p><strong>問題：</strong> 如何在交易讀取時進行 VACUUM？</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Blocks readers</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">vacuum</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> _lock <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>table_lock<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Exclusive lock</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">remove_dead_tuples</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>解決方案：兩階段 VACUUM</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ✅ Non-blocking</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">vacuum</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Phase 1: Mark tuples as prune-able (no lock needed)</span>
+    <span class="token keyword">let</span> global_xmin <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_global_xmin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">mark_pruneable</span><span class="token punctuation">(</span>global_xmin<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Phase 2: Reclaim space (uses page-level locks, not table lock)</span>
+    <span class="token keyword">for</span> page <span class="token keyword">in</span> <span class="token keyword">self</span><span class="token punctuation">.</span>pages<span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> _page_lock <span class="token operator">=</span> page<span class="token punctuation">.</span>lock<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">reclaim_space_on_page</span><span class="token punctuation">(</span>page<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="9-AI-如何加速這項工作">9 AI 如何加速這項工作</h2>
+<h3 id="AI-做對了什麼">AI 做對了什麼</h3>
+<table>
+<thead>
+<tr>
+<th>任務</th>
+<th>AI 貢獻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>可見性規則</strong></td>
+<td>產生正確的 xmin/xmax 邏輯</td>
+</tr>
+<tr>
+<td><strong>環繞處理</strong></td>
+<td>解釋 2 的補數技巧</td>
+</tr>
+<tr>
+<td><strong>快照結構</strong></td>
+<td>建議 xmin/xmax/active 模式</td>
+</tr>
+<tr>
+<td><strong>VACUUM 設計</strong></td>
+<td>概述兩階段方法</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="AI-做錯了什麼">AI 做錯了什麼</h3>
+<table>
+<thead>
+<tr>
+<th>問題</th>
+<th>發生什麼事</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>初始可見性</strong></td>
+<td>初稿沒有處理自己未提交的寫入</td>
+</tr>
+<tr>
+<td><strong>冷凍邏輯</strong></td>
+<td>忽略了冷凍列需要在可見性中特殊處理</td>
+</tr>
+<tr>
+<td><strong>可序列化隔離</strong></td>
+<td>建議沒有謂詞鎖定的完全可序列化（錯誤！）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>模式：</strong> MVCC 很微妙。AI 獲得 80% 的情況。邊界情況需要深入理解。</p>
+<hr>
+<h3 id="範例：除錯可見性錯誤">範例：除錯可見性錯誤</h3>
+<p><strong>我問 AI 的問題：</strong></p>
+<blockquote>
+<p>“交易 A 插入一列，然後查詢它。但查詢看不到該列。為什麼？”</p>
+</blockquote>
+<p><strong>我學到的：</strong></p>
+<ol>
+<li>交易必須看到<strong>自己的</strong>未提交寫入</li>
+<li>需要在快照中追蹤 <code>current_transaction_id</code></li>
+<li>可見性檢查需要為 <code>row_xmin == my_xid</code> 特殊處理</li>
+</ol>
+<p><strong>結果：</strong> 修復 <code>is_visible()</code>：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">is_visible</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> row_xmin<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span> row_xmax<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token operator">&gt;</span><span class="token punctuation">,</span> my_xid<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">bool</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Special case: see your own writes</span>
+    <span class="token keyword">if</span> row_xmin <span class="token operator">==</span> my_xid <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> row_xmax<span class="token punctuation">.</span><span class="token function">map_or</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">,</span> <span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>xmax<span class="token closure-punctuation punctuation">|</span></span> xmax <span class="token operator">!=</span> my_xid<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// ... rest of visibility logic ...</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="總結：MVCC-一張圖">總結：MVCC 一張圖</h2>
+<div class="mermaid">flowchart BT
+    subgraph "Transaction Lifecycle"
+        A[BEGIN] --&gt; B[Get Snapshot]
+        B --&gt; C[Read/Write with MVCC]
+        C --&gt; D{COMMIT or ROLLBACK?}
+        D --&gt;|COMMIT| E[Write WAL]
+        D --&gt;|ROLLBACK| F[Discard Changes]
+        E --&gt; G[Mark Committed]
+    end
+
+    subgraph "MVCC Row States"
+        H[Live: xmin committed, xmax=0]
+        I[Dead: xmin &amp; xmax committed]
+        J[Frozen: xmin=FROZEN_XID]
+    end
+
+    subgraph "VACUUM"
+        K[Regular VACUUM] --&gt; L[Mark space reusable]
+        M[VACUUM FULL] --&gt; N[Compact table]
+        O[AutoVacuum] --&gt; P[Prevent wraparound]
+    end
+
+    subgraph "Isolation Levels"
+        Q[Read Committed] --&gt; R[New snapshot per statement]
+        S[Repeatable Read] --&gt; T[Single snapshot]
+        U[Serializable] --&gt; V[Predicate locking]
+    end
+
+    style B fill:#e3f2fd,stroke:#1976d2
+    style H fill:#e8f5e9,stroke:#388e3c
+    style I fill:#ffebee,stroke:#c62828
+    style O fill:#fff3e0,stroke:#f57c00</div>
+<p><strong>關鍵要點：</strong></p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>為什麼重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MVCC</strong></td>
+<td>讀者不阻塞寫入者，寫入者不阻塞讀者</td>
+</tr>
+<tr>
+<td><strong>快照</strong></td>
+<td>在時間點一致的資料視圖</td>
+</tr>
+<tr>
+<td><strong>交易 ID</strong></td>
+<td>追蹤版本建立/刪除</td>
+</tr>
+<tr>
+<td><strong>VACUUM</strong></td>
+<td>從死版本回收空間</td>
+</tr>
+<tr>
+<td><strong>環繞</strong></td>
+<td>40 億交易限制需要冷凍</td>
+</tr>
+<tr>
+<td><strong>隔離級別</strong></td>
+<td>一致性與併發性之間的權衡</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>進一步閱讀：</strong></p>
+<ul>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/blob/master/src/backend/access/heap/heapam_visibility.c"><code>src/backend/access/heap/heapam_visibility.c</code></a></li>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/tree/master/src/backend/access/transam"><code>src/backend/access/transam/</code></a></li>
+<li>“A Critique of ANSI SQL Isolation Levels” by Berenson et al. (1995)</li>
+<li>“Database Management Systems” by Ramakrishnan (Ch. 16: Concurrency Control)</li>
+<li>“The PostgreSQL Book” by Worsley &amp; Morin (Ch. 13: MVCC)</li>
+<li>Vaultgres Repository: <a target="_blank" rel="noopener" href="https://github.com/neoalienson/Vaultgres">github.com/neoalienson/Vaultgres</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/" data-id="4b18d25d" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理",
+        "image": "https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg",
+        "keywords": "Database Internals PostgreSQL Rust",
+        "genre": "Development",
+        "datePublished": "2026-03-03",
+        "dateCreated": "2026-03-03",
+        "dateModified": "2026-03-13",
+        "url": "https://neo01.com//zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/",
+        "description": "Vaultgres 旅程第三部分：實作 MVCC 以實現非阻塞讀取和快照隔離。深入探討交易 ID、可見性規則、VACUUM，以及交易 ID 環繞的噩夢。",
+        "wordCount": 8163
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：綜合 SQL 解析器（DDL、DML、查詢）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-SQL-Parser/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：綜合 SQL 解析器（DDL、DML、查詢）</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：WAL 與 ARIES 崩潰恢復" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：WAL 與 ARIES 崩潰恢復</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理</a></p>
+                            <p class="item-date"><time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Rust 建構資料庫：B+Tree 索引與併發存取" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="title">Rust 建構資料庫：B+Tree 索引與併發存取</a></p>
+                            <p class="item-date"><time datetime="2026-03-01T16:00:00.000Z" itemprop="datePublished">2026-03-02</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2026/">2026</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">77</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#7d437dd3</div>
+                <img src="/qr/qr-6645e6e53ebbc16bf7f6984f181b84a7.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#7d437dd3">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

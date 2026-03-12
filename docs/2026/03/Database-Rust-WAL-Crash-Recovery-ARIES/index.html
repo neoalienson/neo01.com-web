@@ -1,0 +1,1772 @@
+<!DOCTYPE html><html lang="en"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Database in Rust: WAL and Crash Recovery with ARIES | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Database Internals,PostgreSQL,Rust">
+    
+    
+    <meta name="description" content="Part 4 of the Vaultgres journey: implementing Write-Ahead Logging and the ARIES recovery algorithm. Deep dive into durability, checkpoints, and the three-phase recovery that brings your database back">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Database in Rust: WAL and Crash Recovery with ARIES">
+<meta property="og:url" content="https://neo01.com/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Part 4 of the Vaultgres journey: implementing Write-Ahead Logging and the ARIES recovery algorithm. Deep dive into durability, checkpoints, and the three-phase recovery that brings your database back">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+<meta property="article:published_time" content="2026-03-03T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-12T17:33:39.556Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Database Internals">
+<meta property="article:tag" content="PostgreSQL">
+<meta property="article:tag" content="Rust">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/">
+<style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'en';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/">Home</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/Art-Gallery/">Art Gallery</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Architecture/">Architecture</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Cybersecurity/">Cybersecurity</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Development/">Development</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Misc/">Misc</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/about-me/">About</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="Search">
+        <button type="submit" title="Search" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="Type something...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'en',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/03/Database-Rust-WAL-Crash-Recovery-ARIES" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Database in Rust: WAL and Crash Recovery with ARIES
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-12T17:33:39.556Z" itemprop="datePublished">2026-03-13</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/Database-Internals/">Database Internals</a> <a class="tag-link" href="/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/tags/Rust/">Rust</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-The-WAL-Principle"><span class="toc-text">1 The WAL Principle</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-WAL-Record-Format"><span class="toc-text">2 WAL Record Format</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-WAL-Manager-Implementation"><span class="toc-text">3 WAL Manager Implementation</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-Checkpoints-Limiting-Recovery-Time"><span class="toc-text">4 Checkpoints: Limiting Recovery Time</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-ARIES-The-Recovery-Algorithm"><span class="toc-text">5 ARIES: The Recovery Algorithm</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-Recovery-Example-Step-by-Step"><span class="toc-text">6 Recovery Example: Step by Step</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-WAL-Archiving-and-Point-in-Time-Recovery"><span class="toc-text">7 WAL Archiving and Point-in-Time Recovery</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-Challenges-Building-in-Rust"><span class="toc-text">8 Challenges Building in Rust</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#9-How-AI-Accelerated-This"><span class="toc-text">9 How AI Accelerated This</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Summary-WAL-and-ARIES-in-One-Diagram"><span class="toc-text">Summary: WAL and ARIES in One Diagram</span></a></li></ol>
+            <p>In <a href="/2026/03/Database-Rust-MVCC-Transaction-Manager/">Part 3</a>, we built MVCC for concurrent transactions. But there’s a terrifying question we haven’t answered.</p>
+<p><strong>What happens when the power goes out?</strong></p>
+<pre class="language-none"><code class="language-none">Transaction: UPDATE accounts SET balance = 1000 WHERE id = 1
+
+1. Read page into buffer pool
+2. Modify page in memory (balance = 1000)
+3. Mark page as dirty
+4. ACK to client: "Done!"
+5. ⚡ POWER FAILURE ⚡
+6. Dirty page never written to disk
+7. Client's money: GONE 💸</code></pre>
+<p>This is why databases use <strong>WAL: Write-Ahead Logging</strong>.</p>
+<p>Today: implementing WAL and the ARIES recovery algorithm in Rust. This is the code that ensures your data survives crashes, power failures, and kernel panics.</p>
+<hr>
+<h2 id="1-The-WAL-Principle">1 The WAL Principle</h2>
+<h3 id="The-Fundamental-Rule">The Fundamental Rule</h3>
+<p><strong>Write-Ahead Logging:</strong> Before modifying any data page, you MUST write the change to the WAL.</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ WRONG - data modification before WAL</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">update</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> row_id<span class="token punctuation">:</span> <span class="token class-name">RowId</span><span class="token punctuation">,</span> new_data<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">Error</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    page<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> new_data<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Modified in memory!</span>
+    page<span class="token punctuation">.</span><span class="token function">mark_dirty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// WAL comes too late</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">log_update</span><span class="token punctuation">(</span>row_id<span class="token punctuation">,</span> new_data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>  <span class="token comment">// Too late!</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// ✅ CORRECT - WAL first</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">update</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> row_id<span class="token punctuation">:</span> <span class="token class-name">RowId</span><span class="token punctuation">,</span> new_data<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">Error</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Generate LSN (Log Sequence Number)</span>
+    <span class="token keyword">let</span> lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">log_update</span><span class="token punctuation">(</span>row_id<span class="token punctuation">,</span> new_data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 2. Flush WAL to disk (fsync)</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">flush</span><span class="token punctuation">(</span>lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3. NOW safe to modify page</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    page<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>row_id<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> new_data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    page<span class="token punctuation">.</span><span class="token function">set_lsn</span><span class="token punctuation">(</span>lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Track which LSN modified this page</span>
+    page<span class="token punctuation">.</span><span class="token function">mark_dirty</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>Why this works:</strong></p>
+<pre class="language-none"><code class="language-none">Crash at different points:
+
+After WAL write, before page modify:
+→ Recovery replays WAL, data is restored ✓
+
+After page modify, before flush:
+→ WAL on disk, recovery ensures durability ✓
+
+After flush to disk:
+→ Data is durable ✓</code></pre>
+<hr>
+<h3 id="Log-Sequence-Numbers-LSN">Log Sequence Numbers (LSN)</h3>
+<p>Every WAL record gets a unique, monotonically increasing identifier:</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/wal/lsn.rs</span>
+<span class="token attribute attr-name">#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">Lsn</span><span class="token punctuation">(</span><span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Lsn</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">INVALID</span><span class="token punctuation">:</span> <span class="token class-name">Lsn</span> <span class="token operator">=</span> <span class="token class-name">Lsn</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span>value<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">Self</span><span class="token punctuation">(</span>value<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">invalid</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">bool</span> <span class="token punctuation">{</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token number">0</span> <span class="token operator">==</span> <span class="token number">0</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// LSN encoding: segment_id (high 32) + offset (low 32)</span>
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">from_segment_offset</span><span class="token punctuation">(</span>segment<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span> offset<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">Self</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>segment <span class="token keyword">as</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token operator">&lt;&lt;</span> <span class="token number">32</span><span class="token punctuation">)</span> <span class="token operator">|</span> <span class="token punctuation">(</span>offset <span class="token keyword">as</span> <span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">segment</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">u32</span> <span class="token punctuation">{</span>
+        <span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span><span class="token number">0</span> <span class="token operator">&gt;&gt;</span> <span class="token number">32</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u32</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">offset</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">u32</span> <span class="token punctuation">{</span>
+        <span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span><span class="token number">0</span> <span class="token operator">&amp;</span> <span class="token number">0xFFFFFFFF</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u32</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>LSN ordering guarantees:</strong></p>
+<pre class="language-none"><code class="language-none">LSN 100: BEGIN txn 1
+LSN 101: INSERT row A (txn 1)
+LSN 102: INSERT row B (txn 1)
+LSN 103: COMMIT txn 1
+LSN 104: BEGIN txn 2
+LSN 105: UPDATE row A (txn 2)
+...
+
+LSN 100 &lt; LSN 101 &lt; LSN 102 &lt; ...  (strictly increasing)</code></pre>
+<hr>
+<h2 id="2-WAL-Record-Format">2 WAL Record Format</h2>
+<h3 id="Record-Structure">Record Structure</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/wal/record.rs</span>
+<span class="token keyword">use</span> <span class="token keyword">crate</span><span class="token module-declaration namespace"><span class="token punctuation">::</span>storage<span class="token punctuation">::</span></span><span class="token class-name">PageId</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token keyword">crate</span><span class="token module-declaration namespace"><span class="token punctuation">::</span>transaction<span class="token punctuation">::</span></span><span class="token class-name">TransactionId</span><span class="token punctuation">;</span>
+
+<span class="token attribute attr-name">#[derive(Debug, Clone)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalRecord</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> prev_lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span><span class="token punctuation">,</span>  <span class="token comment">// Link to previous record from same transaction</span>
+    <span class="token keyword">pub</span> transaction_id<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> record_type<span class="token punctuation">:</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> page_id<span class="token punctuation">:</span> <span class="token class-name">PageId</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> data<span class="token punctuation">:</span> <span class="token class-name">WalData</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> checksum<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[derive(Debug, Clone)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">WalRecordType</span> <span class="token punctuation">{</span>
+    <span class="token class-name">Begin</span><span class="token punctuation">,</span>
+    <span class="token class-name">Insert</span><span class="token punctuation">,</span>
+    <span class="token class-name">Update</span> <span class="token punctuation">{</span> before_image<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span> after_image<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token class-name">Delete</span> <span class="token punctuation">{</span> before_image<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token class-name">Commit</span><span class="token punctuation">,</span>
+    <span class="token class-name">Abort</span><span class="token punctuation">,</span>
+    <span class="token class-name">CheckpointBegin</span><span class="token punctuation">,</span>
+    <span class="token class-name">CheckpointEnd</span><span class="token punctuation">,</span>
+    <span class="token class-name">Compensation</span> <span class="token punctuation">{</span> undo_next_lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>  <span class="token comment">// For aborts</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[derive(Debug, Clone)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">WalData</span> <span class="token punctuation">{</span>
+    <span class="token class-name">PageImage</span><span class="token punctuation">(</span><span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token punctuation">,</span>      <span class="token comment">// Full page image (for checkpoints)</span>
+    <span class="token class-name">RowData</span><span class="token punctuation">(</span><span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token punctuation">,</span>        <span class="token comment">// Row-level change</span>
+    <span class="token class-name">IndexEntry</span> <span class="token punctuation">{</span> key<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span> value<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>Physical layout on disk:</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│ WAL Segment File (e.g., 000000010000000000000001)           │
+├─────────────────────────────────────────────────────────────┤
+│ PageHeader (16 bytes)                                       │
+├─────────────────────────────────────────────────────────────┤
+│ Record 1:                                                   │
+│   ├─ Length (4 bytes)                                       │
+│   ├─ LSN (8 bytes)                                          │
+│   ├─ Prev LSN (8 bytes)                                     │
+│   ├─ Transaction ID (4 bytes)                               │
+│   ├─ Record Type (1 byte)                                   │
+│   ├─ Page ID (8 bytes)                                      │
+│   ├─ Offset (2 bytes)                                       │
+│   ├─ Data Length (4 bytes)                                  │
+│   ├─ Data (variable)                                        │
+│   └─ Checksum (4 bytes)                                     │
+├─────────────────────────────────────────────────────────────┤
+│ Record 2:                                                   │
+│   ...                                                       │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<hr>
+<h3 id="Physical-vs-Logical-WAL">Physical vs. Logical WAL</h3>
+<p><strong>PostgreSQL uses physical WAL</strong> (page-level changes):</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What’s Logged</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Physical</strong></td>
+<td>Byte ranges on pages</td>
+<td>Simple replay, exact changes</td>
+<td>Larger logs, page-format dependent</td>
+</tr>
+<tr>
+<td><strong>Logical</strong></td>
+<td>SQL operations (INSERT/UPDATE)</td>
+<td>Smaller logs, format-independent</td>
+<td>Complex replay, must re-execute</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Vaultgres approach:</strong> Physical WAL for simplicity (matching PostgreSQL):</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">PhysicalWalRecord</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> page_id<span class="token punctuation">:</span> <span class="token class-name">PageId</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> length<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> before_image<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// For undo</span>
+    <span class="token keyword">pub</span> after_image<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>            <span class="token comment">// For redo</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="3-WAL-Manager-Implementation">3 WAL Manager Implementation</h2>
+<h3 id="Writing-WAL-Records">Writing WAL Records</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/wal/manager.rs</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>fs<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">File</span><span class="token punctuation">,</span> <span class="token class-name">OpenOptions</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>io<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">Write</span><span class="token punctuation">,</span> <span class="token class-name">Seek</span><span class="token punctuation">,</span> <span class="token class-name">SeekFrom</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>path<span class="token punctuation">::</span></span><span class="token class-name">PathBuf</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">parking_lot<span class="token punctuation">::</span></span><span class="token class-name">Mutex</span><span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalManager</span> <span class="token punctuation">{</span>
+    wal_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">,</span>
+    current_segment<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    current_file<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">File</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    current_offset<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token keyword">u32</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    flush_lsn<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">Lsn</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    last_lsn<span class="token punctuation">:</span> <span class="token class-name">AtomicU64</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">WalManager</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span>wal_dir<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">str</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token keyword">Self</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token namespace">std<span class="token punctuation">::</span>fs<span class="token punctuation">::</span></span><span class="token function">create_dir_all</span><span class="token punctuation">(</span>wal_dir<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> manager <span class="token operator">=</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+            wal_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">::</span><span class="token function">from</span><span class="token punctuation">(</span>wal_dir<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            current_segment<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            current_file<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token class-name">File</span><span class="token punctuation">::</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token string">""</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">,</span>  <span class="token comment">// Placeholder</span>
+            current_offset<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            flush_lsn<span class="token punctuation">:</span> <span class="token class-name">Mutex</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token class-name">Lsn</span><span class="token punctuation">::</span><span class="token constant">INVALID</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            last_lsn<span class="token punctuation">:</span> <span class="token class-name">AtomicU64</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+        manager<span class="token punctuation">.</span><span class="token function">open_or_create_segment</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span>manager<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">open_or_create_segment</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">,</span> segment<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> path <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal_dir<span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token macro property">format!</span><span class="token punctuation">(</span><span class="token string">"{:024X}"</span><span class="token punctuation">,</span> segment<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">let</span> file <span class="token operator">=</span> <span class="token class-name">OpenOptions</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">create</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">open</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>path<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>current_file<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span> file<span class="token punctuation">;</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>current_segment <span class="token operator">=</span> segment<span class="token punctuation">;</span>
+        <span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>current_offset<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">append</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> record<span class="token punctuation">:</span> <span class="token class-name">WalRecord</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">Lsn</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Assign new LSN</span>
+        <span class="token keyword">let</span> lsn <span class="token operator">=</span> <span class="token class-name">Lsn</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>last_lsn<span class="token punctuation">.</span><span class="token function">fetch_add</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">SeqCst</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Serialize record</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> buffer <span class="token operator">=</span> <span class="token class-name">Vec</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">serialize_record</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">,</span> lsn<span class="token punctuation">,</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> buffer<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Check if we need a new segment</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> offset <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_offset<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">if</span> <span class="token operator">*</span>offset <span class="token operator">+</span> buffer<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u32</span> <span class="token operator">&gt;</span> <span class="token constant">SEGMENT_SIZE</span> <span class="token punctuation">{</span>
+            <span class="token function">drop</span><span class="token punctuation">(</span>offset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">rotate_segment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+            offset <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_offset<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Write to file</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> file <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_file<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        file<span class="token punctuation">.</span><span class="token function">seek</span><span class="token punctuation">(</span><span class="token class-name">SeekFrom</span><span class="token punctuation">::</span><span class="token class-name">Start</span><span class="token punctuation">(</span><span class="token operator">*</span>offset <span class="token keyword">as</span> <span class="token keyword">u64</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        file<span class="token punctuation">.</span><span class="token function">write_all</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>buffer<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token operator">*</span>offset <span class="token operator">+=</span> buffer<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">u32</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span>lsn<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">flush</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> target_lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> flush_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>flush_lsn<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Already flushed?</span>
+        <span class="token keyword">if</span> <span class="token operator">*</span>flush_lsn <span class="token operator">&gt;=</span> target_lsn <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Sync to disk</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span>current_file<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">sync_all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token operator">*</span>flush_lsn <span class="token operator">=</span> target_lsn<span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Reading-WAL-Records">Reading WAL Records</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">impl</span> <span class="token class-name">WalManager</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">read_from</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> start_lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">WalIterator</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> segment <span class="token operator">=</span> start_lsn<span class="token punctuation">.</span><span class="token function">segment</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> offset <span class="token operator">=</span> start_lsn<span class="token punctuation">.</span><span class="token function">offset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">let</span> path <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal_dir<span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token macro property">format!</span><span class="token punctuation">(</span><span class="token string">"{:024X}"</span><span class="token punctuation">,</span> segment<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> file <span class="token operator">=</span> <span class="token class-name">File</span><span class="token punctuation">::</span><span class="token function">open</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>path<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">WalIterator</span> <span class="token punctuation">{</span>
+            current_file<span class="token punctuation">:</span> file<span class="token punctuation">,</span>
+            current_segment<span class="token punctuation">:</span> segment<span class="token punctuation">,</span>
+            current_offset<span class="token punctuation">:</span> offset<span class="token punctuation">,</span>
+            wal_dir<span class="token punctuation">:</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal_dir<span class="token punctuation">.</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalIterator</span> <span class="token punctuation">{</span>
+    current_file<span class="token punctuation">:</span> <span class="token class-name">File</span><span class="token punctuation">,</span>
+    current_segment<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    current_offset<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    wal_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Iterator</span> <span class="token keyword">for</span> <span class="token class-name">WalIterator</span> <span class="token punctuation">{</span>
+    <span class="token keyword">type</span> <span class="token type-definition class-name">Item</span> <span class="token operator">=</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">WalRecord</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">next</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">Self</span><span class="token punctuation">::</span><span class="token class-name">Item</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Try to read record at current position</span>
+        <span class="token keyword">match</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">read_record</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">Some</span><span class="token punctuation">(</span>record<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">Ok</span><span class="token punctuation">(</span>record<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">None</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                <span class="token comment">// End of segment, try next segment</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>current_segment <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>current_offset <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+                <span class="token keyword">let</span> path <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal_dir<span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token macro property">format!</span><span class="token punctuation">(</span><span class="token string">"{:024X}"</span><span class="token punctuation">,</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_segment<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>current_file <span class="token operator">=</span> <span class="token class-name">File</span><span class="token punctuation">::</span><span class="token function">open</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">ok</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+                <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">read_record</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>r<span class="token closure-punctuation punctuation">|</span></span> r<span class="token punctuation">.</span><span class="token function">ok</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">flatten</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token punctuation">}</span>
+            <span class="token class-name">Err</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token class-name">Some</span><span class="token punctuation">(</span><span class="token class-name">Err</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="4-Checkpoints-Limiting-Recovery-Time">4 Checkpoints: Limiting Recovery Time</h2>
+<h3 id="The-Problem-Unbounded-Replay">The Problem: Unbounded Replay</h3>
+<p><strong>Without checkpoints:</strong></p>
+<pre class="language-none"><code class="language-none">Day 1: Database created
+Day 30: Crash!
+Recovery: Replay 30 days of WAL records 😱</code></pre>
+<p><strong>Solution:</strong> Periodic checkpoints.</p>
+<hr>
+<h3 id="Checkpoint-Process">Checkpoint Process</h3>
+<div class="mermaid">sequenceDiagram
+    participant DB as Database
+    participant WAL as WAL Manager
+    participant BP as Buffer Pool
+    participant CKPT as Checkpoint File
+
+    DB-&gt;&gt;DB: 1. Write CHECKPOINT_BEGIN record
+    DB-&gt;&gt;BP: 2. Flush all dirty pages
+    BP--&gt;&gt;DB: Pages written to disk
+    DB-&gt;&gt;DB: 3. Write CHECKPOINT_END record
+    DB-&gt;&gt;WAL: 4. Flush WAL to disk
+    DB-&gt;&gt;CKPT: 5. Save checkpoint LSN
+    CKPT--&gt;&gt;DB: Checkpoint complete</div>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/wal/checkpoint.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">Checkpoint</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> checkpoint_lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> active_transactions<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> dirty_pages<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token class-name">PageId</span><span class="token punctuation">,</span> <span class="token class-name">Lsn</span><span class="token punctuation">)</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// page_id → page_lsn</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">WalManager</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">create_checkpoint</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">Checkpoint</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// 1. Log checkpoint begin</span>
+        <span class="token keyword">let</span> begin_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span><span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">checkpoint_begin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 2. Flush all dirty pages (this is the expensive part!)</span>
+        buffer_pool<span class="token punctuation">.</span><span class="token function">flush_all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 3. Get current state</span>
+        <span class="token keyword">let</span> checkpoint <span class="token operator">=</span> <span class="token class-name">Checkpoint</span> <span class="token punctuation">{</span>
+            checkpoint_lsn<span class="token punctuation">:</span> begin_lsn<span class="token punctuation">,</span>
+            active_transactions<span class="token punctuation">:</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_active_transactions</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            dirty_pages<span class="token punctuation">:</span> buffer_pool<span class="token punctuation">.</span><span class="token function">get_dirty_pages</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 4. Log checkpoint end</span>
+        <span class="token keyword">let</span> end_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span><span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">checkpoint_end</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>checkpoint<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 5. Flush WAL</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">flush</span><span class="token punctuation">(</span>end_lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// 6. Save checkpoint to known location</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">save_checkpoint_record</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>checkpoint<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span>checkpoint<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Fuzzy-Checkpoints-PostgreSQL-Style">Fuzzy Checkpoints (PostgreSQL Style)</h3>
+<p><strong>Sharp checkpoint:</strong> Blocks all writes during checkpoint. Simple but causes pauses.</p>
+<p><strong>Fuzzy checkpoint:</strong> Allows writes during checkpoint. Complex but no pauses.</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Fuzzy checkpoint approach</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">create_fuzzy_checkpoint</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">Checkpoint</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Record checkpoint start LSN</span>
+    <span class="token keyword">let</span> start_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">current_lsn</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 2. Write CHECKPOINT_BEGIN (don't block)</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span><span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">checkpoint_begin</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3. Get list of dirty pages (snapshot)</span>
+    <span class="token keyword">let</span> dirty_pages <span class="token operator">=</span> buffer_pool<span class="token punctuation">.</span><span class="token function">get_dirty_pages_snapshot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 4. Flush dirty pages in background (don't block new writes)</span>
+    <span class="token keyword">let</span> checkpoint_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">current_lsn</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>page_id<span class="token punctuation">,</span> page_lsn<span class="token punctuation">)</span> <span class="token keyword">in</span> dirty_pages <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> page_lsn <span class="token operator">&lt;</span> checkpoint_lsn <span class="token punctuation">{</span>
+            buffer_pool<span class="token punctuation">.</span><span class="token function">flush_page</span><span class="token punctuation">(</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// 5. Write CHECKPOINT_END with final LSN</span>
+    <span class="token keyword">let</span> end_lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">current_lsn</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span><span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">checkpoint_end_at</span><span class="token punctuation">(</span>end_lsn<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">flush</span><span class="token punctuation">(</span>end_lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">Checkpoint</span> <span class="token punctuation">{</span>
+        checkpoint_lsn<span class="token punctuation">:</span> end_lsn<span class="token punctuation">,</span>
+        <span class="token comment">// ...</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="5-ARIES-The-Recovery-Algorithm">5 ARIES: The Recovery Algorithm</h2>
+<h3 id="The-Three-Phases">The Three Phases</h3>
+<p>ARIES = <strong>A</strong>lgorithm for <strong>R</strong>ecovery and <strong>I</strong>solation <strong>E</strong>xploiting <strong>S</strong>emantics</p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│                    ARIES Recovery                           │
+├─────────────────────────────────────────────────────────────┤
+│ Phase 1: ANALYSIS                                           │
+│ - Scan WAL from last checkpoint                             │
+│ - Determine which transactions were active at crash         │
+│ - Build dirty page table                                    │
+├─────────────────────────────────────────────────────────────┤
+│ Phase 2: REDO                                               │
+│ - Replay ALL logged changes from analysis end               │
+│ - Bring database to exact crash state                       │
+│ - Skip pages already on disk (using page LSN)               │
+├─────────────────────────────────────────────────────────────┤
+│ Phase 3: UNDO                                               │
+│ - Roll back all uncommitted transactions                    │
+│ - Write Compensation Log Records (CLRs)                     │
+│ - Database is now consistent                                │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<hr>
+<h3 id="Phase-1-Analysis">Phase 1: Analysis</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/recovery/analysis.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">AnalysisResult</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> transactions_at_crash<span class="token punctuation">:</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token punctuation">,</span> <span class="token class-name">TxnStatus</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> dirty_page_table<span class="token punctuation">:</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">PageId</span><span class="token punctuation">,</span> <span class="token class-name">Lsn</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// page → first LSN that dirtied it</span>
+    <span class="token keyword">pub</span> redo_start_lsn<span class="token punctuation">:</span> <span class="token class-name">Lsn</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">analyze</span><span class="token punctuation">(</span>wal<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">WalManager</span><span class="token punctuation">,</span> checkpoint<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Checkpoint</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">AnalysisResult</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> txn_status<span class="token punctuation">:</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token punctuation">,</span> <span class="token class-name">TxnStatus</span><span class="token operator">&gt;</span> <span class="token operator">=</span> <span class="token class-name">HashMap</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> dirty_page_table<span class="token punctuation">:</span> <span class="token class-name">HashMap</span><span class="token operator">&lt;</span><span class="token class-name">PageId</span><span class="token punctuation">,</span> <span class="token class-name">Lsn</span><span class="token operator">&gt;</span> <span class="token operator">=</span> <span class="token class-name">HashMap</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Initialize from checkpoint</span>
+    <span class="token keyword">for</span> txn <span class="token keyword">in</span> <span class="token operator">&amp;</span>checkpoint<span class="token punctuation">.</span>active_transactions <span class="token punctuation">{</span>
+        txn_status<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span><span class="token operator">*</span>txn<span class="token punctuation">,</span> <span class="token class-name">TxnStatus</span><span class="token punctuation">::</span><span class="token class-name">Active</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>page_id<span class="token punctuation">,</span> page_lsn<span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token operator">&amp;</span>checkpoint<span class="token punctuation">.</span>dirty_pages <span class="token punctuation">{</span>
+        dirty_page_table<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span><span class="token operator">*</span>page_id<span class="token punctuation">,</span> <span class="token operator">*</span>page_lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Scan WAL from checkpoint</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> iterator <span class="token operator">=</span> wal<span class="token punctuation">.</span><span class="token function">read_from</span><span class="token punctuation">(</span>checkpoint<span class="token punctuation">.</span>checkpoint_lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> record_result <span class="token keyword">in</span> iterator <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> record <span class="token operator">=</span> record_result<span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">match</span> record<span class="token punctuation">.</span>record_type <span class="token punctuation">{</span>
+            <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Begin</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                txn_status<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>transaction_id<span class="token punctuation">,</span> <span class="token class-name">TxnStatus</span><span class="token punctuation">::</span><span class="token class-name">Active</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+            <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Commit</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                txn_status<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>transaction_id<span class="token punctuation">,</span> <span class="token class-name">TxnStatus</span><span class="token punctuation">::</span><span class="token class-name">Committed</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+            <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Abort</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                txn_status<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>transaction_id<span class="token punctuation">,</span> <span class="token class-name">TxnStatus</span><span class="token punctuation">::</span><span class="token class-name">Aborted</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+            <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Insert</span> <span class="token operator">|</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Update</span> <span class="token operator">|</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Delete</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Track first LSN that dirtied each page</span>
+                dirty_page_table<span class="token punctuation">.</span><span class="token function">entry</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>page_id<span class="token punctuation">)</span>
+                    <span class="token punctuation">.</span><span class="token function">or_insert</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+            _ <span class="token operator">=&gt;</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Find minimum redo LSN</span>
+    <span class="token keyword">let</span> redo_start_lsn <span class="token operator">=</span> dirty_page_table<span class="token punctuation">.</span><span class="token function">values</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">copied</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">unwrap_or</span><span class="token punctuation">(</span>checkpoint<span class="token punctuation">.</span>checkpoint_lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">AnalysisResult</span> <span class="token punctuation">{</span>
+        transactions_at_crash<span class="token punctuation">:</span> txn_status<span class="token punctuation">,</span>
+        dirty_page_table<span class="token punctuation">,</span>
+        redo_start_lsn<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Phase-2-Redo">Phase 2: Redo</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/recovery/redo.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">redo</span><span class="token punctuation">(</span>
+    wal<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">WalManager</span><span class="token punctuation">,</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">,</span>
+    analysis<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">AnalysisResult</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> iterator <span class="token operator">=</span> wal<span class="token punctuation">.</span><span class="token function">read_from</span><span class="token punctuation">(</span>analysis<span class="token punctuation">.</span>redo_start_lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> record_result <span class="token keyword">in</span> iterator <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> record <span class="token operator">=</span> record_result<span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Only redo committed transactions' changes</span>
+        <span class="token comment">// (We redo ALL changes first, undo uncommitted later)</span>
+        <span class="token keyword">match</span> <span class="token operator">&amp;</span>record<span class="token punctuation">.</span>record_type <span class="token punctuation">{</span>
+            <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Insert</span> <span class="token operator">|</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Update</span> <span class="token operator">|</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Delete</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Check if page needs redo</span>
+                <span class="token keyword">let</span> page <span class="token operator">=</span> buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+                <span class="token keyword">let</span> page_lsn <span class="token operator">=</span> page<span class="token punctuation">.</span><span class="token function">get_lsn</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Only apply if page is older than this LSN</span>
+                <span class="token keyword">if</span> page_lsn <span class="token operator">&lt;</span> record<span class="token punctuation">.</span>lsn <span class="token punctuation">{</span>
+                    <span class="token function">apply_redo</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">,</span> <span class="token operator">&amp;</span>page<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+                    page<span class="token punctuation">.</span><span class="token function">set_lsn</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token punctuation">}</span>
+                <span class="token comment">// Else: page already has this change (written before crash)</span>
+            <span class="token punctuation">}</span>
+            _ <span class="token operator">=&gt;</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">fn</span> <span class="token function-definition function">apply_redo</span><span class="token punctuation">(</span>record<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">WalRecord</span><span class="token punctuation">,</span> page<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">Page</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">match</span> <span class="token operator">&amp;</span>record<span class="token punctuation">.</span>data <span class="token punctuation">{</span>
+        <span class="token class-name">WalData</span><span class="token punctuation">::</span><span class="token class-name">PageImage</span><span class="token punctuation">(</span>image<span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+            <span class="token comment">// Full page image (from checkpoint)</span>
+            page<span class="token punctuation">.</span><span class="token function">copy_from_slice</span><span class="token punctuation">(</span>image<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        <span class="token class-name">WalData</span><span class="token punctuation">::</span><span class="token class-name">RowData</span><span class="token punctuation">(</span>data<span class="token punctuation">)</span> <span class="token operator">=&gt;</span> <span class="token punctuation">{</span>
+            <span class="token comment">// Partial page update</span>
+            page<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        _ <span class="token operator">=&gt;</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>Key insight:</strong> Redo is <strong>idempotent</strong>. Running it multiple times produces the same result.</p>
+<hr>
+<h3 id="Phase-3-Undo">Phase 3: Undo</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/recovery/undo.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">undo</span><span class="token punctuation">(</span>
+    wal<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">WalManager</span><span class="token punctuation">,</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">,</span>
+    analysis<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">AnalysisResult</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Find transactions to undo (active at crash, not committed)</span>
+    <span class="token keyword">let</span> losers<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token class-name">TransactionId</span><span class="token operator">&gt;</span> <span class="token operator">=</span> analysis<span class="token punctuation">.</span>transactions_at_crash
+        <span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span><span class="token punctuation">(</span>_<span class="token punctuation">,</span> status<span class="token punctuation">)</span><span class="token closure-punctuation punctuation">|</span></span> <span class="token operator">*</span><span class="token operator">*</span>status <span class="token operator">==</span> <span class="token class-name">TxnStatus</span><span class="token punctuation">::</span><span class="token class-name">Active</span><span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span><span class="token punctuation">(</span>txn<span class="token punctuation">,</span> _<span class="token punctuation">)</span><span class="token closure-punctuation punctuation">|</span></span> <span class="token operator">*</span>txn<span class="token punctuation">)</span>
+        <span class="token punctuation">.</span><span class="token function">collect</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Undo in reverse order (LIFO - Last Committed, First Undone)</span>
+    <span class="token keyword">for</span> txn_id <span class="token keyword">in</span> losers<span class="token punctuation">.</span><span class="token function">into_iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">rev</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token function">undo_transaction</span><span class="token punctuation">(</span>wal<span class="token punctuation">,</span> buffer_pool<span class="token punctuation">,</span> txn_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">fn</span> <span class="token function-definition function">undo_transaction</span><span class="token punctuation">(</span>
+    wal<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">WalManager</span><span class="token punctuation">,</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">,</span>
+    txn_id<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Find all records for this transaction (in reverse)</span>
+    <span class="token keyword">let</span> records <span class="token operator">=</span> wal<span class="token punctuation">.</span><span class="token function">get_transaction_records</span><span class="token punctuation">(</span>txn_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">for</span> record <span class="token keyword">in</span> records<span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">rev</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Write Compensation Log Record (CLR)</span>
+        <span class="token keyword">let</span> clr <span class="token operator">=</span> <span class="token class-name">WalRecord</span> <span class="token punctuation">{</span>
+            lsn<span class="token punctuation">:</span> wal<span class="token punctuation">.</span><span class="token function">next_lsn</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            prev_lsn<span class="token punctuation">:</span> record<span class="token punctuation">.</span>lsn<span class="token punctuation">,</span>
+            transaction_id<span class="token punctuation">:</span> txn_id<span class="token punctuation">,</span>
+            record_type<span class="token punctuation">:</span> <span class="token class-name">WalRecordType</span><span class="token punctuation">::</span><span class="token class-name">Compensation</span> <span class="token punctuation">{</span>
+                undo_next_lsn<span class="token punctuation">:</span> record<span class="token punctuation">.</span>prev_lsn<span class="token punctuation">,</span>
+            <span class="token punctuation">}</span><span class="token punctuation">,</span>
+            page_id<span class="token punctuation">:</span> record<span class="token punctuation">.</span>page_id<span class="token punctuation">,</span>
+            offset<span class="token punctuation">:</span> record<span class="token punctuation">.</span>offset<span class="token punctuation">,</span>
+            data<span class="token punctuation">:</span> <span class="token class-name">WalData</span><span class="token punctuation">::</span><span class="token class-name">RowData</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>before_image<span class="token punctuation">.</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap_or_default</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            checksum<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>  <span class="token comment">// Calculate checksum</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">let</span> clr_lsn <span class="token operator">=</span> wal<span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span>clr<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Apply undo (restore before_image)</span>
+        <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>before_image<span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token operator">&amp;</span>record<span class="token punctuation">.</span>before_image <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> page <span class="token operator">=</span> buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>page_id<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+            page<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span>record<span class="token punctuation">.</span>offset<span class="token punctuation">,</span> before_image<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            page<span class="token punctuation">.</span><span class="token function">set_lsn</span><span class="token punctuation">(</span>clr_lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Log transaction abort</span>
+    wal<span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span><span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">abort</span><span class="token punctuation">(</span>txn_id<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    wal<span class="token punctuation">.</span><span class="token function">flush_all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Complete-Recovery-Process">Complete Recovery Process</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/recovery/mod.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">recover</span><span class="token punctuation">(</span>
+    wal<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">WalManager</span><span class="token punctuation">,</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BufferPool</span><span class="token punctuation">,</span>
+    data_dir<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">str</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">RecoveryStats</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Find last checkpoint</span>
+    <span class="token keyword">let</span> checkpoint <span class="token operator">=</span> <span class="token function">find_last_checkpoint</span><span class="token punctuation">(</span>wal<span class="token punctuation">,</span> data_dir<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"Starting recovery from checkpoint LSN {}"</span><span class="token punctuation">,</span> checkpoint<span class="token punctuation">.</span>checkpoint_lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 2. Phase 1: Analysis</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"Phase 1: Analysis..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> analysis <span class="token operator">=</span> <span class="token function">analyze</span><span class="token punctuation">(</span>wal<span class="token punctuation">,</span> <span class="token operator">&amp;</span>checkpoint<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"  Found {} active transactions at crash"</span><span class="token punctuation">,</span>
+             analysis<span class="token punctuation">.</span>transactions_at_crash<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"  Redo will start from LSN {}"</span><span class="token punctuation">,</span> analysis<span class="token punctuation">.</span>redo_start_lsn<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3. Phase 2: Redo</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"Phase 2: Redo..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">redo</span><span class="token punctuation">(</span>wal<span class="token punctuation">,</span> buffer_pool<span class="token punctuation">,</span> <span class="token operator">&amp;</span>analysis<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"  Redo complete"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 4. Phase 3: Undo</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"Phase 3: Undo..."</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">undo</span><span class="token punctuation">(</span>wal<span class="token punctuation">,</span> buffer_pool<span class="token punctuation">,</span> <span class="token operator">&amp;</span>analysis<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"  Undo complete"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 5. Truncate old WAL (optional)</span>
+    <span class="token function">truncate_wal_before</span><span class="token punctuation">(</span>wal<span class="token punctuation">,</span> checkpoint<span class="token punctuation">.</span>checkpoint_lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token class-name">RecoveryStats</span> <span class="token punctuation">{</span>
+        checkpoint_lsn<span class="token punctuation">:</span> checkpoint<span class="token punctuation">.</span>checkpoint_lsn<span class="token punctuation">,</span>
+        redo_start_lsn<span class="token punctuation">:</span> analysis<span class="token punctuation">.</span>redo_start_lsn<span class="token punctuation">,</span>
+        transactions_aborted<span class="token punctuation">:</span> analysis<span class="token punctuation">.</span>transactions_at_crash
+            <span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span><span class="token punctuation">(</span>_<span class="token punctuation">,</span> s<span class="token punctuation">)</span><span class="token closure-punctuation punctuation">|</span></span> <span class="token operator">*</span><span class="token operator">*</span>s <span class="token operator">==</span> <span class="token class-name">TxnStatus</span><span class="token punctuation">::</span><span class="token class-name">Active</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span><span class="token function">count</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="6-Recovery-Example-Step-by-Step">6 Recovery Example: Step by Step</h2>
+<h3 id="Crash-Scenario">Crash Scenario</h3>
+<pre class="language-none"><code class="language-none">Time    LSN    Transaction    Action
+─────────────────────────────────────────────────────
+10:00   100    CKPT           Checkpoint created
+10:01   101    T1 (xid=1)     BEGIN
+10:02   102    T1             INSERT row A (balance=100)
+10:03   103    T2 (xid=2)     BEGIN
+10:04   104    T2             INSERT row B (balance=200)
+10:05   105    T1             COMMIT
+10:06   106    T2             UPDATE row B (balance=250)
+10:07   ─────  ⚡ CRASH ⚡</code></pre>
+<p><strong>State at crash:</strong></p>
+<ul>
+<li>T1: Committed (LSN 105)</li>
+<li>T2: Active (not committed)</li>
+<li>Dirty pages: A (LSN 102), B (LSN 106)</li>
+</ul>
+<hr>
+<h3 id="Recovery-Execution">Recovery Execution</h3>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│ Phase 1: ANALYSIS                                           │
+├─────────────────────────────────────────────────────────────┤
+│ Start from checkpoint LSN 100                               │
+│ Scan records 100-106                                        │
+│                                                             │
+│ Result:                                                     │
+│   - T1: Committed (LSN 105)                                 │
+│   - T2: Active (loser!)                                     │
+│   - Dirty pages: A→102, B→106                               │
+│   - Redo start: LSN 102                                     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 2: REDO                                               │
+├─────────────────────────────────────────────────────────────┤
+│ Replay from LSN 102:                                        │
+│                                                             │
+│ LSN 102: INSERT row A                                       │
+│   → Check page A LSN                                        │
+│   → If page LSN &lt; 102: apply insert                         │
+│   → Else: skip (already on disk)                            │
+│                                                             │
+│ LSN 104: INSERT row B                                       │
+│   → Apply if needed                                         │
+│                                                             │
+│ LSN 106: UPDATE row B                                       │
+│   → Apply if needed                                         │
+│                                                             │
+│ Result: Database at exact crash state                       │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ Phase 3: UNDO                                               │
+├─────────────────────────────────────────────────────────────┤
+│ Loser transactions: T2                                      │
+│                                                             │
+│ Undo T2 (in reverse order):                                 │
+│   1. Undo LSN 106 (UPDATE B: 200→250)                       │
+│      → Write CLR: undo_next_lsn = 104                       │
+│      → Restore B to balance=200                             │
+│                                                             │
+│   2. Undo LSN 104 (INSERT B)                                │
+│      → Write CLR: undo_next_lsn = 103                       │
+│      → Delete row B                                         │
+│                                                             │
+│   3. Log T2 ABORT                                           │
+│                                                             │
+│ Result: T2's changes rolled back, T1's changes preserved    │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<hr>
+<h2 id="7-WAL-Archiving-and-Point-in-Time-Recovery">7 WAL Archiving and Point-in-Time Recovery</h2>
+<h3 id="WAL-Archiving">WAL Archiving</h3>
+<p><strong>Continuous archiving:</strong> Copy WAL segments to safe storage before reuse.</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/wal/archiver.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">WalArchiver</span> <span class="token punctuation">{</span>
+    wal_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">,</span>
+    archive_dir<span class="token punctuation">:</span> <span class="token class-name">PathBuf</span><span class="token punctuation">,</span>
+    archive_timeout<span class="token punctuation">:</span> <span class="token class-name">Duration</span><span class="token punctuation">,</span>
+    last_archived_segment<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">WalArchiver</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">archive_ready_segments</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Find completed segments (can't be overwritten)</span>
+        <span class="token keyword">for</span> segment <span class="token keyword">in</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_ready_segments</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> src <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal_dir<span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token macro property">format!</span><span class="token punctuation">(</span><span class="token string">"{:024X}"</span><span class="token punctuation">,</span> segment<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token keyword">let</span> dst <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>archive_dir<span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token macro property">format!</span><span class="token punctuation">(</span><span class="token string">"{:024X}.backup"</span><span class="token punctuation">,</span> segment<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token comment">// Copy to archive (could be remote storage like S3)</span>
+            <span class="token namespace">std<span class="token punctuation">::</span>fs<span class="token punctuation">::</span></span><span class="token function">copy</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>src<span class="token punctuation">,</span> <span class="token operator">&amp;</span>dst<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">self</span><span class="token punctuation">.</span>last_archived_segment <span class="token operator">=</span> segment<span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Point-in-Time-Recovery-PITR">Point-in-Time Recovery (PITR)</h3>
+<pre class="language-none"><code class="language-none">Goal: Restore database to state at 2026-03-22 14:30:00
+
+1. Restore base backup from 2026-03-22 00:00:00
+2. Replay WAL segments from archive
+3. Stop replay at target time (14:30:00)
+4. Database restored to exact point in time</code></pre>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/recovery/pitr.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">recover_to_point_in_time</span><span class="token punctuation">(</span>
+    base_backup<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">str</span><span class="token punctuation">,</span>
+    archive_dir<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">str</span><span class="token punctuation">,</span>
+    target_time<span class="token punctuation">:</span> <span class="token namespace">chrono<span class="token punctuation">::</span></span><span class="token class-name">DateTime</span><span class="token operator">&lt;</span><span class="token namespace">chrono<span class="token punctuation">::</span></span><span class="token class-name">Utc</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">RecoveryError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Restore base backup</span>
+    <span class="token function">restore_base_backup</span><span class="token punctuation">(</span>base_backup<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 2. Find WAL segments to replay</span>
+    <span class="token keyword">let</span> segments <span class="token operator">=</span> <span class="token function">find_wal_segments_for_time_range</span><span class="token punctuation">(</span>archive_dir<span class="token punctuation">,</span> target_time<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3. Replay WAL up to target time</span>
+    <span class="token keyword">for</span> segment <span class="token keyword">in</span> segments <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> records <span class="token operator">=</span> <span class="token function">read_wal_segment</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>segment<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">for</span> record <span class="token keyword">in</span> records <span class="token punctuation">{</span>
+            <span class="token comment">// Check if we've passed target time</span>
+            <span class="token keyword">if</span> record<span class="token punctuation">.</span>timestamp <span class="token operator">&gt;</span> target_time <span class="token punctuation">{</span>
+                <span class="token macro property">println!</span><span class="token punctuation">(</span><span class="token string">"Reached target time, stopping recovery"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span> <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+
+            <span class="token function">apply_redo_record</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="8-Challenges-Building-in-Rust">8 Challenges Building in Rust</h2>
+<h3 id="Challenge-1-fsync-and-Durability">Challenge 1: fsync and Durability</h3>
+<p><strong>Problem:</strong> Rust’s <code>File::sync_all()</code> is correct, but easy to forget.</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Missing fsync - data NOT durable!</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">commit</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn_id<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">Error</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> record <span class="token operator">=</span> <span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">commit</span><span class="token punctuation">(</span>txn_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span>record<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token comment">// Forgot to flush!</span>
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// ✅ Correct</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">commit</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> txn_id<span class="token punctuation">:</span> <span class="token class-name">TransactionId</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">Error</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> record <span class="token operator">=</span> <span class="token class-name">WalRecord</span><span class="token punctuation">::</span><span class="token function">commit</span><span class="token punctuation">(</span>txn_id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">append</span><span class="token punctuation">(</span>record<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">flush</span><span class="token punctuation">(</span>lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>  <span class="token comment">// fsync!</span>
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>Lesson:</strong> Wrap WAL operations in safe abstractions that enforce flushing.</p>
+<hr>
+<h3 id="Challenge-2-LSN-Ordering-and-Concurrency">Challenge 2: LSN Ordering and Concurrency</h3>
+<p><strong>Problem:</strong> Multiple threads appending WAL records must get monotonically increasing LSNs.</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Race condition - LSNs not ordered!</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">append</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> record<span class="token punctuation">:</span> <span class="token class-name">WalRecord</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Lsn</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_lsn <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">;</span>  <span class="token comment">// Not atomic!</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>current_lsn <span class="token operator">=</span> lsn<span class="token punctuation">;</span>
+    <span class="token comment">// ...</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// ✅ Correct - atomic LSN allocation</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">append</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> record<span class="token punctuation">:</span> <span class="token class-name">WalRecord</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">Lsn</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> lsn <span class="token operator">=</span> <span class="token class-name">Lsn</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>last_lsn<span class="token punctuation">.</span><span class="token function">fetch_add</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">SeqCst</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// ...</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="Challenge-3-Partial-Writes-and-Checksums">Challenge 3: Partial Writes and Checksums</h3>
+<p><strong>Problem:</strong> Crash during WAL write = partial record on disk.</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Solution: Checksums + length prefix</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">serialize_record</span><span class="token punctuation">(</span>record<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">WalRecord</span><span class="token punctuation">,</span> buffer<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> data_start <span class="token operator">=</span> buffer<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Write placeholder for length (fill in later)</span>
+    buffer<span class="token punctuation">.</span><span class="token function">extend_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token number">0u8</span><span class="token punctuation">;</span> <span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Write record fields</span>
+    buffer<span class="token punctuation">.</span><span class="token function">extend_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">.</span>lsn<span class="token punctuation">.</span><span class="token function">to_le_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// ... more fields ...</span>
+    buffer<span class="token punctuation">.</span><span class="token function">extend_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">.</span>data<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Calculate checksum over everything except checksum field</span>
+    <span class="token keyword">let</span> checksum <span class="token operator">=</span> <span class="token namespace">crc32<span class="token punctuation">::</span></span><span class="token function">calculate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>buffer<span class="token punctuation">[</span>data_start <span class="token operator">+</span> <span class="token number">4</span><span class="token punctuation">..</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    buffer<span class="token punctuation">.</span><span class="token function">extend_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>checksum<span class="token punctuation">.</span><span class="token function">to_le_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Fill in length</span>
+    <span class="token keyword">let</span> total_len <span class="token operator">=</span> buffer<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> data_start<span class="token punctuation">;</span>
+    buffer<span class="token punctuation">[</span>data_start<span class="token punctuation">..</span>data_start <span class="token operator">+</span> <span class="token number">4</span><span class="token punctuation">]</span>
+        <span class="token punctuation">.</span><span class="token function">copy_from_slice</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token punctuation">(</span>total_len <span class="token keyword">as</span> <span class="token keyword">u32</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">to_le_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">deserialize_record</span><span class="token punctuation">(</span>buffer<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token class-name">WalRecord</span><span class="token punctuation">,</span> <span class="token class-name">WalError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Read length</span>
+    <span class="token keyword">let</span> length <span class="token operator">=</span> <span class="token keyword">u32</span><span class="token punctuation">::</span><span class="token function">from_le_bytes</span><span class="token punctuation">(</span>buffer<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">..</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">try_into</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">usize</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Verify we have enough data</span>
+    <span class="token keyword">if</span> buffer<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> length <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token class-name">Err</span><span class="token punctuation">(</span><span class="token class-name">WalError</span><span class="token punctuation">::</span><span class="token class-name">PartialWrite</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Verify checksum</span>
+    <span class="token keyword">let</span> stored_checksum <span class="token operator">=</span> <span class="token keyword">u32</span><span class="token punctuation">::</span><span class="token function">from_le_bytes</span><span class="token punctuation">(</span>
+        buffer<span class="token punctuation">[</span>length <span class="token operator">-</span> <span class="token number">4</span><span class="token punctuation">..</span>length<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">try_into</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span>
+    <span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> calculated <span class="token operator">=</span> <span class="token namespace">crc32<span class="token punctuation">::</span></span><span class="token function">calculate</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>buffer<span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">..</span>length <span class="token operator">-</span> <span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> stored_checksum <span class="token operator">!=</span> calculated <span class="token punctuation">{</span>
+        <span class="token keyword">return</span> <span class="token class-name">Err</span><span class="token punctuation">(</span><span class="token class-name">WalError</span><span class="token punctuation">::</span><span class="token class-name">ChecksumMismatch</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// ... parse record ...</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="9-How-AI-Accelerated-This">9 How AI Accelerated This</h2>
+<h3 id="What-AI-Got-Right">What AI Got Right</h3>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>AI Contribution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ARIES phases</strong></td>
+<td>Explained analysis/redo/undo clearly</td>
+</tr>
+<tr>
+<td><strong>LSN structure</strong></td>
+<td>Suggested segment/offset encoding</td>
+</tr>
+<tr>
+<td><strong>Checkpoint design</strong></td>
+<td>Outlined fuzzy vs. sharp trade-offs</td>
+</tr>
+<tr>
+<td><strong>CLR records</strong></td>
+<td>Explained compensation log record purpose</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="What-AI-Got-Wrong">What AI Got Wrong</h3>
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>What Happened</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Redo logic</strong></td>
+<td>First draft redid only committed txns (wrong! Redo ALL, then undo)</td>
+</tr>
+<tr>
+<td><strong>Undo order</strong></td>
+<td>Suggested forward order instead of reverse (LIFO)</td>
+</tr>
+<tr>
+<td><strong>Page LSN</strong></td>
+<td>Missed that page LSN is used to skip redundant redos</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pattern:</strong> ARIES is subtle. The “redo all, undo some” insight is counterintuitive.</p>
+<hr>
+<h3 id="Example-Understanding-Redo-Philosophy">Example: Understanding Redo Philosophy</h3>
+<p><strong>My question to AI:</strong></p>
+<blockquote>
+<p>“Why does ARIES redo uncommitted transactions? Shouldn’t we only redo committed ones?”</p>
+</blockquote>
+<p><strong>What I learned:</strong></p>
+<ol>
+<li><strong>Redo phase:</strong> Bring database to exact crash state (including uncommitted changes)</li>
+<li><strong>Undo phase:</strong> Roll back uncommitted transactions</li>
+<li><strong>Why?</strong> Simpler than tracking dependencies during redo</li>
+<li><strong>Key insight:</strong> Redo is idempotent, undo must be logged (CLRs)</li>
+</ol>
+<p><strong>Result:</strong> Correct redo implementation:</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Redo ALL records, not just committed</span>
+<span class="token keyword">if</span> page_lsn <span class="token operator">&lt;</span> record<span class="token punctuation">.</span>lsn <span class="token punctuation">{</span>
+    <span class="token function">apply_redo</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>record<span class="token punctuation">,</span> <span class="token operator">&amp;</span>page<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>  <span class="token comment">// Apply regardless of txn status</span>
+<span class="token punctuation">}</span>
+<span class="token comment">// Undo phase will handle uncommitted transactions</span></code></pre>
+<hr>
+<h2 id="Summary-WAL-and-ARIES-in-One-Diagram">Summary: WAL and ARIES in One Diagram</h2>
+<div class="mermaid">flowchart TD
+    subgraph "Normal Operation"
+        A[Transaction] --&gt; B[Write WAL Record]
+        B --&gt; C[Flush WAL fsync]
+        C --&gt; D[Modify Page]
+        D --&gt; E[Mark Dirty]
+        E --&gt; F[ACK to Client]
+        F --&gt; G[Checkpoint Later]
+    end
+
+    subgraph "Crash Recovery"
+        H[⚡ CRASH ⚡] --&gt; I[Restart Database]
+        I --&gt; J[Phase 1: Analysis]
+        J --&gt; K[Find Active Transactions]
+        K --&gt; L[Phase 2: Redo]
+        L --&gt; M[Replay All WAL from Checkpoint]
+        M --&gt; N[Phase 3: Undo]
+        N --&gt; O[Rollback Loser Transactions]
+        O --&gt; P[Database Consistent]
+    end
+
+    subgraph "WAL Structure"
+        Q[WAL Segment 1] --&gt; R[WAL Segment 2]
+        R --&gt; S[WAL Segment 3]
+        T[Checkpoint Record] -.-&gt; Q
+    end
+
+    style C fill:#fff3e0,stroke:#f57c00
+    style J fill:#e3f2fd,stroke:#1976d2
+    style L fill:#e3f2fd,stroke:#1976d2
+    style N fill:#e3f2fd,stroke:#1976d2
+    style P fill:#e8f5e9,stroke:#388e3c</div>
+<p><strong>Key Takeaways:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Why It Matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>WAL</strong></td>
+<td>Durability without sacrificing performance</td>
+</tr>
+<tr>
+<td><strong>LSN</strong></td>
+<td>Total ordering of all changes</td>
+</tr>
+<tr>
+<td><strong>Checkpoints</strong></td>
+<td>Bound recovery time</td>
+</tr>
+<tr>
+<td><strong>ARIES Analysis</strong></td>
+<td>Determine what needs recovery</td>
+</tr>
+<tr>
+<td><strong>ARIES Redo</strong></td>
+<td>Replay to exact crash state</td>
+</tr>
+<tr>
+<td><strong>ARIES Undo</strong></td>
+<td>Roll back uncommitted work</td>
+</tr>
+<tr>
+<td><strong>CLRs</strong></td>
+<td>Idempotent undo, prevents re-undo</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Further Reading:</strong></p>
+<ul>
+<li>“ARIES: A Transaction Recovery Method Supporting Fine Granularity Locking” by Mohan et al. (1992)</li>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/blob/master/src/backend/access/transam/xlog.c"><code>src/backend/access/transam/xlog.c</code></a></li>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/blob/master/src/backend/access/transam/xlogfuncs.c"><code>src/backend/access/transam/xlogfuncs.c</code></a></li>
+<li>“Database Management Systems” by Ramakrishnan (Ch. 17: Recovery)</li>
+<li>“Readings in Database Systems” (Red Book) - ARIES chapter</li>
+<li>Vaultgres Repository: <a target="_blank" rel="noopener" href="https://github.com/neoalienson/Vaultgres">github.com/neoalienson/Vaultgres</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" data-id="2f470ce6" class="article-share-link"><i class="fa fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Database in Rust: WAL and Crash Recovery with ARIES",
+        "image": "https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg",
+        "keywords": "Database Internals PostgreSQL Rust",
+        "genre": "Development",
+        "datePublished": "2026-03-04",
+        "dateCreated": "2026-03-04",
+        "dateModified": "2026-03-13",
+        "url": "https://neo01.com/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/",
+        "description": "Part 4 of the Vaultgres journey: implementing Write-Ahead Logging and the ARIES recovery algorithm. Deep dive into durability, checkpoints, and the three-phase recovery that brings your database back from a crash.",
+        "wordCount": 13986
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>follow:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">links</h3>
+    <div class="widget">
+        <ul><li><a href="/ai">AI Playground</a></li><li><a href="/tools">Tools</a></li><li><a href="/games">Games</a></li><li><a href="/pages/useful-information">Useful Information</a></li><li><a href="/pages/Hexo-Blogging-Cheatsheet">Hexo Blogging Cheatsheet</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">recents</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: B+Tree Indexes with Concurrent Access" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="title">Database in Rust: B+Tree Indexes with Concurrent Access</a></p>
+                            <p class="item-date"><time datetime="2026-03-07T16:00:00.000Z" itemprop="datePublished">2026-03-08</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Building a PostgreSQL-Compatible Database in Rust: Comprehensive SQL Parser (DDL, DML, Queries)" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-SQL-Parser/" class="title">Building a PostgreSQL-Compatible Database in Rust: Comprehensive SQL Parser (DDL, DML, Queries)</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: Wire Protocol and Result Set Serialization" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">Database in Rust: Wire Protocol and Result Set Serialization</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: WAL and Crash Recovery with ARIES" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">Database in Rust: WAL and Crash Recovery with ARIES</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: MVCC and Transaction Management" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="title">Database in Rust: MVCC and Transaction Management</a></p>
+                            <p class="item-date"><time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2026/">2026</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2025/">2025</a>
+                    <span class="archive-list-count">84</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2002/">2002</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#f96fcc6f</div>
+                <img src="/qr/qr-8e787d244fff4b7522762b9c274a21ee.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#f96fcc6f">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. All rights reserved.
+                  <a href="/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

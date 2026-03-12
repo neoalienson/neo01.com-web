@@ -1,0 +1,2109 @@
+<!DOCTYPE html><html lang="en"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Parallel Query,Performance,PostgreSQL">
+    
+    
+    <meta name="description" content="Deep dive into PostgreSQL's parallel query execution—how Gather nodes, parallel workers, and multi-core processing accelerate large table scans, hash joins, and aggregations. Learn when parallelism he">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance">
+<meta property="og:url" content="https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Deep dive into PostgreSQL's parallel query execution—how Gather nodes, parallel workers, and multi-core processing accelerate large table scans, hash joins, and aggregations. Learn when parallelism he">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="https://neo01.com/assets/architecture/sql_plan_thumbnail.jpg">
+<meta property="article:published_time" content="2026-02-15T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-12T14:41:50.442Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Parallel Query">
+<meta property="article:tag" content="Performance">
+<meta property="article:tag" content="PostgreSQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/sql_plan_thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">Decoding Digital Anomalies</p>
+                          <p class="subtitle">Sometimes the feature is the bug in the digital rabbit hole, and vice versa</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'en';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/">Home</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/">AI</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/AI/Art-Gallery/">Art Gallery</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Architecture/">Architecture</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Cybersecurity/">Cybersecurity</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Development/">Development</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/categories/Misc/">Misc</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/about-me/">About</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="Search">
+        <button type="submit" title="Search" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="Type something...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: 'Posts',
+            PAGES: 'Pages',
+            CATEGORIES: 'Categories',
+            TAGS: 'Tags',
+            UNTITLED: '(Untitled)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'en',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/02/Understanding-PostgreSQL-Parallel-Query-Execution" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-02-15T16:00:00.000Z" itemprop="datePublished">2026-02-16</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-12T14:41:50.442Z" itemprop="datePublished">2026-03-12</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/tags/Performance/">Performance</a> <a class="tag-link" href="/tags/Parallel-Query/">Parallel Query</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-The-Problem-Single-Threaded-Execution"><span class="toc-text">1 The Problem: Single-Threaded Execution</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-Architecture-How-Parallel-Query-Works"><span class="toc-text">2 Architecture: How Parallel Query Works</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-Parallel-Aware-Operators"><span class="toc-text">3 Parallel-Aware Operators</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-Configuration-Tuning-Parallel-Query"><span class="toc-text">4 Configuration: Tuning Parallel Query</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-When-Parallel-Query-Helps-and-When-It-Hurts"><span class="toc-text">5 When Parallel Query Helps (and When It Hurts)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-Debugging-Parallel-Query-Issues"><span class="toc-text">6 Debugging Parallel Query Issues</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-Advanced-Parallel-Query-Internals"><span class="toc-text">7 Advanced: Parallel Query Internals</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-Practical-Tuning-Guide"><span class="toc-text">8 Practical Tuning Guide</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Summary-Parallel-Query-in-One-Diagram"><span class="toc-text">Summary: Parallel Query in One Diagram</span></a></li></ol>
+            <p>When PostgreSQL introduced <strong>parallel query execution</strong> in version 9.6, it unlocked a fundamental capability: leveraging multi-core CPUs to accelerate analytical workloads.</p>
+<p>Before parallel query, PostgreSQL was strictly <strong>single-threaded</strong>—one query, one CPU core. On a 32-core server, a full table scan used 1 core at 100%, leaving 31 cores idle. For OLTP workloads (short, selective queries), this was fine. For analytics (scanning millions of rows), it was a bottleneck.</p>
+<p>Parallel query changes this by allowing operations like <strong>Seq Scan</strong>, <strong>Hash Join</strong>, and <strong>Aggregate</strong> to split work across multiple <strong>background worker processes</strong>. A <strong>Gather</strong> or <strong>Gather Merge</strong> node collects results from workers and returns them to the client.</p>
+<p>The result? <strong>2x–4x speedup</strong> (or more) on suitable workloads.</p>
+<p>But parallel query isn’t free. It adds overhead, consumes resources, and can <em>slow down</em> queries if misused. This guide explains how it works, when to use it, and how to tune it.</p>
+<hr>
+<h2 id="1-The-Problem-Single-Threaded-Execution">1 The Problem: Single-Threaded Execution</h2>
+<h3 id="The-Pre-9-6-Reality">The Pre-9.6 Reality</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span>  <span class="token comment">-- 100 million rows</span></code></pre>
+<p><strong>Execution (single-threaded):</strong></p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">┌─────────────────────────────────────┐
+│  Seq Scan<span class="token operator">:</span> transactions             │
+│  ─────────────────────────────────  │
+│  Rows<span class="token operator">:</span> <span class="token number">100</span><span class="token punctuation">,</span><span class="token number">000</span><span class="token punctuation">,</span><span class="token number">000</span>                  │
+│  Time<span class="token operator">:</span> <span class="token number">12</span><span class="token punctuation">,</span>000ms                     │
+│  <span class="token constant">CPU</span><span class="token operator">:</span> <span class="token number">1</span> core @ <span class="token number">100</span><span class="token operator">%</span>                 │
+│  Other <span class="token number">31</span> <span class="token literal-property property">cores</span><span class="token operator">:</span> Idle               │
+└─────────────────────────────────────┘</code></pre>
+<p><strong>The bottleneck:</strong> Disk I/O and CPU-bound operations (filtering, aggregation) can’t be parallelized. One core does all the work.</p>
+<hr>
+<h3 id="The-Parallel-Solution">The Parallel Solution</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span></code></pre>
+<p><strong>Execution (parallel):</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────┐
+│                    Gather (Aggregate)                   │
+│                    ──────────────────                   │
+│                    Combines partial results             │
+└─────────────────────────────────────────────────────────┘
+           │              │              │              │
+    ┌──────┴─────┐ ┌─────┴──────┐ ┌─────┴──────┐ ┌─────┴──────┐
+    │  Worker 1  │ │  Worker 2  │ │  Worker 3  │ │  Worker 4  │
+    │  Scan 25M  │ │  Scan 25M  │ │  Scan 25M  │ │  Scan 25M  │
+    │  rows      │ │  rows      │ │  rows      │ │  rows      │
+    └────────────┘ └────────────┘ └────────────┘ └────────────┘
+           │              │              │              │
+    ┌──────┴──────────────┴──────────────┴──────────────┴──────┐
+    │              Seq Scan: transactions                       │
+    │              (table split into 4 ranges)                  │
+    └───────────────────────────────────────────────────────────┘
+
+Total Time: ~3,500ms (3.4x speedup)
+CPU: 4 cores @ ~90% each</code></pre>
+<p><strong>Key insight:</strong> The table is divided into <strong>ranges</strong>, each worker scans a portion, and results are combined at the top.</p>
+<hr>
+<h2 id="2-Architecture-How-Parallel-Query-Works">2 Architecture: How Parallel Query Works</h2>
+<h3 id="The-Parallel-Execution-Stack">The Parallel Execution Stack</h3>
+<div class="mermaid">flowchart BT
+    A[Client] --&gt; B[Gather Node]
+    B --&gt; C[Parallel Leader]
+    C --&gt; D[Worker 1]
+    C --&gt; E[Worker 2]
+    C --&gt; F[Worker 3]
+    C --&gt; G[Worker 4]
+    
+    D --&gt; H[Seq Scan: Range 1]
+    E --&gt; I[Seq Scan: Range 2]
+    F --&gt; J[Seq Scan: Range 3]
+    G --&gt; K[Seq Scan: Range 4]
+    
+    style B fill:#fce4ec,stroke:#c2185b
+    style C fill:#e3f2fd,stroke:#1976d2
+    style D fill:#fff3e0,stroke:#f57c00
+    style E fill:#fff3e0,stroke:#f57c00
+    style F fill:#fff3e0,stroke:#f57c00
+    style G fill:#fff3e0,stroke:#f57c00</div>
+<p><strong>Components:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Parallel Leader</strong></td>
+<td>Main backend that coordinates workers</td>
+</tr>
+<tr>
+<td><strong>Parallel Workers</strong></td>
+<td>Background processes that execute portions of the plan</td>
+</tr>
+<tr>
+<td><strong>Gather Node</strong></td>
+<td>Collects results from workers and returns to client</td>
+</tr>
+<tr>
+<td><strong>Gather Merge Node</strong></td>
+<td>Like Gather, but preserves sort order</td>
+</tr>
+<tr>
+<td><strong>Shared Memory</strong></td>
+<td>Communication channel between leader and workers</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="The-Gather-Node-Collecting-Results">The Gather Node: Collecting Results</h3>
+<p>The <strong>Gather</strong> node is the bridge between parallel workers and the client:</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from src/backend/executor/nodeGather.c */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">GatherState</span> <span class="token punctuation">{</span>
+    PlanState ps<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> nworkers<span class="token punctuation">;</span>              <span class="token comment">/* Number of workers */</span>
+    <span class="token keyword">struct</span> <span class="token class-name">ParallelExecutorContext</span> <span class="token operator">*</span>pei<span class="token punctuation">;</span>  <span class="token comment">/* Communication context */</span>
+    TupleTableSlot <span class="token operator">*</span>pending_result<span class="token punctuation">;</span>  <span class="token comment">/* Next row from workers */</span>
+<span class="token punctuation">}</span> GatherState<span class="token punctuation">;</span>
+
+<span class="token keyword">static</span> TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecGather</span><span class="token punctuation">(</span>GatherState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">/* Initialize workers on first call */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>node<span class="token operator">-&gt;</span>workers_initialized<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token function">InitializeParallelWorkers</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        node<span class="token operator">-&gt;</span>workers_initialized <span class="token operator">=</span> true<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">/* Get next row from any worker */</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>node<span class="token operator">-&gt;</span>pending_result <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">all_workers_done</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>  <span class="token comment">/* No more rows */</span>
+        
+        node<span class="token operator">-&gt;</span>pending_result <span class="token operator">=</span> <span class="token function">FetchRowFromWorker</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    
+    <span class="token comment">/* Return row to parent */</span>
+    TupleTableSlot <span class="token operator">*</span>result <span class="token operator">=</span> node<span class="token operator">-&gt;</span>pending_result<span class="token punctuation">;</span>
+    node<span class="token operator">-&gt;</span>pending_result <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>The Contract:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>InitializeParallelWorkers()</code></td>
+<td>Launch worker processes</td>
+</tr>
+<tr>
+<td><code>FetchRowFromWorker()</code></td>
+<td>Get next row from any worker (round-robin)</td>
+</tr>
+<tr>
+<td><code>all_workers_done()</code></td>
+<td>Check if all workers finished</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Gather vs. Gather Merge:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Node Type</th>
+<th>Use Case</th>
+<th>Preserves Order?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Gather</strong></td>
+<td>General parallel execution</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td><strong>Gather Merge</strong></td>
+<td>Parallel execution with ORDER BY</td>
+<td>✅ Yes (merge-sort)</td>
+</tr>
+</tbody>
+</table>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Uses Gather</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> large_table<span class="token punctuation">;</span>
+
+<span class="token comment">-- Uses Gather Merge</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> large_table <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> created_at<span class="token punctuation">;</span>
+<span class="token comment">-- Workers return sorted chunks; Gather Merge combines them</span></code></pre>
+<hr>
+<h3 id="Parallel-Workers-Background-Processes">Parallel Workers: Background Processes</h3>
+<p>Workers are <strong>separate PostgreSQL backend processes</strong>:</p>
+<pre class="language-none"><code class="language-none">postgres: parallel worker for database neo01              # Worker 1
+postgres: parallel worker for database neo01              # Worker 2
+postgres: parallel worker for database neo01              # Worker 3
+postgres: parallel worker for database neo01              # Worker 4
+postgres: neo01                                           # Parallel Leader</code></pre>
+<p><strong>Key properties:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Separate processes</strong></td>
+<td>Not threads—full OS processes with own memory</td>
+</tr>
+<tr>
+<td><strong>Shared memory</strong></td>
+<td>Communicate via DSM (Dynamic Shared Memory)</td>
+</tr>
+<tr>
+<td><strong>Inherit transaction</strong></td>
+<td>Workers see the same transaction snapshot</td>
+</tr>
+<tr>
+<td><strong>No direct client access</strong></td>
+<td>Only the leader communicates with the client</td>
+</tr>
+<tr>
+<td><strong>Temporary</strong></td>
+<td>Workers exit when query completes</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Process Overhead</p><div class="admonition-content"><p>Because workers are separate processes (not threads), there's overhead:</p>
+<ul>
+<li><strong>Process creation:</strong> ~1-5ms per worker</li>
+<li><strong>DSM setup:</strong> Shared memory allocation</li>
+<li><strong>Context switching:</strong> OS must schedule multiple processes</li>
+</ul>
+<p>For queries that run in &lt;100ms, parallel overhead often exceeds the benefit.</p>
+</div></div>
+<hr>
+<h2 id="3-Parallel-Aware-Operators">3 Parallel-Aware Operators</h2>
+<p>Not all operators can run in parallel. PostgreSQL supports parallelism for specific node types:</p>
+<h3 id="Parallel-Capable-Operators">Parallel-Capable Operators</h3>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Parallel Strategy</th>
+<th>Speedup Potential</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Seq Scan</strong></td>
+<td>Split table into ranges; each worker scans a range</td>
+<td>⭐⭐⭐ High</td>
+</tr>
+<tr>
+<td><strong>Hash Join</strong></td>
+<td>Build phase: parallel hash; Probe phase: parallel probe</td>
+<td>⭐⭐⭐ High</td>
+</tr>
+<tr>
+<td><strong>Aggregate</strong></td>
+<td>Each worker computes partial aggregate; leader combines</td>
+<td>⭐⭐⭐ High</td>
+</tr>
+<tr>
+<td><strong>Bitmap Heap Scan</strong></td>
+<td>Split bitmap into ranges</td>
+<td>⭐⭐ Medium</td>
+</tr>
+<tr>
+<td><strong>Index Scan</strong></td>
+<td>Limited support (index-only scans)</td>
+<td>⭐ Low</td>
+</tr>
+<tr>
+<td><strong>Sort</strong></td>
+<td>Each worker sorts a chunk; Gather Merge combines</td>
+<td>⭐⭐ Medium</td>
+</tr>
+</tbody>
+</table>
+<h3 id="Non-Parallel-Operators">Non-Parallel Operators</h3>
+<table>
+<thead>
+<tr>
+<th>Operator</th>
+<th>Why Not Parallel?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Nested Loop Join</strong></td>
+<td>Inherently sequential (inner depends on outer)</td>
+</tr>
+<tr>
+<td><strong>Window Functions</strong></td>
+<td>Require ordered input; hard to partition</td>
+</tr>
+<tr>
+<td><strong>CTEs (pre-PG15)</strong></td>
+<td>Optimization fence; executed separately</td>
+</tr>
+<tr>
+<td><strong>Functions (most)</strong></td>
+<td>Not marked <code>PARALLEL SAFE</code></td>
+</tr>
+<tr>
+<td><strong>INSERT/UPDATE/DELETE</strong></td>
+<td>Row-level locking conflicts</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📌 PARALLEL Safety Levels</p><div class="admonition-content"><p>Functions are marked with parallel safety:</p>
+</div></div>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Meaning</th>
+<th>Can Run in Parallel?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PARALLEL UNSAFE</code></td>
+<td>May modify state</td>
+<td>❌ No</td>
+</tr>
+<tr>
+<td><code>PARALLEL RESTRICTED</code></td>
+<td>Read-only, but can’t execute parallel plans</td>
+<td>⚠️ Leader only</td>
+</tr>
+<tr>
+<td><code>PARALLEL SAFE</code></td>
+<td>Pure read-only</td>
+<td>✅ Yes</td>
+</tr>
+</tbody>
+</table>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Check function parallel safety</span>
+<span class="token keyword">SELECT</span> proname<span class="token punctuation">,</span> proparallel 
+<span class="token keyword">FROM</span> pg_proc 
+<span class="token keyword">WHERE</span> proname <span class="token operator">=</span> <span class="token string">'random'</span><span class="token punctuation">;</span>  <span class="token comment">-- 'u' = UNSAFE</span>
+
+<span class="token comment">-- random() is UNSAFE (uses global RNG state)</span></code></pre>
+<hr>
+<h3 id="Example-Parallel-Seq-Scan">Example: Parallel Seq Scan</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">EXPLAIN</span> <span class="token punctuation">(</span><span class="token keyword">ANALYZE</span><span class="token punctuation">,</span> BUFFERS<span class="token punctuation">)</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2025-01-01'</span><span class="token punctuation">;</span></code></pre>
+<p><strong>Plan:</strong></p>
+<pre class="language-none"><code class="language-none">                                                    QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=1234567.89..1234568.01 rows=1 width=8) (actual time=3521.234..3521.456 rows=1 loops=1)
+   Buffers: shared hit=123456, read=567890
+   -&gt;  Gather  (cost=1234567.00..1234567.89 rows=4 width=8) (actual time=3520.123..3521.234 rows=4 loops=1)
+         Workers Planned: 4
+         Workers Launched: 4
+         Buffers: shared hit=123456, read=567890
+         -&gt;  Partial Aggregate  (cost=1234567.00..1234567.00 rows=1 width=8) (actual time=3510.567..3510.678 rows=1 loops=4)
+               Buffers: shared hit=30864, read=141972
+               -&gt;  Parallel Seq Scan on transactions  (cost=0.00..1234000.00 rows=226667 width=0) (actual time=12.345..3450.123 rows=25000000 loops=4)
+                     Filter: (created_at &gt;= '2025-01-01'::date)
+                     Rows Removed by Filter: 75000000
+                     Buffers: shared hit=30864, read=141972
+ Planning Time: 0.456 ms
+ Workers Planned: 4
+ Workers Launched: 4
+ JIT:
+   Functions: 8
+   Options: inlining false, optimization true, expression_decomposition true, code_generation true
+ Execution Time: 3545.678 ms</code></pre>
+<p><strong>Key observations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Workers Planned</code></td>
+<td>4</td>
+<td>Planner requested 4 workers</td>
+</tr>
+<tr>
+<td><code>Workers Launched</code></td>
+<td>4</td>
+<td>All 4 workers started (no resource limits hit)</td>
+</tr>
+<tr>
+<td><code>loops=4</code></td>
+<td>4</td>
+<td>Each worker executed this node once</td>
+</tr>
+<tr>
+<td><code>rows=25000000</code></td>
+<td>25M per worker</td>
+<td>Total: 100M rows scanned</td>
+</tr>
+<tr>
+<td><code>Partial Aggregate</code></td>
+<td>Per-worker</td>
+<td>Each worker counts its portion</td>
+</tr>
+<tr>
+<td><code>Finalize Aggregate</code></td>
+<td>Leader</td>
+<td>Combines 4 partial counts</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Example-Parallel-Hash-Join">Example: Parallel Hash Join</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">EXPLAIN</span> <span class="token punctuation">(</span><span class="token keyword">ANALYZE</span><span class="token punctuation">,</span> BUFFERS<span class="token punctuation">)</span>
+<span class="token keyword">SELECT</span> u<span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token function">COUNT</span><span class="token punctuation">(</span>o<span class="token punctuation">.</span>id<span class="token punctuation">)</span>
+<span class="token keyword">FROM</span> users u
+<span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>created_at <span class="token operator">&gt;</span> <span class="token string">'2025-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> u<span class="token punctuation">.</span>name<span class="token punctuation">;</span></code></pre>
+<p><strong>Plan:</strong></p>
+<pre class="language-none"><code class="language-none">                                                               QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate  (cost=5678901.23..5678912.34 rows=100000 width=40) (actual time=8234.567..8245.678 rows=95432 loops=1)
+   Group Key: u.name
+   Buffers: shared hit=234567, read=1234567
+   -&gt;  Gather Merge  (cost=5678901.23..5678909.87 rows=400000 width=40) (actual time=8230.123..8240.234 rows=381728 loops=1)
+         Workers Planned: 4
+         Workers Launched: 4
+         Buffers: shared hit=234567, read=1234567
+         -&gt;  Partial GroupAggregate  (cost=5678901.23..5678905.45 rows=100000 width=40) (actual time=8200.456..8210.567 rows=95432 loops=4)
+               Group Key: u.name
+               Buffers: shared hit=58641, read=308641
+               -&gt;  Sort  (cost=5678901.23..5678902.34 rows=400000 width=40) (actual time=8190.345..8195.456 rows=95432 loops=4)
+                     Sort Key: u.name
+                     Sort Method: quicksort  Memory: 256kB
+                     Buffers: shared hit=58641, read=308641
+                     -&gt;  Hash Join  (cost=123456.78..5678000.00 rows=400000 width=40) (actual time=456.789..8100.123 rows=95432 loops=4)
+                           Hash Cond: (o.user_id = u.id)
+                           Buffers: shared hit=58641, read=308641
+                           -&gt;  Parallel Seq Scan on orders o  (cost=0.00..5500000.00 rows=2500000 width=8) (actual time=12.345..7800.234 rows=625000 loops=4)
+                                 Buffers: shared hit=45678, read=234567
+                           -&gt;  Hash  (cost=100000.00..100000.00 rows=250000 width=12) (actual time=440.123..440.234 rows=250000 loops=1)
+                                 Buckets: 262144  Batches: 2  Memory Usage: 12288kB
+                                 -&gt;  Seq Scan on users u  (cost=0.00..100000.00 rows=250000 width=12) (actual time=0.123..350.456 rows=250000 loops=1)
+                                       Filter: (created_at &gt; '2025-01-01'::date)
+                                       Rows Removed by Filter: 750000
+                                       Buffers: shared hit=12345, read=67890
+ Planning Time: 1.234 ms
+ Workers Planned: 4
+ Workers Launched: 4
+ Execution Time: 8267.890 ms</code></pre>
+<p><strong>Execution Flow:</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────────┐
+│                    Finalize GroupAggregate                      │
+│                    (Leader: combines 4 partial aggregates)      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    │   Gather Merge    │  (Preserves sort order)
+                    └─────────┬─────────┘
+                              │
+        ┌──────────┬──────────┼──────────┬──────────┐
+        │          │          │          │          │
+   ┌────┴───┐ ┌────┴───┐ ┌────┴───┐ ┌────┴───┐
+   │Worker 1│ │Worker 2│ │Worker 3│ │Worker 4│
+   │Partial │ │Partial │ │Partial │ │Partial │
+   │Agg     │ │Agg     │ │Agg     │ │Agg     │
+   └────┬───┘ └────┬───┘ └────┬───┘ └────┬───┘
+        │          │          │          │
+        └──────────┴──────────┴──────────┘
+                   │
+         ┌─────────┴─────────┐
+         │   Parallel Hash   │
+         │   (Shared hash    │
+         │    table in DSM)  │
+         └─────────┬─────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+   ┌────┴────┐          ┌─────┴─────┐
+   │Parallel │          │   Hash    │
+   │Scan     │          │   Build   │
+   │orders   │          │   (users) │
+   └─────────┘          └───────────┘</code></pre>
+<p><strong>Key insight:</strong> The hash table is built <strong>once</strong> (by the leader or workers collectively) and stored in <strong>shared memory</strong>. All workers probe the same hash table.</p>
+<hr>
+<h2 id="4-Configuration-Tuning-Parallel-Query">4 Configuration: Tuning Parallel Query</h2>
+<p>PostgreSQL provides several GUCs (Grand Unified Configuration) to control parallel query:</p>
+<h3 id="Core-Parameters">Core Parameters</h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_parallel_workers_per_gather</code></td>
+<td>2</td>
+<td>Max workers per Gather node</td>
+</tr>
+<tr>
+<td><code>max_parallel_workers</code></td>
+<td>8</td>
+<td>Total workers available system-wide</td>
+</tr>
+<tr>
+<td><code>max_parallel_maintenance_workers</code></td>
+<td>2</td>
+<td>Workers for maintenance (VACUUM, CREATE INDEX)</td>
+</tr>
+<tr>
+<td><code>parallel_leader_participation</code></td>
+<td>on</td>
+<td>Whether leader also works</td>
+</tr>
+<tr>
+<td><code>min_parallel_table_scan_size</code></td>
+<td>8MB</td>
+<td>Minimum table size for parallel scan</td>
+</tr>
+<tr>
+<td><code>min_parallel_index_scan_size</code></td>
+<td>512kB</td>
+<td>Minimum index size for parallel scan</td>
+</tr>
+<tr>
+<td><code>parallel_setup_cost</code></td>
+<td>1000.0</td>
+<td>Planner cost estimate for parallel setup</td>
+</tr>
+<tr>
+<td><code>parallel_tuple_cost</code></td>
+<td>0.1</td>
+<td>Planner cost per tuple transferred</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Parameter-Deep-Dive">Parameter Deep Dive</h3>
+<h4 id="max-parallel-workers-per-gather"><code>max_parallel_workers_per_gather</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Default: 2</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- For a single large query</span>
+<span class="token keyword">SET</span> <span class="token keyword">LOCAL</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">8</span><span class="token punctuation">;</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> huge_table<span class="token punctuation">;</span></code></pre>
+<p><strong>Trade-off:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low (1-2)</td>
+<td>Less overhead, more predictable</td>
+<td>Limited speedup</td>
+</tr>
+<tr>
+<td>High (8+)</td>
+<td>Maximum parallelism</td>
+<td>Diminishing returns, resource contention</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule of thumb:</strong> Start with 4, measure, adjust.</p>
+<hr>
+<h4 id="max-parallel-workers"><code>max_parallel_workers</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- System-wide limit (postgresql.conf)</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">16</span>  <span class="token comment">-- Total workers across all queries</span>
+
+<span class="token comment">-- Check current usage</span>
+<span class="token keyword">SELECT</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> 
+<span class="token keyword">FROM</span> pg_stat_activity 
+<span class="token keyword">WHERE</span> backend_type <span class="token operator">=</span> <span class="token string">'parallel worker'</span><span class="token punctuation">;</span></code></pre>
+<p><strong>Relationship:</strong></p>
+<pre class="language-none"><code class="language-none">max_parallel_workers_per_gather ≤ max_parallel_workers
+
+Example:
+  max_parallel_workers = 8
+  max_parallel_workers_per_gather = 4
+  
+  → Max 2 concurrent parallel queries (8 / 4 = 2)</code></pre>
+<hr>
+<h4 id="parallel-leader-participation"><code>parallel_leader_participation</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Default: on (leader also does work)</span>
+<span class="token keyword">SET</span> parallel_leader_participation <span class="token operator">=</span> <span class="token keyword">on</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- Leader coordinates AND scans a portion of the table</span></code></pre>
+<p><strong>When to disable:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Setting</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Many concurrent queries</td>
+<td><code>off</code></td>
+<td>Leader handles coordination, workers do all scanning</td>
+</tr>
+<tr>
+<td>Small number of workers</td>
+<td><code>on</code></td>
+<td>Maximize parallelism (leader + workers)</td>
+</tr>
+<tr>
+<td>I/O-bound workloads</td>
+<td><code>on</code></td>
+<td>Leader can help with I/O</td>
+</tr>
+<tr>
+<td>CPU-bound workloads</td>
+<td><code>off</code></td>
+<td>Leader focuses on coordination</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h4 id="min-parallel-table-scan-size"><code>min_parallel_table_scan_size</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Default: 8MB</span>
+<span class="token keyword">SET</span> min_parallel_table_scan_size <span class="token operator">=</span> <span class="token number">16</span>MB<span class="token punctuation">;</span>
+
+<span class="token comment">-- Tables smaller than 16MB won't use parallel scan</span></code></pre>
+<p><strong>Why it exists:</strong> Parallel overhead (~5-10ms) exceeds benefit for small tables.</p>
+<p><strong>Tuning:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Recommended Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OLTP (small queries)</td>
+<td>32MB+ (discourage parallelism)</td>
+</tr>
+<tr>
+<td>Analytics (large scans)</td>
+<td>4-8MB (encourage parallelism)</td>
+</tr>
+<tr>
+<td>Mixed</td>
+<td>8-16MB (balance)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Planner-Cost-Parameters">Planner Cost Parameters</h3>
+<p>The planner uses cost estimates to decide whether parallelism is worthwhile:</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Default costs</span>
+parallel_setup_cost <span class="token operator">=</span> <span class="token number">1000.0</span>    <span class="token comment">-- Equivalent to ~10ms of work</span>
+parallel_tuple_cost <span class="token operator">=</span> <span class="token number">0.1</span>       <span class="token comment">-- Per-row transfer cost</span></code></pre>
+<p><strong>How the planner decides:</strong></p>
+<pre class="language-none"><code class="language-none">Total Parallel Cost = parallel_setup_cost 
+                    + (parallel_tuple_cost × rows)
+                    + (scan_cost / workers)
+
+If Parallel Cost &lt; Serial Cost → Choose Parallel</code></pre>
+<p><strong>Tuning:</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Make parallelism more attractive</span>
+<span class="token keyword">SET</span> parallel_setup_cost <span class="token operator">=</span> <span class="token number">500.0</span><span class="token punctuation">;</span>   <span class="token comment">-- Lower setup penalty</span>
+<span class="token keyword">SET</span> parallel_tuple_cost <span class="token operator">=</span> <span class="token number">0.05</span><span class="token punctuation">;</span>    <span class="token comment">-- Lower transfer cost</span>
+
+<span class="token comment">-- Make parallelism less attractive</span>
+<span class="token keyword">SET</span> parallel_setup_cost <span class="token operator">=</span> <span class="token number">2000.0</span><span class="token punctuation">;</span>  <span class="token comment">-- Higher setup penalty</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 Debugging Planner Decisions</p><div class="admonition-content"><p>Use <code>EXPLAIN (VERBOSE, COSTS)</code> to see why the planner chose (or rejected) parallelism:</p>
+<pre><code class="language-sql">EXPLAIN (VERBOSE, COSTS)
+SELECT COUNT(*) FROM transactions;
+</code><p><code class="language-sql">– Look for:<br>
+– "Workers Planned: 0" → Planner rejected parallelism<br>
+– "Workers Planned: 4" → Planner chose parallel<br>
+</code></p></pre><p></p>
+</div></div>
+<hr>
+<h2 id="5-When-Parallel-Query-Helps-and-When-It-Hurts">5 When Parallel Query Helps (and When It Hurts)</h2>
+<h3 id="Ideal-Workloads-for-Parallel-Query">Ideal Workloads for Parallel Query</h3>
+<table>
+<thead>
+<tr>
+<th>Workload</th>
+<th>Characteristics</th>
+<th>Expected Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Large table scans</strong></td>
+<td>&gt;100MB tables, selective filters</td>
+<td>2x-4x</td>
+</tr>
+<tr>
+<td><strong>Bulk aggregations</strong></td>
+<td>COUNT, SUM, AVG over millions of rows</td>
+<td>3x-5x</td>
+</tr>
+<tr>
+<td><strong>Hash joins</strong></td>
+<td>Large fact tables joining to dimensions</td>
+<td>2x-4x</td>
+</tr>
+<tr>
+<td><strong>Index-only scans</strong></td>
+<td>Covering indexes on large tables</td>
+<td>2x-3x</td>
+</tr>
+<tr>
+<td><strong>Parallel CREATE INDEX</strong></td>
+<td><code>CREATE INDEX CONCURRENTLY</code> (PG11+)</td>
+<td>2x-3x</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example: Large Aggregation</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Before: 12 seconds (single-threaded)</span>
+<span class="token comment">-- After: 3.5 seconds (4 workers)</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span> 
+    DATE_TRUNC<span class="token punctuation">(</span><span class="token string">'hour'</span><span class="token punctuation">,</span> created_at<span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">hour</span><span class="token punctuation">,</span>
+    <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">transactions</span><span class="token punctuation">,</span>
+    <span class="token function">SUM</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span> <span class="token keyword">as</span> total_amount
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2025-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> <span class="token keyword">hour</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="When-Parallel-Query-Hurts">When Parallel Query Hurts</h3>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Why It Hurts</th>
+<th>Alternative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Small tables (&lt;10MB)</strong></td>
+<td>Overhead &gt; benefit</td>
+<td>Disable parallelism</td>
+</tr>
+<tr>
+<td><strong>OLTP queries (&lt;100ms)</strong></td>
+<td>Setup time dominates</td>
+<td>Keep <code>max_parallel_workers_per_gather = 0</code></td>
+</tr>
+<tr>
+<td><strong>Many concurrent queries</strong></td>
+<td>Worker starvation</td>
+<td>Limit <code>max_parallel_workers</code></td>
+</tr>
+<tr>
+<td><strong>Memory-bound workloads</strong></td>
+<td>Workers compete for cache</td>
+<td>Reduce workers</td>
+</tr>
+<tr>
+<td><strong>Functions marked UNSAFE</strong></td>
+<td>Falls back to serial</td>
+<td>Mark functions SAFE if possible</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Example: Parallel Overhead</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Small table: parallel is SLOWER</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> small_table<span class="token punctuation">;</span>  <span class="token comment">-- 50ms serial, 80ms parallel</span>
+
+<span class="token comment">-- Why?</span>
+<span class="token comment">-- - Process creation: 5ms × 4 workers = 20ms</span>
+<span class="token comment">-- - DSM setup: 10ms</span>
+<span class="token comment">-- - Coordination: 5ms</span>
+<span class="token comment">-- - Actual scan: 5ms (table is tiny)</span>
+<span class="token comment">-- Total parallel: 40ms overhead + 5ms scan = 45ms+ (vs 50ms serial)</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ The OLTP Trap</p><div class="admonition-content"><p>For OLTP workloads (short, frequent queries), parallel query often <strong>degrades</strong> performance:</p>
+</div></div>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Typical OLTP query</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> id <span class="token operator">=</span> <span class="token number">12345</span><span class="token punctuation">;</span>  <span class="token comment">-- Uses index, returns 1 row</span>
+
+<span class="token comment">-- Parallel overhead: 30-50ms</span>
+<span class="token comment">-- Serial execution: 0.5ms</span>
+<span class="token comment">-- Result: 60-100x slower with parallelism!</span></code></pre>
+<p><strong>Solution:</strong> Disable parallelism for OLTP:</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- In postgresql.conf for OLTP databases</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">0</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">0</span></code></pre>
+<hr>
+<h2 id="6-Debugging-Parallel-Query-Issues">6 Debugging Parallel Query Issues</h2>
+<h3 id="Common-Problems">Common Problems</h3>
+<h4 id="Problem-1-Workers-Not-Launched">Problem 1: Workers Not Launched</h4>
+<pre class="language-none"><code class="language-none">Workers Planned: 4
+Workers Launched: 2  -- Only 2 started!</code></pre>
+<p><strong>Causes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Check</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Worker limit hit</td>
+<td><code>SHOW max_parallel_workers;</code></td>
+<td>Increase limit</td>
+</tr>
+<tr>
+<td>Memory pressure</td>
+<td>Check <code>work_mem × workers</code></td>
+<td>Reduce <code>max_parallel_workers</code></td>
+</tr>
+<tr>
+<td>Table too small</td>
+<td>Check table size vs <code>min_parallel_table_scan_size</code></td>
+<td>Lower threshold or accept serial</td>
+</tr>
+<tr>
+<td>Function is UNSAFE</td>
+<td>Check <code>proparallel</code> in <code>pg_proc</code></td>
+<td>Mark SAFE or rewrite</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h4 id="Problem-2-Parallel-Scan-Falls-Back-to-Index-Scan">Problem 2: Parallel Scan Falls Back to Index Scan</h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Expected: Parallel Seq Scan</span>
+<span class="token comment">-- Actual: Index Scan (serial)</span></code></pre>
+<p><strong>Why:</strong> The planner determined index scan is cheaper.</p>
+<p><strong>Force parallel scan (for testing):</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SET</span> enable_indexscan <span class="token operator">=</span> <span class="token keyword">off</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> enable_seqscan <span class="token operator">=</span> <span class="token keyword">on</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token keyword">EXPLAIN</span> <span class="token keyword">ANALYZE</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> large_table<span class="token punctuation">;</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ Don't Force in Production</p><div class="admonition-content"><p>Disabling index scans is for <strong>debugging only</strong>. The planner usually knows best. If parallel seq scan is truly better, adjust cost parameters instead.</p>
+</div></div>
+<hr>
+<h4 id="Problem-3-Uneven-Worker-Load">Problem 3: Uneven Worker Load</h4>
+<pre class="language-none"><code class="language-none">Worker 1: 50M rows, 3000ms
+Worker 2: 30M rows, 1800ms
+Worker 3: 15M rows, 900ms
+Worker 4: 5M rows, 300ms</code></pre>
+<p><strong>Why:</strong> Data skew (workers scan different-sized ranges).</p>
+<p><strong>Impact:</strong> Slowest worker determines total time (Amdahl’s Law).</p>
+<p><strong>Mitigation:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Better data distribution</td>
+<td>Reorganize table (PARTITION BY)</td>
+</tr>
+<tr>
+<td>More workers</td>
+<td>More granular ranges</td>
+</tr>
+<tr>
+<td>Accept imbalance</td>
+<td>Often not worth optimizing</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Monitoring-Parallel-Query">Monitoring Parallel Query</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- Check active parallel workers</span>
+<span class="token keyword">SELECT</span> 
+    pid<span class="token punctuation">,</span>
+    usename<span class="token punctuation">,</span>
+    query<span class="token punctuation">,</span>
+    backend_type
+<span class="token keyword">FROM</span> pg_stat_activity
+<span class="token keyword">WHERE</span> backend_type <span class="token operator">=</span> <span class="token string">'parallel worker'</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- Check parallel query statistics (PG14+)</span>
+<span class="token keyword">SELECT</span> 
+    datname<span class="token punctuation">,</span>
+    numbackends<span class="token punctuation">,</span>
+    xact_commit<span class="token punctuation">,</span>
+    xact_rollback
+<span class="token keyword">FROM</span> pg_stat_database<span class="token punctuation">;</span>
+
+<span class="token comment">-- View parallel worker memory usage</span>
+<span class="token keyword">SELECT</span> 
+    pid<span class="token punctuation">,</span>
+    usename<span class="token punctuation">,</span>
+    query<span class="token punctuation">,</span>
+    temp_blks_read<span class="token punctuation">,</span>
+    temp_blks_written
+<span class="token keyword">FROM</span> pg_stat_activity
+<span class="token keyword">WHERE</span> query <span class="token operator">LIKE</span> <span class="token string">'%parallel%'</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h2 id="7-Advanced-Parallel-Query-Internals">7 Advanced: Parallel Query Internals</h2>
+<h3 id="Dynamic-Shared-Memory-DSM">Dynamic Shared Memory (DSM)</h3>
+<p>Workers communicate via <strong>Dynamic Shared Memory</strong>:</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from src/backend/storage/ipc/dsm.c */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dsm_segment</span> <span class="token punctuation">{</span>
+    dsm_handle handle<span class="token punctuation">;</span>      <span class="token comment">/* Unique identifier */</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>mapped_address<span class="token punctuation">;</span>   <span class="token comment">/* Mapped memory address */</span>
+    Size size<span class="token punctuation">;</span>              <span class="token comment">/* Segment size */</span>
+<span class="token punctuation">}</span> dsm_segment<span class="token punctuation">;</span>
+
+<span class="token comment">/* Create shared memory segment */</span>
+dsm_segment <span class="token operator">*</span>
+<span class="token function">dsm_create</span><span class="token punctuation">(</span>Size size<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">/* Allocate shared memory */</span>
+    <span class="token comment">/* Return segment handle */</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">/* Attach to shared memory (workers) */</span>
+<span class="token keyword">void</span> <span class="token operator">*</span>
+<span class="token function">dsm_attach</span><span class="token punctuation">(</span>dsm_handle handle<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">/* Map shared memory into worker's address space */</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>What’s stored in DSM:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Size</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query plan</td>
+<td>~10-100KB</td>
+<td>Workers need to know what to execute</td>
+</tr>
+<tr>
+<td>Table scan ranges</td>
+<td>~1KB per worker</td>
+<td>Which blocks each worker scans</td>
+</tr>
+<tr>
+<td>Hash tables</td>
+<td>Variable (MBs)</td>
+<td>Shared hash for parallel hash join</td>
+</tr>
+<tr>
+<td>Partial aggregates</td>
+<td>~1KB per worker</td>
+<td>Intermediate results</td>
+</tr>
+<tr>
+<td>Tuple queues</td>
+<td>Variable</td>
+<td>Rows transferred from workers to leader</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Parallel-Context-Switching">Parallel Context Switching</h3>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│                     Parallel Leader                         │
+│  ────────────────────────────────────────────────────────   │
+│  1. Parse &amp; analyze query                                   │
+│  2. Generate parallel-aware plan                            │
+│  3. Create DSM segment                                      │
+│  4. Launch worker processes                                 │
+│  5. Send plan + context to workers via DSM                  │
+│  6. Wait for workers to start                               │
+│  7. Begin execution (Gather node pulls from workers)        │
+│  8. Collect results, return to client                       │
+│  9. Clean up DSM, terminate workers                         │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>Timeline:</strong></p>
+<pre class="language-none"><code class="language-none">0ms     5ms     10ms    15ms    20ms    100ms   3500ms
+│───────│───────│───────│───────│───────│───────│───────│
+│ DSM   │Worker │Workers│First  │       │       │Final  │
+│ setup │launch │ready  │row    │Scan   │Scan   │result │
+│       │       │       │       │       │       │       │
+└───────────────┘
+    Overhead (~20ms)</code></pre>
+<hr>
+<h2 id="8-Practical-Tuning-Guide">8 Practical Tuning Guide</h2>
+<h3 id="OLTP-Database">OLTP Database</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- postgresql.conf</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">0</span>  <span class="token comment">-- Disable parallel query</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">0</span>
+max_parallel_maintenance_workers <span class="token operator">=</span> <span class="token number">1</span>  <span class="token comment">-- Keep for maintenance</span>
+
+<span class="token comment">-- Why: OLTP queries are short; parallel overhead hurts more than helps</span></code></pre>
+<hr>
+<h3 id="Analytics-Database">Analytics Database</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- postgresql.conf</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">8</span>   <span class="token comment">-- Maximize parallelism</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">32</span>             <span class="token comment">-- Support multiple concurrent queries</span>
+max_parallel_maintenance_workers <span class="token operator">=</span> <span class="token number">4</span>  <span class="token comment">-- Parallel VACUUM, CREATE INDEX</span>
+
+min_parallel_table_scan_size <span class="token operator">=</span> <span class="token number">4</span>MB    <span class="token comment">-- Encourage parallelism</span>
+parallel_setup_cost <span class="token operator">=</span> <span class="token number">500.0</span>           <span class="token comment">-- Lower barrier to parallelism</span>
+parallel_tuple_cost <span class="token operator">=</span> <span class="token number">0.05</span>
+
+<span class="token comment">-- Per-query (for critical reports)</span>
+<span class="token keyword">SET</span> <span class="token keyword">LOCAL</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">16</span><span class="token punctuation">;</span>
+<span class="token keyword">SELECT</span> <span class="token comment">/* complex analytical query */</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="Mixed-Workload">Mixed Workload</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- postgresql.conf</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span>   <span class="token comment">-- Moderate parallelism</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">16</span>             <span class="token comment">-- Support ~4 concurrent parallel queries</span>
+max_parallel_maintenance_workers <span class="token operator">=</span> <span class="token number">2</span>
+
+min_parallel_table_scan_size <span class="token operator">=</span> <span class="token number">16</span>MB   <span class="token comment">-- Only parallelize large scans</span>
+
+<span class="token comment">-- Application-level tuning</span>
+<span class="token comment">-- OLTP queries: Use default (4 workers)</span>
+<span class="token comment">-- Analytical queries: SET LOCAL max_parallel_workers_per_gather = 8</span></code></pre>
+<hr>
+<h3 id="Tuning-Checklist">Tuning Checklist</h3>
+<pre class="language-none"><code class="language-none">□ Check current settings:
+  SHOW max_parallel_workers_per_gather;
+  SHOW max_parallel_workers;
+  SHOW min_parallel_table_scan_size;
+
+□ Identify candidate queries:
+  -- Find queries with sequential scans on large tables
+  SELECT query, total_exec_time, calls
+  FROM pg_stat_statements
+  WHERE query LIKE '%Seq Scan%'
+  ORDER BY total_exec_time DESC;
+
+□ Test with parallelism:
+  SET max_parallel_workers_per_gather = 4;
+  EXPLAIN (ANALYZE, BUFFERS) &lt;query&gt;;
+
+□ Measure speedup:
+  -- Compare serial vs parallel execution time
+  -- Check Workers Launched matches Workers Planned
+
+□ Adjust based on results:
+  -- Good speedup (2x+): Keep settings
+  -- Marginal speedup (&lt;1.5x): Reduce workers or disable
+  -- Slower: Disable parallelism for this query type</code></pre>
+<hr>
+<h2 id="Summary-Parallel-Query-in-One-Diagram">Summary: Parallel Query in One Diagram</h2>
+<div class="mermaid">flowchart BT
+    subgraph "Parallel Query Execution"
+        A[Client] --&gt; B[Gather Node]
+        B --&gt; C[Parallel Leader]
+        C --&gt; D[Worker 1]
+        C --&gt; E[Worker 2]
+        C --&gt; F[Worker 3]
+        C --&gt; G[Worker 4]
+        
+        D --&gt; H[Parallel Seq Scan]
+        E --&gt; I[Parallel Seq Scan]
+        F --&gt; J[Parallel Seq Scan]
+        G --&gt; K[Parallel Seq Scan]
+        
+        H --&gt; L[Table Range 1]
+        I --&gt; M[Table Range 2]
+        J --&gt; N[Table Range 3]
+        K --&gt; O[Table Range 4]
+    end
+    
+    subgraph "Configuration"
+        P[max_parallel_workers_per_gather]
+        Q[max_parallel_workers]
+        R[min_parallel_table_scan_size]
+    end
+    
+    subgraph "Best For"
+        S[Large table scans]
+        T[Bulk aggregations]
+        U[Hash joins]
+    end
+    
+    style B fill:#fce4ec,stroke:#c2185b
+    style D fill:#fff3e0,stroke:#f57c00
+    style E fill:#fff3e0,stroke:#f57c00
+    style F fill:#fff3e0,stroke:#f57c00
+    style G fill:#fff3e0,stroke:#f57c00
+    style P fill:#e3f2fd,stroke:#1976d2
+    style Q fill:#e3f2fd,stroke:#1976d2
+    style R fill:#e3f2fd,stroke:#1976d2</div>
+<p><strong>Key Takeaways:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Parallel Query</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Architecture</strong></td>
+<td>Leader + workers via DSM</td>
+</tr>
+<tr>
+<td><strong>Gather node</strong></td>
+<td>Collects results from workers</td>
+</tr>
+<tr>
+<td><strong>Gather Merge</strong></td>
+<td>Preserves sort order</td>
+</tr>
+<tr>
+<td><strong>Best for</strong></td>
+<td>Large scans, aggregations, hash joins</td>
+</tr>
+<tr>
+<td><strong>Avoid for</strong></td>
+<td>OLTP, small tables, sub-100ms queries</td>
+</tr>
+<tr>
+<td><strong>Speedup</strong></td>
+<td>2x-4x typical, up to 10x for ideal workloads</td>
+</tr>
+<tr>
+<td><strong>Overhead</strong></td>
+<td>~20-50ms setup time</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>Further Reading:</strong></p>
+<ul>
+<li>PostgreSQL Docs: <a target="_blank" rel="noopener" href="https://www.postgresql.org/docs/current/parallel-query.html">“Parallel Query”</a></li>
+<li>Robert Haas: <a target="_blank" rel="noopener" href="https://rhaas.blogspot.com/2015/10/parallel-query-in-postgresql.html">“Parallel Query in PostgreSQL”</a> (2015)</li>
+<li>Andres Freund: <a target="_blank" rel="noopener" href="https://www.postgresql.org/message-id/flat/20160929183442.GA1210147%40alap3.anarazel.de">“Parallelism in PostgreSQL”</a></li>
+<li>Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/tree/master/src/backend/executor/nodeGather.c"><code>src/backend/executor/nodeGather.c</code></a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/" data-id="2395f532" class="article-share-link"><i class="fa fa-share"></i>Share</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "image": "https://neo01.com/assets/architecture/sql_plan_thumbnail.jpg",
+        "keywords": "Parallel Query Performance PostgreSQL",
+        "genre": "Architecture",
+        "datePublished": "2026-02-16",
+        "dateCreated": "2026-02-16",
+        "dateModified": "2026-03-12",
+        "url": "https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/",
+        "description": "Deep dive into PostgreSQL's parallel query execution—how Gather nodes, parallel workers, and multi-core processing accelerate large table scans, hash joins, and aggregations. Learn when parallelism helps, when it hurts, and how to tune it.",
+        "wordCount": 6032
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>follow:</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">links</h3>
+    <div class="widget">
+        <ul><li><a href="/ai">AI Playground</a></li><li><a href="/tools">Tools</a></li><li><a href="/games">Games</a></li><li><a href="/pages/useful-information">Useful Information</a></li><li><a href="/pages/Hexo-Blogging-Cheatsheet">Hexo Blogging Cheatsheet</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">recents</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: B+Tree Indexes with Concurrent Access" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="title">Database in Rust: B+Tree Indexes with Concurrent Access</a></p>
+                            <p class="item-date"><time datetime="2026-03-07T16:00:00.000Z" itemprop="datePublished">2026-03-08</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Building a PostgreSQL-Compatible Database in Rust: Comprehensive SQL Parser (DDL, DML, Queries)" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-SQL-Parser/" class="title">Building a PostgreSQL-Compatible Database in Rust: Comprehensive SQL Parser (DDL, DML, Queries)</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: Wire Protocol and Result Set Serialization" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">Database in Rust: Wire Protocol and Result Set Serialization</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: WAL and Crash Recovery with ARIES" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">Database in Rust: WAL and Crash Recovery with ARIES</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Database in Rust: MVCC and Transaction Management" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">Development</a></p>
+                            <p class="item-title"><a href="/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="title">Database in Rust: MVCC and Transaction Management</a></p>
+                            <p class="item-date"><time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">archives</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2026/">2026</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2025/">2025</a>
+                    <span class="archive-list-count">84</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2002/">2002</a>
+                    <span class="archive-list-count">2</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#28e285a1</div>
+                <img src="/qr/qr-6f26737943a1445f34b4308eeabdec7a.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#28e285a1">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. All rights reserved.
+                  <a href="/terms-and-conditions">Terms and Conditions</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

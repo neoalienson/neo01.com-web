@@ -1,0 +1,1724 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>Rust 建構資料庫：B+Tree 索引與併發存取 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Database Internals,PostgreSQL,Rust">
+    
+    
+    <meta name="description" content="Vaultgres 旅程第二部分：實作驅動快速查詢的 B+Tree 索引。深入探討樹結構、頁面分裂，以及伴隨鎖耦合和安全遍歷的併發存取噩夢。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Rust 建構資料庫：B+Tree 索引與併發存取">
+<meta property="og:url" content="https://neo01.com/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Vaultgres 旅程第二部分：實作驅動快速查詢的 B+Tree 索引。深入探討樹結構、頁面分裂，以及伴隨鎖耦合和安全遍歷的併發存取噩夢。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+<meta property="article:published_time" content="2026-03-01T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-12T17:44:20.817Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Database Internals">
+<meta property="article:tag" content="PostgreSQL">
+<meta property="article:tag" content="Rust">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-TW';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me/">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Development/">Development</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        Rust 建構資料庫：B+Tree 索引與併發存取
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-03-01T16:00:00.000Z" itemprop="datePublished">2026-03-02</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-12T17:44:20.817Z" itemprop="datePublished">2026-03-13</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/zh-TW/tags/Database-Internals/">Database Internals</a> <a class="tag-link" href="/zh-TW/tags/Rust/">Rust</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E7%82%BA%E4%BB%80%E9%BA%BC%E9%81%B8%E6%93%87-B-Tree%EF%BC%9F"><span class="toc-text">1 為什麼選擇 B+Tree？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E7%AF%80%E9%BB%9E%E4%BD%88%E5%B1%80%EF%BC%9A%E5%B0%87-B-Tree-%E8%A3%9D%E5%85%A5%E9%A0%81%E9%9D%A2"><span class="toc-text">2 節點佈局：將 B+Tree 裝入頁面</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E5%9F%BA%E6%9C%AC-B-Tree-%E6%93%8D%E4%BD%9C"><span class="toc-text">3 基本 B+Tree 操作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E4%BD%B5%E7%99%BC%E5%AD%98%E5%8F%96%EF%BC%9A%E7%9C%9F%E6%AD%A3%E7%9A%84%E6%8C%91%E6%88%B0"><span class="toc-text">4 併發存取：真正的挑戰</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E7%AF%84%E5%9C%8D%E6%8E%83%E6%8F%8F%EF%BC%9A%E5%88%A9%E7%94%A8%E9%80%A3%E7%B5%90%E8%91%89%E5%AD%90"><span class="toc-text">5 範圍掃描：利用連結葉子</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E8%88%87%E7%B7%A9%E8%A1%9D%E6%B1%A0%E6%95%B4%E5%90%88"><span class="toc-text">6 與緩衝池整合</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E7%94%A8-Rust-%E5%BB%BA%E6%A7%8B%E7%9A%84%E6%8C%91%E6%88%B0"><span class="toc-text">7 用 Rust 建構的挑戰</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-AI-%E5%A6%82%E4%BD%95%E5%8A%A0%E9%80%9F%E9%80%99%E9%A0%85%E5%B7%A5%E4%BD%9C"><span class="toc-text">8 AI 如何加速這項工作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B8%BD%E7%B5%90%EF%BC%9AB-Tree-%E4%B8%80%E5%BC%B5%E5%9C%96"><span class="toc-text">總結：B+Tree 一張圖</span></a></li></ol>
+            <p>在 <a href="/zh-TW/2026/03/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/">第一部分</a> 中，我們建立了基礎：頁面式儲存和緩衝池。但有個問題。</p>
+<p><strong>尋找一列需要完整表掃描：</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Without an index: O(n)</span>
+<span class="token keyword">for</span> page <span class="token keyword">in</span> table_pages <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> row <span class="token keyword">in</span> page<span class="token punctuation">.</span>rows <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> row<span class="token punctuation">.</span>id <span class="token operator">==</span> <span class="token number">42</span> <span class="token punctuation">{</span>
+            <span class="token keyword">return</span> row<span class="token punctuation">;</span>  <span class="token comment">// Found it! (maybe on the last page)</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>對於有 100 萬列的表？那是 100 萬次比較。在磁碟上？<strong>無法接受。</strong></p>
+<p>真正的資料庫使用<strong>索引</strong>在 O(log n) 時間內找到列。PostgreSQL 的預設：<strong>B+Tree</strong>。</p>
+<p>今天：在 Rust 中實作執行緒安全的 B+Tree 索引，並與我們的緩衝池整合。是的，併發存取和聽起來一樣困難。</p>
+<hr>
+<h2 id="1-為什麼選擇-B-Tree？">1 為什麼選擇 B+Tree？</h2>
+<h3 id="替代方案">替代方案</h3>
+<table>
+<thead>
+<tr>
+<th>索引類型</th>
+<th>查詢</th>
+<th>範圍掃描</th>
+<th>插入</th>
+<th>使用場景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>雜湊表</strong></td>
+<td>O(1)</td>
+<td>❌ 不支援</td>
+<td>O(1)</td>
+<td>僅精確匹配</td>
+</tr>
+<tr>
+<td><strong>B+Tree</strong></td>
+<td>O(log n)</td>
+<td>✅ 優秀</td>
+<td>O(log n)</td>
+<td>通用</td>
+</tr>
+<tr>
+<td><strong>LSM Tree</strong></td>
+<td>O(log n)</td>
+<td>⚠️ 需要壓縮</td>
+<td>O(1) 平均</td>
+<td>寫入密集 (RocksDB)</td>
+</tr>
+<tr>
+<td><strong>跳躍表</strong></td>
+<td>O(log n)</td>
+<td>✅ 良好</td>
+<td>O(log n)</td>
+<td>記憶體中 (Redis)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>PostgreSQL 選擇 B+Tree 因為：</strong></p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>為什麼重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>平衡</strong></td>
+<td>所有葉節點在同一深度——可預測的效能</td>
+</tr>
+<tr>
+<td><strong>範圍查詢</strong></td>
+<td>葉節點連結——高效的 <code>WHERE id BETWEEN 10 AND 100</code></td>
+</tr>
+<tr>
+<td><strong>磁碟友好</strong></td>
+<td>高扇出（每個節點數百個鍵）——淺樹</td>
+</tr>
+<tr>
+<td><strong>自我平衡</strong></td>
+<td>不需要手動重組</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="B-Tree-結構">B+Tree 結構</h3>
+<pre class="language-none"><code class="language-none">                ┌─────────────────┐
+                │   Root Node     │  ← Page 0
+                │  [10] │ [50]    │
+                └────────┬────────┘
+                         │
+        ┌────────────────┼────────────────┐
+        │                │                │
+        ▼                ▼                ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│  Node [10]   │ │  Node [50]   │ │  Node [∞]    │  ← Page 1, 2, 3
+│ [1,5,7]│[10] │ │ [20,30]│[50] │ │ [60,80,90]  │
+└──────────────┘ └──────────────┘ └──────────────┘
+        │                │                │
+        ▼                ▼                ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ Leaf [1,5,7] │ │Leaf [10,20,30│ │Leaf [50,60,  │  ← Page 4, 5, 6
+│ → next: 5    │ │ → next: 6    │ │     80,90]   │
+└──────────────┘ └──────────────┘ └──────────────┘</code></pre>
+<p><strong>關鍵屬性：</strong></p>
+<table>
+<thead>
+<tr>
+<th>屬性</th>
+<th>Vaultgres 中的值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>階數 (扇出)</strong></td>
+<td>每個內部節點約 500 個鍵 (8KB 頁面)</td>
+</tr>
+<tr>
+<td><strong>高度</strong></td>
+<td>10 億個鍵需要 3-4 層</td>
+</tr>
+<tr>
+<td><strong>葉節點</strong></td>
+<td>包含實際資料指標 (TID)</td>
+</tr>
+<tr>
+<td><strong>內部節點</strong></td>
+<td>僅鍵 + 子指標 (路由)</td>
+</tr>
+<tr>
+<td><strong>連結葉子</strong></td>
+<td>每個葉子指向下一個——無需樹遍歷的範圍掃描</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-節點佈局：將-B-Tree-裝入頁面">2 節點佈局：將 B+Tree 裝入頁面</h2>
+<h3 id="內部節點結構">內部節點結構</h3>
+<p>每個節點適合一個 8KB 頁面：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/index/btree_node.rs</span>
+<span class="token keyword">use</span> <span class="token keyword">crate</span><span class="token module-declaration namespace"><span class="token punctuation">::</span>storage<span class="token punctuation">::</span>page<span class="token punctuation">::</span></span><span class="token punctuation">{</span><span class="token class-name">Page</span><span class="token punctuation">,</span> <span class="token constant">PAGE_SIZE</span><span class="token punctuation">,</span> <span class="token constant">PAGE_HEADER_SIZE</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">BTREE_NODE_HEADER_SIZE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token number">32</span><span class="token punctuation">;</span>
+<span class="token keyword">pub</span> <span class="token keyword">const</span> <span class="token constant">MAX_KEYS_PER_NODE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token constant">PAGE_SIZE</span> <span class="token operator">-</span> <span class="token constant">BTREE_NODE_HEADER_SIZE</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">12</span><span class="token punctuation">;</span>  <span class="token comment">// ~680 keys</span>
+
+<span class="token attribute attr-name">#[repr(C)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeNodeHeader</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> is_leaf<span class="token punctuation">:</span> <span class="token keyword">bool</span><span class="token punctuation">,</span>           <span class="token comment">// 1 byte</span>
+    <span class="token keyword">pub</span> key_count<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>          <span class="token comment">// 2 bytes</span>
+    <span class="token keyword">pub</span> parent_page<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>        <span class="token comment">// 8 bytes</span>
+    <span class="token keyword">pub</span> right_sibling<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>      <span class="token comment">// 8 bytes (for leaf nodes)</span>
+    <span class="token keyword">pub</span> level<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>              <span class="token comment">// 2 bytes (distance from leaf)</span>
+    _padding<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">;</span> <span class="token number">10</span><span class="token punctuation">]</span><span class="token punctuation">,</span>          <span class="token comment">// Pad to 32 bytes</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeNode</span> <span class="token punctuation">{</span>
+    page<span class="token punctuation">:</span> <span class="token class-name">Page</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">BTreeNode</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new_leaf</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token class-name">Page</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> header <span class="token operator">=</span> <span class="token class-name">BTreeNodeHeader</span> <span class="token punctuation">{</span>
+            is_leaf<span class="token punctuation">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+            key_count<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            parent_page<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            right_sibling<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            level<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            _padding<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">;</span> <span class="token number">10</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+        <span class="token comment">// Write header to page...</span>
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span> page <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">new_internal</span><span class="token punctuation">(</span>level<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> page <span class="token operator">=</span> <span class="token class-name">Page</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> header <span class="token operator">=</span> <span class="token class-name">BTreeNodeHeader</span> <span class="token punctuation">{</span>
+            is_leaf<span class="token punctuation">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+            key_count<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            parent_page<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            right_sibling<span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            level<span class="token punctuation">,</span>
+            _padding<span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">;</span> <span class="token number">10</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">;</span>
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span> page <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>頁面內的關鍵佈局：</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│ PageHeader (24 bytes)                                       │
+├─────────────────────────────────────────────────────────────┤
+│ BTreeNodeHeader (32 bytes)                                  │
+├─────────────────────────────────────────────────────────────┤
+│ Keys (variable size, sorted)                                │
+├─────────────────────────────────────────────────────────────┤
+│ Child Pointers (8 bytes each)                               │
+├─────────────────────────────────────────────────────────────┤
+│ Free space                                                  │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<hr>
+<h3 id="鍵和值格式">鍵和值格式</h3>
+<p>對於 <code>users.id</code> (整數) 的索引：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeKey</span> <span class="token punctuation">{</span>
+    data<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u8</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// Serialized key (e.g., 4 bytes for i32)</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">BTreeKey</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">from_i32</span><span class="token punctuation">(</span>value<span class="token punctuation">:</span> <span class="token keyword">i32</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+            data<span class="token punctuation">:</span> value<span class="token punctuation">.</span><span class="token function">to_le_bytes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">to_vec</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">to_i32</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">i32</span> <span class="token punctuation">{</span>
+        <span class="token keyword">i32</span><span class="token punctuation">::</span><span class="token function">from_le_bytes</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>data<span class="token punctuation">.</span><span class="token function">try_into</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 葉節點值：指向實際列 (TID = Table ID + Page + Offset)</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeValue</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> table_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> page_num<span class="token punctuation">:</span> <span class="token keyword">u32</span><span class="token punctuation">,</span>
+    <span class="token keyword">pub</span> offset<span class="token punctuation">:</span> <span class="token keyword">u16</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="3-基本-B-Tree-操作">3 基本 B+Tree 操作</h2>
+<h3 id="搜尋：尋找鍵">搜尋：尋找鍵</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">impl</span> <span class="token class-name">BTreeIndex</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">search</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> key<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BTreeKey</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">BTreeValue</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> current_page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>root_page<span class="token punctuation">;</span>
+
+        <span class="token keyword">loop</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> node <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_node</span><span class="token punctuation">(</span>current_page<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> node<span class="token punctuation">.</span><span class="token function">is_leaf</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Found leaf—search for key</span>
+                <span class="token keyword">return</span> node<span class="token punctuation">.</span><span class="token function">search_leaf</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Internal node—find child to descend</span>
+                <span class="token keyword">let</span> child_idx <span class="token operator">=</span> node<span class="token punctuation">.</span><span class="token function">find_child_index</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                current_page <span class="token operator">=</span> node<span class="token punctuation">.</span><span class="token function">get_child_pointer</span><span class="token punctuation">(</span>child_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">BTreeNode</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">search_leaf</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> key<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BTreeKey</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">BTreeValue</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Binary search within leaf</span>
+        <span class="token keyword">let</span> idx <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">binary_search</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_value</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">binary_search</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> key<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token class-name">BTreeKey</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">usize</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> low <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> high <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">key_count</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">while</span> low <span class="token operator">&lt;</span> high <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> mid <span class="token operator">=</span> <span class="token punctuation">(</span>low <span class="token operator">+</span> high<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">;</span>
+            <span class="token keyword">match</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_key</span><span class="token punctuation">(</span>mid<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">cmp</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token namespace">std<span class="token punctuation">::</span>cmp<span class="token punctuation">::</span></span><span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">Equal</span> <span class="token operator">=&gt;</span> <span class="token keyword">return</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>mid<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token namespace">std<span class="token punctuation">::</span>cmp<span class="token punctuation">::</span></span><span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">Less</span> <span class="token operator">=&gt;</span> low <span class="token operator">=</span> mid <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                <span class="token namespace">std<span class="token punctuation">::</span>cmp<span class="token punctuation">::</span></span><span class="token class-name">Ordering</span><span class="token punctuation">::</span><span class="token class-name">Greater</span> <span class="token operator">=&gt;</span> high <span class="token operator">=</span> mid<span class="token punctuation">,</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token class-name">None</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>複雜度：</strong> O(log_f n)，其中 f = 扇出 (~500)。對於 10 億個鍵：<strong>約 4 次頁面存取。</strong></p>
+<hr>
+<h3 id="插入：困難的部分">插入：困難的部分</h3>
+<p>插入是 B+Tree 變得複雜的地方：</p>
+<div class="mermaid">flowchart TD
+    A[Insert key K] --&gt; B[Find leaf node L]
+    B --&gt; C{L has space?}
+    C --&gt;|Yes| D[Insert K into L]
+    C --&gt;|No| E[Split L into L and L']
+    E --&gt; F{L is root?}
+    F --&gt;|Yes| G[Create new root]
+    F --&gt;|No| H[Insert separator into parent]
+    H --&gt; I{Parent has space?}
+    I --&gt;|Yes| J[Done]
+    I --&gt;|No| K[Split parent]
+    K --&gt; I
+    G --&gt; L[Done]
+    D --&gt; L
+    J --&gt; L</div>
+<p><strong>逐步範例：</strong></p>
+<pre class="language-none"><code class="language-none">Initial state (order = 3 for simplicity):
+┌─────────────────┐
+│   Root: [50]    │
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+┌───────┐ ┌───────┐
+│[10,30]│ │[60,80]│  ← Leaf full!
+└───────┘ └───────┘
+
+Insert 70:
+
+1. Find leaf: [60,80]
+2. Leaf is full—split!
+3. New leaves: [60] and [70,80]
+4. Promote 70 to parent
+
+Result:
+┌───────────────────┐
+│  Root: [50]│[70]  │
+└─────────┬─────────┘
+          │
+    ┌─────┼─────┐
+    │     │     │
+    ▼     ▼     ▼
+┌────┐ ┌────┐ ┌──────┐
+│[10]│ │[30]│ │[60,80│  ← Wait, that's wrong...
+└────┘ └────┘ └──────┘</code></pre>
+<p><strong>正確的分裂：</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">impl</span> <span class="token class-name">BTreeNode</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">split</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token punctuation">(</span><span class="token class-name">BTreeNode</span><span class="token punctuation">,</span> <span class="token class-name">BTreeKey</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> mid <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">key_count</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> separator <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_key</span><span class="token punctuation">(</span>mid<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Create new sibling node</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> new_node <span class="token operator">=</span> <span class="token class-name">BTreeNode</span><span class="token punctuation">::</span><span class="token function">new_leaf</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Move half the keys to new node</span>
+        <span class="token keyword">for</span> i <span class="token keyword">in</span> mid<span class="token punctuation">..</span><span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">key_count</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            new_node<span class="token punctuation">.</span><span class="token function">insert</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_key</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_value</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+
+        <span class="token comment">// Truncate original node</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">truncate</span><span class="token punctuation">(</span>mid<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Set sibling pointers</span>
+        new_node<span class="token punctuation">.</span><span class="token function">set_right_sibling</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">right_sibling</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">set_right_sibling</span><span class="token punctuation">(</span>new_node<span class="token punctuation">.</span><span class="token function">page_id</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token punctuation">(</span>new_node<span class="token punctuation">,</span> separator<span class="token punctuation">)</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="4-併發存取：真正的挑戰">4 併發存取：真正的挑戰</h2>
+<h3 id="問題：鎖定樹">問題：鎖定樹</h3>
+<p><strong>天真方法：鎖定整個樹</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Terrible performance</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">insert</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> key<span class="token punctuation">:</span> <span class="token class-name">BTreeKey</span><span class="token punctuation">,</span> value<span class="token punctuation">:</span> <span class="token class-name">BTreeValue</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> _guard <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>global_lock<span class="token punctuation">.</span><span class="token function">lock</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// ... do insert ...</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>結果：</strong> 一次一個操作。違背了資料庫的目的。</p>
+<hr>
+<h3 id="更好：鎖耦合-Crabbing">更好：鎖耦合 (Crabbing)</h3>
+<p><strong>鎖耦合：</strong> 在遍歷期間最多保持兩個相鄰節點的鎖。</p>
+<div class="mermaid">sequenceDiagram
+    participant T as Thread
+    participant R as Root Node
+    participant C as Child Node
+    participant G as Grandchild
+
+    T-&gt;&gt;R: Lock Root
+    T-&gt;&gt;R: Find child pointer
+    T-&gt;&gt;C: Lock Child
+    T-&gt;&gt;R: Unlock Root
+    T-&gt;&gt;C: Find grandchild pointer
+    T-&gt;&gt;G: Lock Grandchild
+    T-&gt;&gt;C: Unlock Child
+    T-&gt;&gt;G: Insert at leaf
+    T-&gt;&gt;G: Unlock Grandchild</div>
+<p><strong>Rust 實作：</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/index/btree_concurrent.rs</span>
+<span class="token keyword">use</span> <span class="token namespace">std<span class="token punctuation">::</span>sync<span class="token punctuation">::</span></span><span class="token class-name">Arc</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">parking_lot<span class="token punctuation">::</span></span><span class="token class-name">RwLock</span><span class="token punctuation">;</span>  <span class="token comment">// Better than std::sync::RwLock</span>
+
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeIndex</span> <span class="token punctuation">{</span>
+    root_page<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">BufferPool</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    <span class="token comment">// Each node is protected by its own lock</span>
+    node_locks<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">DashMap</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token punctuation">,</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">RwLock</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;&gt;</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// page_id → lock</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">BTreeIndex</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">insert</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> key<span class="token punctuation">:</span> <span class="token class-name">BTreeKey</span><span class="token punctuation">,</span> value<span class="token punctuation">:</span> <span class="token class-name">BTreeValue</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">BTreeError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> current_page <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>root_page<span class="token punctuation">;</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> parent_lock<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">RwLock</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;&gt;</span><span class="token operator">&gt;</span> <span class="token operator">=</span> <span class="token class-name">None</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> <span class="token keyword">mut</span> current_lock <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_node_lock</span><span class="token punctuation">(</span>current_page<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token keyword">loop</span> <span class="token punctuation">{</span>
+            <span class="token comment">// Acquire read lock on current node</span>
+            <span class="token keyword">let</span> read_guard <span class="token operator">=</span> current_lock<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">let</span> node <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_node</span><span class="token punctuation">(</span>current_page<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> node<span class="token punctuation">.</span><span class="token function">is_leaf</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Upgrade to write lock</span>
+                <span class="token function">drop</span><span class="token punctuation">(</span>read_guard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">let</span> write_guard <span class="token operator">=</span> current_lock<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Check if split needed</span>
+                <span class="token keyword">if</span> node<span class="token punctuation">.</span><span class="token function">is_full</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                    <span class="token comment">// Need parent lock for split</span>
+                    <span class="token keyword">if</span> <span class="token keyword">let</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>parent_lock<span class="token punctuation">)</span> <span class="token operator">=</span> parent_lock <span class="token punctuation">{</span>
+                        <span class="token keyword">let</span> _parent_guard <span class="token operator">=</span> parent_lock<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">split_leaf</span><span class="token punctuation">(</span>current_page<span class="token punctuation">,</span> parent_lock<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+                        <span class="token comment">// Splitting root</span>
+                        <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">split_root</span><span class="token punctuation">(</span>current_page<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+                    <span class="token punctuation">}</span>
+                <span class="token punctuation">}</span>
+
+                <span class="token comment">// Insert into leaf</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">insert_into_leaf</span><span class="token punctuation">(</span>current_page<span class="token punctuation">,</span> key<span class="token punctuation">,</span> value<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span> <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Internal node—descend</span>
+                <span class="token keyword">let</span> child_idx <span class="token operator">=</span> node<span class="token punctuation">.</span><span class="token function">find_child_index</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>key<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">let</span> child_page <span class="token operator">=</span> node<span class="token punctuation">.</span><span class="token function">get_child_pointer</span><span class="token punctuation">(</span>child_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Lock child before releasing current (lock coupling)</span>
+                <span class="token keyword">let</span> child_lock <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_node_lock</span><span class="token punctuation">(</span>child_page<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">let</span> _child_read <span class="token operator">=</span> child_lock<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Release current lock</span>
+                <span class="token function">drop</span><span class="token punctuation">(</span>read_guard<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token function">drop</span><span class="token punctuation">(</span>current_lock<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Move down</span>
+                parent_lock <span class="token operator">=</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>child_lock<span class="token punctuation">.</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                current_lock <span class="token operator">=</span> child_lock<span class="token punctuation">;</span>
+                current_page <span class="token operator">=</span> child_page<span class="token punctuation">;</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 鎖升級死結</p><div class="admonition-content"><p><strong>問題：</strong> 在持有其他鎖的同時從讀鎖升級到寫鎖可能會死結。</p>
+<p><strong>Vaultgres 中的解決方案：</strong> 使用 <code>parking_lot::RwLock</code> 搭配 <code>upgradable_read()</code> 或釋放並重新獲取（帶有樂觀重試）。</p>
+</div></div>
+<hr>
+<h3 id="分裂噩夢">分裂噩夢</h3>
+<p><strong>情境：兩個執行緒分裂同一個節點</strong></p>
+<pre class="language-none"><code class="language-none">Thread A:                    Thread B:
+1. Lock parent P
+2. Lock leaf L
+3. Split L → L1, L2
+4. Insert separator in P
+                           5. Lock parent P (waits!)
+                           5. Lock leaf L (already split!)
+                           6. ??? CORRUPTION ???</code></pre>
+<p><strong>解決方案：獲取鎖後檢查條件</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">split_leaf</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> leaf_page<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span> parent_lock<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">RwLock</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">&gt;&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">BTreeError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> parent_guard <span class="token operator">=</span> parent_lock<span class="token punctuation">.</span><span class="token function">write</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Re-check: is this leaf still full?</span>
+    <span class="token keyword">let</span> leaf <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_node</span><span class="token punctuation">(</span>leaf_page<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token operator">!</span>leaf<span class="token punctuation">.</span><span class="token function">is_full</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Another thread already split—nothing to do!</span>
+        <span class="token keyword">return</span> <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">// Proceed with split...</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="5-範圍掃描：利用連結葉子">5 範圍掃描：利用連結葉子</h2>
+<h3 id="樹遍歷的問題">樹遍歷的問題</h3>
+<p>對於 <code>SELECT * FROM users WHERE id BETWEEN 10 AND 100</code>：</p>
+<p><strong>沒有葉子連結：</strong> 必須為每個鍵遍歷樹。O(n log n)。</p>
+<p><strong>有葉子連結：</strong> 找到起始鍵一次，然後掃描葉子。O(log n + k)。</p>
+<hr>
+<h3 id="實作">實作</h3>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeScan</span> <span class="token punctuation">{</span>
+    current_leaf<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span>
+    current_idx<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">,</span>
+    end_key<span class="token punctuation">:</span> <span class="token class-name">BTreeKey</span><span class="token punctuation">,</span>
+    buffer_pool<span class="token punctuation">:</span> <span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">BufferPool</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Iterator</span> <span class="token keyword">for</span> <span class="token class-name">BTreeScan</span> <span class="token punctuation">{</span>
+    <span class="token keyword">type</span> <span class="token type-definition class-name">Item</span> <span class="token operator">=</span> <span class="token class-name">BTreeValue</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">fn</span> <span class="token function-definition function">next</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">Self</span><span class="token punctuation">::</span><span class="token class-name">Item</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token keyword">loop</span> <span class="token punctuation">{</span>
+            <span class="token keyword">let</span> leaf <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_leaf</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>current_leaf<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+            <span class="token keyword">if</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_idx <span class="token operator">&lt;</span> leaf<span class="token punctuation">.</span><span class="token function">key_count</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+                <span class="token keyword">let</span> key <span class="token operator">=</span> leaf<span class="token punctuation">.</span><span class="token function">get_key</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>current_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+                <span class="token comment">// Check if we've passed the end</span>
+                <span class="token keyword">if</span> key <span class="token operator">&gt;</span> <span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">.</span>end_key <span class="token punctuation">{</span>
+                    <span class="token keyword">return</span> <span class="token class-name">None</span><span class="token punctuation">;</span>
+                <span class="token punctuation">}</span>
+
+                <span class="token keyword">let</span> value <span class="token operator">=</span> leaf<span class="token punctuation">.</span><span class="token function">get_value</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>current_idx<span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>current_idx <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+                <span class="token keyword">return</span> <span class="token class-name">Some</span><span class="token punctuation">(</span>value<span class="token punctuation">)</span><span class="token punctuation">;</span>
+            <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token punctuation">{</span>
+                <span class="token comment">// Move to next leaf</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>current_leaf <span class="token operator">=</span> leaf<span class="token punctuation">.</span><span class="token function">right_sibling</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+                <span class="token keyword">self</span><span class="token punctuation">.</span>current_idx <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+                <span class="token keyword">if</span> <span class="token keyword">self</span><span class="token punctuation">.</span>current_leaf <span class="token operator">==</span> <span class="token number">0</span> <span class="token punctuation">{</span>
+                    <span class="token keyword">return</span> <span class="token class-name">None</span><span class="token punctuation">;</span>  <span class="token comment">// End of tree</span>
+                <span class="token punctuation">}</span>
+            <span class="token punctuation">}</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>使用：</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">let</span> scan <span class="token operator">=</span> index<span class="token punctuation">.</span><span class="token function">scan_range</span><span class="token punctuation">(</span><span class="token class-name">BTreeKey</span><span class="token punctuation">::</span><span class="token function">from_i32</span><span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">BTreeKey</span><span class="token punctuation">::</span><span class="token function">from_i32</span><span class="token punctuation">(</span><span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">for</span> value <span class="token keyword">in</span> scan <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> row <span class="token operator">=</span> buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span>value<span class="token punctuation">.</span>page_num<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token comment">// Process row...</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="6-與緩衝池整合">6 與緩衝池整合</h2>
+<h3 id="頁面類型">頁面類型</h3>
+<p>緩衝池現在處理多種頁面類型：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/page_type.rs</span>
+<span class="token attribute attr-name">#[derive(Debug, Clone, Copy, PartialEq)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">PageType</span> <span class="token punctuation">{</span>
+    <span class="token class-name">Heap</span><span class="token punctuation">,</span>       <span class="token comment">// Table data (from Part 1)</span>
+    <span class="token class-name">BTreeLeaf</span><span class="token punctuation">,</span>  <span class="token comment">// B+Tree leaf node</span>
+    <span class="token class-name">BTreeInternal</span><span class="token punctuation">,</span>  <span class="token comment">// B+Tree internal node</span>
+    <span class="token class-name">BTreeRoot</span><span class="token punctuation">,</span>  <span class="token comment">// B+Tree root</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">Page</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">page_type</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">PageType</span> <span class="token punctuation">{</span>
+        <span class="token comment">// Read from page header...</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="記憶體壓力">記憶體壓力</h3>
+<p><strong>問題：</strong> 索引掃描可能會淘汰熱門資料頁面。</p>
+<pre class="language-none"><code class="language-none">1. Index scan touches 1000 leaf pages
+2. LRU evicts hot table pages to make room
+3. Query needs table pages—disk I/O!</code></pre>
+<p><strong>解決方案：帶使用提示的時鐘掃描</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// src/storage/buffer_pool.rs</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BufferFrame</span> <span class="token punctuation">{</span>
+    <span class="token comment">// ... existing fields ...</span>
+    <span class="token keyword">pub</span> usage_hint<span class="token punctuation">:</span> <span class="token class-name">UsageHint</span><span class="token punctuation">,</span>  <span class="token comment">// New!</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[derive(Debug, Clone, Copy)]</span>
+<span class="token keyword">pub</span> <span class="token keyword">enum</span> <span class="token type-definition class-name">UsageHint</span> <span class="token punctuation">{</span>
+    <span class="token class-name">Normal</span><span class="token punctuation">,</span>      <span class="token comment">// Standard LRU</span>
+    <span class="token class-name">IndexScan</span><span class="token punctuation">,</span>   <span class="token comment">// May be evicted sooner</span>
+    <span class="token class-name">Pinned</span><span class="token punctuation">,</span>      <span class="token comment">// Keep in memory (hot table)</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">BufferPool</span> <span class="token punctuation">{</span>
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">get_page_with_hint</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> page_id<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span> hint<span class="token punctuation">:</span> <span class="token class-name">UsageHint</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token class-name">Arc</span><span class="token operator">&lt;</span><span class="token class-name">Mutex</span><span class="token operator">&lt;</span><span class="token class-name">Page</span><span class="token operator">&gt;&gt;</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+        <span class="token comment">// ... set hint on frame ...</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="7-用-Rust-建構的挑戰">7 用 Rust 建構的挑戰</h2>
+<h3 id="挑戰-1：自我參考結構">挑戰 1：自我參考結構</h3>
+<p><strong>問題：</strong> 節點需要參考其父節點/子節點，但 Rust 的借用檢查器討厭這個。</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Doesn't compile</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeNode</span> <span class="token punctuation">{</span>
+    parent<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token operator">&amp;</span><span class="token class-name">BTreeNode</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// Reference to parent</span>
+    children<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token operator">&amp;</span><span class="token class-name">BTreeNode</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>   <span class="token comment">// References to children</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>解決方案：頁面 ID 作為間接參考</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ✅ Works</span>
+<span class="token keyword">pub</span> <span class="token keyword">struct</span> <span class="token type-definition class-name">BTreeNode</span> <span class="token punctuation">{</span>
+    parent_page<span class="token punctuation">:</span> <span class="token class-name">Option</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>  <span class="token comment">// Page ID, not reference</span>
+    children<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">u64</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>        <span class="token comment">// Page IDs</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// Resolve page ID to node when needed</span>
+<span class="token keyword">let</span> parent <span class="token operator">=</span> buffer_pool<span class="token punctuation">.</span><span class="token function">get_page</span><span class="token punctuation">(</span><span class="token keyword">self</span><span class="token punctuation">.</span>parent_page<span class="token operator">?</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="挑戰-2：鎖順序">挑戰 2：鎖順序</h3>
+<p><strong>問題：</strong> 如果執行緒以不同順序獲取鎖則會死結。</p>
+<pre class="language-none"><code class="language-none">Thread A: Lock page 5, then page 10
+Thread B: Lock page 10, then page 5  ← Deadlock!</code></pre>
+<p><strong>解決方案：始終以一致順序鎖定（父節點先於子節點）</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Lock coupling enforces this naturally</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">descend</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> parent_page<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">,</span> child_page<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">let</span> parent_lock <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_lock</span><span class="token punctuation">(</span>parent_page<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> child_lock <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">get_lock</span><span class="token punctuation">(</span>child_page<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// Always acquire parent first</span>
+    <span class="token keyword">let</span> _parent <span class="token operator">=</span> parent_lock<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> _child <span class="token operator">=</span> child_lock<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Safe—consistent order</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h3 id="挑戰-3：帶-WAL-的分裂">挑戰 3：帶 WAL 的分裂</h3>
+<p><strong>問題：</strong> 分裂會觸及多個頁面。如何使其原子化？</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// ❌ Not atomic</span>
+<span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">write_node</span><span class="token punctuation">(</span>left<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">write_node</span><span class="token punctuation">(</span>right<span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// ← Crash here = corruption!</span>
+<span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">update_parent</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>
+<p><strong>解決方案：在修改頁面前寫入 WAL</strong></p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">split_node</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> node_page<span class="token punctuation">:</span> <span class="token keyword">u64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token class-name">Result</span><span class="token operator">&lt;</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token class-name">BTreeError</span><span class="token operator">&gt;</span> <span class="token punctuation">{</span>
+    <span class="token comment">// 1. Write WAL record describing the split</span>
+    <span class="token keyword">let</span> lsn <span class="token operator">=</span> <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">log_split</span><span class="token punctuation">(</span>node_page<span class="token punctuation">,</span> left_data<span class="token punctuation">,</span> right_data<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">flush</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>  <span class="token comment">// Durable before proceeding</span>
+
+    <span class="token comment">// 2. Now safe to modify pages</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">write_node</span><span class="token punctuation">(</span>left<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">write_node</span><span class="token punctuation">(</span>right<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span><span class="token function">update_parent</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token comment">// 3. Log completion</span>
+    <span class="token keyword">self</span><span class="token punctuation">.</span>wal<span class="token punctuation">.</span><span class="token function">log_split_complete</span><span class="token punctuation">(</span>lsn<span class="token punctuation">)</span><span class="token operator">?</span><span class="token punctuation">;</span>
+
+    <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="8-AI-如何加速這項工作">8 AI 如何加速這項工作</h2>
+<h3 id="AI-做對了什么">AI 做對了什么</h3>
+<table>
+<thead>
+<tr>
+<th>任務</th>
+<th>AI 貢獻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>鎖耦合演算法</strong></td>
+<td>用偽程式碼解釋模式</td>
+</tr>
+<tr>
+<td><strong>分裂邏輯</strong></td>
+<td>產生正確的鍵重新分配</td>
+</tr>
+<tr>
+<td><strong>Rust 模式</strong></td>
+<td>建議使用 <code>parking_lot</code> 而非 <code>std::sync</code></td>
+</tr>
+<tr>
+<td><strong>除錯協助</strong></td>
+<td>「這個死結發生是因為…」</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="AI-做錯了什么">AI 做錯了什么</h3>
+<table>
+<thead>
+<tr>
+<th>問題</th>
+<th>發生什麼事</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>初始鎖升級</strong></td>
+<td>建議使用 <code>RwLock::upgrade()</code> 但在 std 中不存在</td>
+</tr>
+<tr>
+<td><strong>頁面佈局</strong></td>
+<td>初稿將鍵和值交錯（快取不友好）</td>
+</tr>
+<tr>
+<td><strong>分裂邊界情況</strong></td>
+<td>忽略了「根分裂」特殊情況</td>
+</tr>
+</tbody>
+</table>
+<p><strong>模式：</strong> AI 提供 80% 的解決方案。剩餘 20% 需要深入理解。</p>
+<hr>
+<h3 id="範例：除錯競爭條件">範例：除錯競爭條件</h3>
+<p><strong>我問 AI 的問題：</strong></p>
+<blockquote>
+<p>“兩個執行緒可以同時分裂同一個葉子，導致重複鍵。PostgreSQL 如何防止這種情況？”</p>
+</blockquote>
+<p><strong>我學到的：</strong></p>
+<ol>
+<li>PostgreSQL 在緩衝釘選上使用<strong>基於閂鎖的同步</strong></li>
+<li>分裂前，檢查分裂是否已經發生</li>
+<li>使用<strong>短期鎖</strong>，每層後釋放</li>
+</ol>
+<p><strong>結果：</strong> 在 <code>split_leaf()</code> 中添加了重新檢查邏輯：</p>
+<pre class="language-rust" data-language="rust"><code class="language-rust"><span class="token comment">// Re-check after acquiring all locks</span>
+<span class="token keyword">if</span> <span class="token operator">!</span>leaf<span class="token punctuation">.</span><span class="token function">is_full</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token class-name">Ok</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  <span class="token comment">// Another thread handled it</span>
+<span class="token punctuation">}</span></code></pre>
+<hr>
+<h2 id="總結：B-Tree-一張圖">總結：B+Tree 一張圖</h2>
+<div class="mermaid">flowchart BT
+    subgraph "B+Tree Structure"
+        R[Root Node] --&gt; I1[Internal Node]
+        R --&gt; I2[Internal Node]
+        I1 --&gt; L1[Leaf 1]
+        I1 --&gt; L2[Leaf 2]
+        I2 --&gt; L3[Leaf 3]
+        I2 --&gt; L4[Leaf 4]
+    end
+
+    subgraph "Leaf Links"
+        L1 -.-&gt; L2
+        L2 -.-&gt; L3
+        L3 -.-&gt; L4
+    end
+
+    subgraph "Concurrency"
+        lock1[Lock Coupling] --&gt; R
+        lock2[Parent before Child] --&gt; I1
+        lock3[Re-check after lock] --&gt; L1
+    end
+
+    subgraph "Buffer Pool"
+        R --&gt; BP[Page Cache]
+        L1 --&gt; BP
+        L4 --&gt; BP
+    end
+
+    style R fill:#e3f2fd,stroke:#1976d2
+    style L1 fill:#e8f5e9,stroke:#388e3c
+    style lock1 fill:#fff3e0,stroke:#f57c00</div>
+<p><strong>關鍵要點：</strong></p>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>為什麼重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B+Tree</strong></td>
+<td>O(log n) 查詢，高效範圍掃描</td>
+</tr>
+<tr>
+<td><strong>鎖耦合</strong></td>
+<td>細粒度鎖定無死結</td>
+</tr>
+<tr>
+<td><strong>葉子連結</strong></td>
+<td>無需樹遍歷的範圍掃描</td>
+</tr>
+<tr>
+<td><strong>WAL 整合</strong></td>
+<td>原子分裂，崩潰恢復</td>
+</tr>
+<tr>
+<td><strong>Rust 挑戰</strong></td>
+<td>借用檢查器、鎖順序、自我參考結構</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>進一步閱讀：</strong></p>
+<ul>
+<li>PostgreSQL Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/tree/master/src/backend/access/nbtree"><code>src/backend/access/nbtree/</code></a></li>
+<li>“The Art of Computer Programming, Vol. 3” by Knuth (B-Trees)</li>
+<li>“Database Management Systems” by Ramakrishnan (Ch. 10: Tree-Structured Indexing)</li>
+<li>“Efficient and Safe B+Tree Implementation” by PostgreSQL contributors</li>
+<li>Vaultgres Repository: <a target="_blank" rel="noopener" href="https://github.com/neoalienson/Vaultgres">github.com/neoalienson/Vaultgres</a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" data-id="22cd80b" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "Rust 建構資料庫：B+Tree 索引與併發存取",
+        "image": "https://neo01.com/assets/architecture/vaultgres_thumbnail.jpg",
+        "keywords": "Database Internals PostgreSQL Rust",
+        "genre": "Development",
+        "datePublished": "2026-03-02",
+        "dateCreated": "2026-03-02",
+        "dateModified": "2026-03-13",
+        "url": "https://neo01.com//zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/",
+        "description": "Vaultgres 旅程第二部分：實作驅動快速查詢的 B+Tree 索引。深入探討樹結構、頁面分裂，以及伴隨鎖耦合和安全遍歷的併發存取噩夢。",
+        "wordCount": 6989
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：綜合 SQL 解析器（DDL、DML、查詢）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-SQL-Parser/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：綜合 SQL 解析器（DDL、DML、查詢）</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：WAL 與 ARIES 崩潰恢復" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：WAL 與 ARIES 崩潰恢復</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：MVCC 與交易管理</a></p>
+                            <p class="item-date"><time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Rust 建構資料庫：B+Tree 索引與併發存取" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="title">Rust 建構資料庫：B+Tree 索引與併發存取</a></p>
+                            <p class="item-date"><time datetime="2026-03-01T16:00:00.000Z" itemprop="datePublished">2026-03-02</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2026/">2026</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">77</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#55a13efb</div>
+                <img src="/qr/qr-154b392aeef83fe45cbb3cbe99480d8f.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#55a13efb">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>

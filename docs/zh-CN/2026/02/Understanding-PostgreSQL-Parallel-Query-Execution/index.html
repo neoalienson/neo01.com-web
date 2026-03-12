@@ -1,0 +1,2104 @@
+<!DOCTYPE html><html lang="zh-CN"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>深入了解 PostgreSQL 并行查询执行：多核性能 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="Parallel Query,Performance,PostgreSQL">
+    
+    
+    <meta name="description" content="深入探讨 PostgreSQL 并行查询执行——Gather 节点、并行 worker 进程与多核处理如何加速大型表扫描、哈希连接与聚合运算。了解何时使用并行化能提升性能，何时会造成反效果，以及如何调整设置。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="深入了解 PostgreSQL 并行查询执行：多核性能">
+<meta property="og:url" content="https://neo01.com/zh-CN/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="深入探讨 PostgreSQL 并行查询执行——Gather 节点、并行 worker 进程与多核处理如何加速大型表扫描、哈希连接与聚合运算。了解何时使用并行化能提升性能，何时会造成反效果，以及如何调整设置。">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neo01.com/assets/architecture/sql_plan_thumbnail.jpg">
+<meta property="article:published_time" content="2026-02-15T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-12T14:42:15.050Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="Parallel Query">
+<meta property="article:tag" content="Performance">
+<meta property="article:tag" content="PostgreSQL">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/sql_plan_thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解码数字异常</p>
+                          <p class="subtitle">有时功能就是数字兔子洞中的错误，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-TW">繁體中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-CN';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/">主页</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/">人工智能</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/AI/Art-Gallery/">艺术画廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Architecture/">架构</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Cybersecurity/">网络安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Development/">开发</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-CN/categories/Misc/">杂项</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-CN/about-me/">关于</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜索">
+        <button type="submit" title="搜索" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="想要查找什么...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '页面',
+            CATEGORIES: '分类',
+            TAGS: '标签',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-CN',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/02/Understanding-PostgreSQL-Parallel-Query-Execution-zh-CN" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        深入了解 PostgreSQL 并行查询执行：多核性能
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-02-15T16:00:00.000Z" itemprop="datePublished">2026-02-16</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-12T14:42:15.050Z" itemprop="datePublished">2026-03-12</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-CN/tags/PostgreSQL/">PostgreSQL</a> <a class="tag-link" href="/zh-CN/tags/Performance/">Performance</a> <a class="tag-link" href="/zh-CN/tags/Parallel-Query/">Parallel Query</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E9%97%AE%E9%A2%98%EF%BC%9A%E5%8D%95%E7%BA%BF%E7%A8%8B%E6%89%A7%E8%A1%8C"><span class="toc-text">1 问题：单线程执行</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-%E6%9E%B6%E6%9E%84%EF%BC%9A%E5%B9%B6%E8%A1%8C%E6%9F%A5%E8%AF%A2%E5%A6%82%E4%BD%95%E8%BF%90%E4%BD%9C"><span class="toc-text">2 架构：并行查询如何运作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E6%84%9F%E7%9F%A5%E5%B9%B6%E8%A1%8C%E7%9A%84%E7%AE%97%E5%AD%90"><span class="toc-text">3 感知并行的算子</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E8%AE%BE%E7%BD%AE%EF%BC%9A%E8%B0%83%E6%95%B4%E5%B9%B6%E8%A1%8C%E6%9F%A5%E8%AF%A2"><span class="toc-text">4 设置：调整并行查询</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E4%BD%95%E6%97%B6%E5%B9%B6%E8%A1%8C%E6%9F%A5%E8%AF%A2%E6%9C%89%E5%B8%AE%E5%8A%A9%EF%BC%88%E4%BD%95%E6%97%B6%E6%9C%89%E5%AE%B3%EF%BC%89"><span class="toc-text">5 何时并行查询有帮助（何时有害）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E8%B0%83%E8%AF%95%E5%B9%B6%E8%A1%8C%E6%9F%A5%E8%AF%A2%E9%97%AE%E9%A2%98"><span class="toc-text">6 调试并行查询问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E9%AB%98%E7%BA%A7%EF%BC%9A%E5%B9%B6%E8%A1%8C%E6%9F%A5%E8%AF%A2%E5%86%85%E9%83%A8%E5%AE%9E%E7%8E%B0"><span class="toc-text">7 高级：并行查询内部实现</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#8-%E5%AE%9E%E7%94%A8%E8%B0%83%E6%95%B4%E6%8C%87%E5%8D%97"><span class="toc-text">8 实用调整指南</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93%EF%BC%9A%E4%B8%80%E5%BC%A0%E5%9B%BE%E7%9C%8B%E6%87%82%E5%B9%B6%E8%A1%8C%E6%9F%A5%E8%AF%A2"><span class="toc-text">总结：一张图看懂并行查询</span></a></li></ol>
+            <p>当 PostgreSQL 在 9.6 版本引入<strong>并行查询执行</strong>（parallel query execution）时，它解锁了一项基本能力：利用多核 CPU 来加速分析性工作负载。</p>
+<p>在并行查询出现之前，PostgreSQL 是严格的<strong>单线程</strong>架构——一个查询，一个 CPU 核心。在 32 核心的服务器上，完整表扫描只使用 1 个核心达到 100% 利用率，其余 31 个核心闲置。对于 OLTP 工作负载（短暂、选择性查询），这没问题。但对于分析型查询（扫描数百万行），这成为瓶颈。</p>
+<p>并行查询通过允许<strong>顺序扫描</strong>（Seq Scan）、<strong>哈希连接</strong>（Hash Join）和<strong>聚合</strong>（Aggregate）等运算拆分到多个<strong>后台 worker 进程</strong>来改变这种状况。<strong>Gather</strong> 或 <strong>Gather Merge</strong> 节点收集 worker 的结果并返回给客户端。</p>
+<p>结果是什么？在适合的工作负载上可达到 <strong>2 到 4 倍或更高的加速</strong>。</p>
+<p>但并行查询不是免费的。它会增加额外开销、消耗资源，如果使用不当甚至会<em>拖慢</em>查询。本指南将解释其运作原理、使用时机以及如何调整。</p>
+<hr>
+<h2 id="1-问题：单线程执行">1 问题：单线程执行</h2>
+<h3 id="9-6-版之前的现实">9.6 版之前的现实</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span>  <span class="token comment">-- 1 亿行</span></code></pre>
+<p><strong>执行（单线程）：</strong></p>
+<pre class="language-javascript" data-language="javascript"><code class="language-javascript">┌─────────────────────────────────────┐
+│  Seq Scan<span class="token operator">:</span> transactions             │
+│  ─────────────────────────────────  │
+│  Rows<span class="token operator">:</span> <span class="token number">100</span><span class="token punctuation">,</span><span class="token number">000</span><span class="token punctuation">,</span><span class="token number">000</span>                  │
+│  Time<span class="token operator">:</span> <span class="token number">12</span><span class="token punctuation">,</span>000ms                     │
+│  <span class="token constant">CPU</span><span class="token operator">:</span> <span class="token number">1</span> core @ <span class="token number">100</span><span class="token operator">%</span>                 │
+│  Other <span class="token number">31</span> <span class="token literal-property property">cores</span><span class="token operator">:</span> Idle               │
+└─────────────────────────────────────┘</code></pre>
+<p><strong>瓶颈：</strong> 磁盘 I/O 和 CPU 密集型运算（过滤、聚合）无法并行化。一个核心完成所有工作。</p>
+<hr>
+<h3 id="并行解决方案">并行解决方案</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span><span class="token punctuation">;</span></code></pre>
+<p><strong>执行（并行）：</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────┐
+│                    Gather (Aggregate)                   │
+│                    ──────────────────                   │
+│                    Combines partial results             │
+└─────────────────────────────────────────────────────────┘
+           │              │              │              │
+    ┌──────┴─────┐ ┌─────┴──────┐ ┌─────┴──────┐ ┌─────┴──────┐
+    │  Worker 1  │ │  Worker 2  │ │  Worker 3  │ │  Worker 4  │
+    │  Scan 25M  │ │  Scan 25M  │ │  Scan 25M  │ │  Scan 25M  │
+    │  rows      │ │  rows      │ │  rows      │ │  rows      │
+    └────────────┘ └────────────┘ └────────────┘ └────────────┘
+           │              │              │              │
+    ┌──────┴──────────────┴──────────────┴──────────────┴──────┐
+    │              Seq Scan: transactions                       │
+    │              (table split into 4 ranges)                  │
+    └───────────────────────────────────────────────────────────┘
+
+Total Time: ~3,500ms (3.4x speedup)
+CPU: 4 cores @ ~90% each</code></pre>
+<p><strong>关键洞察：</strong> 表被划分为多个<strong>范围</strong>，每个 worker 扫描一部分，结果在顶层合并。</p>
+<hr>
+<h2 id="2-架构：并行查询如何运作">2 架构：并行查询如何运作</h2>
+<h3 id="并行执行堆栈">并行执行堆栈</h3>
+<div class="mermaid">flowchart BT
+    A[Client] --&gt; B[Gather Node]
+    B --&gt; C[Parallel Leader]
+    C --&gt; D[Worker 1]
+    C --&gt; E[Worker 2]
+    C --&gt; F[Worker 3]
+    C --&gt; G[Worker 4]
+
+    D --&gt; H[Seq Scan: Range 1]
+    E --&gt; I[Seq Scan: Range 2]
+    F --&gt; J[Seq Scan: Range 3]
+    G --&gt; K[Seq Scan: Range 4]
+
+    style B fill:#fce4ec,stroke:#c2185b
+    style C fill:#e3f2fd,stroke:#1976d2
+    style D fill:#fff3e0,stroke:#f57c00
+    style E fill:#fff3e0,stroke:#f57c00
+    style F fill:#fff3e0,stroke:#f57c00
+    style G fill:#fff3e0,stroke:#f57c00</div>
+<p><strong>组件：</strong></p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Parallel Leader</strong></td>
+<td>协调 worker 的主要后端进程</td>
+</tr>
+<tr>
+<td><strong>Parallel Workers</strong></td>
+<td>执行部分计划的后台进程</td>
+</tr>
+<tr>
+<td><strong>Gather Node</strong></td>
+<td>收集 worker 的结果并返回给客户端</td>
+</tr>
+<tr>
+<td><strong>Gather Merge Node</strong></td>
+<td>类似 Gather，但保持排序顺序</td>
+</tr>
+<tr>
+<td><strong>Shared Memory</strong></td>
+<td>leader 与 worker 之间的通信通道</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="Gather-节点：收集结果">Gather 节点：收集结果</h3>
+<p><strong>Gather</strong> 节点是并行 worker 与客户端之间的桥梁：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from src/backend/executor/nodeGather.c */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">GatherState</span> <span class="token punctuation">{</span>
+    PlanState ps<span class="token punctuation">;</span>
+    <span class="token keyword">int</span> nworkers<span class="token punctuation">;</span>              <span class="token comment">/* Number of workers */</span>
+    <span class="token keyword">struct</span> <span class="token class-name">ParallelExecutorContext</span> <span class="token operator">*</span>pei<span class="token punctuation">;</span>  <span class="token comment">/* Communication context */</span>
+    TupleTableSlot <span class="token operator">*</span>pending_result<span class="token punctuation">;</span>  <span class="token comment">/* Next row from workers */</span>
+<span class="token punctuation">}</span> GatherState<span class="token punctuation">;</span>
+
+<span class="token keyword">static</span> TupleTableSlot <span class="token operator">*</span>
+<span class="token function">ExecGather</span><span class="token punctuation">(</span>GatherState <span class="token operator">*</span>node<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">/* Initialize workers on first call */</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>node<span class="token operator">-&gt;</span>workers_initialized<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token function">InitializeParallelWorkers</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        node<span class="token operator">-&gt;</span>workers_initialized <span class="token operator">=</span> true<span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">/* Get next row from any worker */</span>
+    <span class="token keyword">while</span> <span class="token punctuation">(</span>node<span class="token operator">-&gt;</span>pending_result <span class="token operator">==</span> <span class="token constant">NULL</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token function">all_workers_done</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>  <span class="token comment">/* No more rows */</span>
+
+        node<span class="token operator">-&gt;</span>pending_result <span class="token operator">=</span> <span class="token function">FetchRowFromWorker</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token comment">/* Return row to parent */</span>
+    TupleTableSlot <span class="token operator">*</span>result <span class="token operator">=</span> node<span class="token operator">-&gt;</span>pending_result<span class="token punctuation">;</span>
+    node<span class="token operator">-&gt;</span>pending_result <span class="token operator">=</span> <span class="token constant">NULL</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> result<span class="token punctuation">;</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>契约：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>InitializeParallelWorkers()</code></td>
+<td>启动 worker 进程</td>
+</tr>
+<tr>
+<td><code>FetchRowFromWorker()</code></td>
+<td>从任意 worker 获取下一行（轮询）</td>
+</tr>
+<tr>
+<td><code>all_workers_done()</code></td>
+<td>检查所有 worker 是否完成</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Gather 与 Gather Merge 的比较：</strong></p>
+<table>
+<thead>
+<tr>
+<th>节点类型</th>
+<th>使用场景</th>
+<th>保持顺序？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Gather</strong></td>
+<td>一般并行执行</td>
+<td>❌ 否</td>
+</tr>
+<tr>
+<td><strong>Gather Merge</strong></td>
+<td>带有 ORDER BY 的并行执行</td>
+<td>✅ 是（合并排序）</td>
+</tr>
+</tbody>
+</table>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 使用 Gather</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> large_table<span class="token punctuation">;</span>
+
+<span class="token comment">-- 使用 Gather Merge</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> large_table <span class="token keyword">ORDER</span> <span class="token keyword">BY</span> created_at<span class="token punctuation">;</span>
+<span class="token comment">-- Worker 返回排序后的区块；Gather Merge 合并它们</span></code></pre>
+<hr>
+<h3 id="Parallel-Workers：后台进程">Parallel Workers：后台进程</h3>
+<p>Worker 是<strong>独立的 PostgreSQL 后端进程</strong>：</p>
+<pre class="language-none"><code class="language-none">postgres: parallel worker for database neo01              # Worker 1
+postgres: parallel worker for database neo01              # Worker 2
+postgres: parallel worker for database neo01              # Worker 3
+postgres: parallel worker for database neo01              # Worker 4
+postgres: neo01                                           # Parallel Leader</code></pre>
+<p><strong>关键特性：</strong></p>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>独立进程</strong></td>
+<td>不是线程——是具有自己内存的完整操作系统进程</td>
+</tr>
+<tr>
+<td><strong>共享内存</strong></td>
+<td>通过 DSM（Dynamic Shared Memory）通信</td>
+</tr>
+<tr>
+<td><strong>继承事务</strong></td>
+<td>Worker 看到相同的事务快照</td>
+</tr>
+<tr>
+<td><strong>无直接客户端访问</strong></td>
+<td>只有 leader 与客户端通信</td>
+</tr>
+<tr>
+<td><strong>暂时性</strong></td>
+<td>查询完成后 worker 退出</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 进程开销</p><div class="admonition-content"><p>由于 worker 是独立进程（而非线程），因此存在开销：</p>
+<ul>
+<li><strong>进程创建：</strong> 每个 worker 约 1-5ms</li>
+<li><strong>DSM 设置：</strong> 共享内存配置</li>
+<li><strong>上下文切换：</strong> 操作系统必须调度多个进程</li>
+</ul>
+<p>对于执行时间 &lt;100ms 的查询，并行开销通常超过其收益。</p>
+</div></div>
+<hr>
+<h2 id="3-感知并行的算子">3 感知并行的算子</h2>
+<p>并非所有算子都能并行执行。PostgreSQL 仅支持特定节点类型的并行化：</p>
+<h3 id="支持并行的算子">支持并行的算子</h3>
+<table>
+<thead>
+<tr>
+<th>算子</th>
+<th>并行策略</th>
+<th>加速潜力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Seq Scan</strong></td>
+<td>将表划分为范围；每个 worker 扫描一个范围</td>
+<td>⭐⭐⭐ 高</td>
+</tr>
+<tr>
+<td><strong>Hash Join</strong></td>
+<td>创建阶段：并行哈希；探测阶段：并行探测</td>
+<td>⭐⭐⭐ 高</td>
+</tr>
+<tr>
+<td><strong>Aggregate</strong></td>
+<td>每个 worker 计算部分聚合；leader 合并</td>
+<td>⭐⭐⭐ 高</td>
+</tr>
+<tr>
+<td><strong>Bitmap Heap Scan</strong></td>
+<td>将 bitmap 划分为范围</td>
+<td>⭐⭐ 中</td>
+</tr>
+<tr>
+<td><strong>Index Scan</strong></td>
+<td>有限支持（仅限 index-only scans）</td>
+<td>⭐ 低</td>
+</tr>
+<tr>
+<td><strong>Sort</strong></td>
+<td>每个 worker 排序一个区块；Gather Merge 合并</td>
+<td>⭐⭐ 中</td>
+</tr>
+</tbody>
+</table>
+<h3 id="不支持并行的算子">不支持并行的算子</h3>
+<table>
+<thead>
+<tr>
+<th>算子</th>
+<th>无法并行的原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Nested Loop Join</strong></td>
+<td>本质上是顺序的（内部依赖外部）</td>
+</tr>
+<tr>
+<td><strong>Window Functions</strong></td>
+<td>需要有序输入；难以分割</td>
+</tr>
+<tr>
+<td><strong>CTEs（PG15 之前）</strong></td>
+<td>优化屏障；分别执行</td>
+</tr>
+<tr>
+<td><strong>函数（大多数）</strong></td>
+<td>未标记为 <code>PARALLEL SAFE</code></td>
+</tr>
+<tr>
+<td><strong>INSERT/UPDATE/DELETE</strong></td>
+<td>行级锁冲突</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>📌 PARALLEL 安全等级</p><div class="admonition-content"><p>函数标记有并行安全性：</p>
+</div></div>
+<table>
+<thead>
+<tr>
+<th>等级</th>
+<th>意义</th>
+<th>可以并行执行？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PARALLEL UNSAFE</code></td>
+<td>可能修改状态</td>
+<td>❌ 否</td>
+</tr>
+<tr>
+<td><code>PARALLEL RESTRICTED</code></td>
+<td>仅只读，但不能执行并行计划</td>
+<td>⚠️ 仅 leader</td>
+</tr>
+<tr>
+<td><code>PARALLEL SAFE</code></td>
+<td>纯只读</td>
+<td>✅ 是</td>
+</tr>
+</tbody>
+</table>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 检查函数并行安全性</span>
+<span class="token keyword">SELECT</span> proname<span class="token punctuation">,</span> proparallel
+<span class="token keyword">FROM</span> pg_proc
+<span class="token keyword">WHERE</span> proname <span class="token operator">=</span> <span class="token string">'random'</span><span class="token punctuation">;</span>  <span class="token comment">-- 'u' = UNSAFE</span>
+
+<span class="token comment">-- random() 是 UNSAFE（使用全局 RNG 状态）</span></code></pre>
+<hr>
+<h3 id="示例：并行-Seq-Scan">示例：并行 Seq Scan</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">EXPLAIN</span> <span class="token punctuation">(</span><span class="token keyword">ANALYZE</span><span class="token punctuation">,</span> BUFFERS<span class="token punctuation">)</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2025-01-01'</span><span class="token punctuation">;</span></code></pre>
+<p><strong>计划：</strong></p>
+<pre class="language-none"><code class="language-none">                                                    QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate  (cost=1234567.89..1234568.01 rows=1 width=8) (actual time=3521.234..3521.456 rows=1 loops=1)
+   Buffers: shared hit=123456, read=567890
+   -&gt;  Gather  (cost=1234567.00..1234567.89 rows=4 width=8) (actual time=3520.123..3521.234 rows=4 loops=1)
+         Workers Planned: 4
+         Workers Launched: 4
+         Buffers: shared hit=123456, read=567890
+         -&gt;  Partial Aggregate  (cost=1234567.00..1234567.00 rows=1 width=8) (actual time=3510.567..3510.678 rows=1 loops=4)
+               Buffers: shared hit=30864, read=141972
+               -&gt;  Parallel Seq Scan on transactions  (cost=0.00..1234000.00 rows=226667 width=0) (actual time=12.345..3450.123 rows=25000000 loops=4)
+                     Filter: (created_at &gt;= '2025-01-01'::date)
+                     Rows Removed by Filter: 75000000
+                     Buffers: shared hit=30864, read=141972
+ Planning Time: 0.456 ms
+ Workers Planned: 4
+ Workers Launched: 4
+ JIT:
+   Functions: 8
+   Options: inlining false, optimization true, expression_decomposition true, code_generation true
+ Execution Time: 3545.678 ms</code></pre>
+<p><strong>关键观察：</strong></p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+<th>意义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Workers Planned</code></td>
+<td>4</td>
+<td>规划器请求 4 个 worker</td>
+</tr>
+<tr>
+<td><code>Workers Launched</code></td>
+<td>4</td>
+<td>所有 4 个 worker 已启动（未触及资源限制）</td>
+</tr>
+<tr>
+<td><code>loops=4</code></td>
+<td>4</td>
+<td>每个 worker 执行此节点一次</td>
+</tr>
+<tr>
+<td><code>rows=25000000</code></td>
+<td>每个 worker 2500 万行</td>
+<td>总计：扫描 1 亿行</td>
+</tr>
+<tr>
+<td><code>Partial Aggregate</code></td>
+<td>每个 worker</td>
+<td>每个 worker 计算其部分的计数</td>
+</tr>
+<tr>
+<td><code>Finalize Aggregate</code></td>
+<td>Leader</td>
+<td>合并 4 个部分计数</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="示例：并行-Hash-Join">示例：并行 Hash Join</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">EXPLAIN</span> <span class="token punctuation">(</span><span class="token keyword">ANALYZE</span><span class="token punctuation">,</span> BUFFERS<span class="token punctuation">)</span>
+<span class="token keyword">SELECT</span> u<span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token function">COUNT</span><span class="token punctuation">(</span>o<span class="token punctuation">.</span>id<span class="token punctuation">)</span>
+<span class="token keyword">FROM</span> users u
+<span class="token keyword">JOIN</span> orders o <span class="token keyword">ON</span> u<span class="token punctuation">.</span>id <span class="token operator">=</span> o<span class="token punctuation">.</span>user_id
+<span class="token keyword">WHERE</span> u<span class="token punctuation">.</span>created_at <span class="token operator">&gt;</span> <span class="token string">'2025-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> u<span class="token punctuation">.</span>name<span class="token punctuation">;</span></code></pre>
+<p><strong>计划：</strong></p>
+<pre class="language-none"><code class="language-none">                                                               QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate  (cost=5678901.23..5678912.34 rows=100000 width=40) (actual time=8234.567..8245.678 rows=95432 loops=1)
+   Group Key: u.name
+   Buffers: shared hit=234567, read=1234567
+   -&gt;  Gather Merge  (cost=5678901.23..5678909.87 rows=400000 width=40) (actual time=8230.123..8240.234 rows=381728 loops=1)
+         Workers Planned: 4
+         Workers Launched: 4
+         Buffers: shared hit=234567, read=1234567
+         -&gt;  Partial GroupAggregate  (cost=5678901.23..5678905.45 rows=100000 width=40) (actual time=8200.456..8210.567 rows=95432 loops=4)
+               Group Key: u.name
+               Buffers: shared hit=58641, read=308641
+               -&gt;  Sort  (cost=5678901.23..5678902.34 rows=400000 width=40) (actual time=8190.345..8195.456 rows=95432 loops=4)
+                     Sort Key: u.name
+                     Sort Method: quicksort  Memory: 256kB
+                     Buffers: shared hit=58641, read=308641
+                     -&gt;  Hash Join  (cost=123456.78..5678000.00 rows=400000 width=40) (actual time=456.789..8100.123 rows=95432 loops=4)
+                           Hash Cond: (o.user_id = u.id)
+                           Buffers: shared hit=58641, read=308641
+                           -&gt;  Parallel Seq Scan on orders o  (cost=0.00..5500000.00 rows=2500000 width=8) (actual time=12.345..7800.234 rows=625000 loops=4)
+                                 Buffers: shared hit=45678, read=234567
+                           -&gt;  Hash  (cost=100000.00..100000.00 rows=250000 width=12) (actual time=440.123..440.234 rows=250000 loops=1)
+                                 Buckets: 262144  Batches: 2  Memory Usage: 12288kB
+                                 -&gt;  Seq Scan on users u  (cost=0.00..100000.00 rows=250000 width=12) (actual time=0.123..350.456 rows=250000 loops=1)
+                                       Filter: (created_at &gt; '2025-01-01'::date)
+                                       Rows Removed by Filter: 750000
+                                       Buffers: shared hit=12345, read=67890
+ Planning Time: 1.234 ms
+ Workers Planned: 4
+ Workers Launched: 4
+ Execution Time: 8267.890 ms</code></pre>
+<p><strong>执行流程：</strong></p>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────────┐
+│                    Finalize GroupAggregate                      │
+│                    (Leader: combines 4 partial aggregates)      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    │   Gather Merge    │  (Preserves sort order)
+                    └─────────┬─────────┘
+                              │
+        ┌──────────┬──────────┼──────────┬──────────┐
+        │          │          │          │          │
+   ┌────┴───┐ ┌────┴───┐ ┌────┴───┐ ┌────┴───┐
+   │Worker 1│ │Worker 2│ │Worker 3│ │Worker 4│
+   │Partial │ │Partial │ │Partial │ │Partial │
+   │Agg     │ │Agg     │ │Agg     │ │Agg     │
+   └────┬───┘ └────┬───┘ └────┬───┘ └────┬───┘
+        │          │          │          │
+        └──────────┴──────────┴──────────┘
+                   │
+         ┌─────────┴─────────┐
+         │   Parallel Hash   │
+         │   (Shared hash    │
+         │    table in DSM)  │
+         └─────────┬─────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+   ┌────┴────┐          ┌─────┴─────┐
+   │Parallel │          │   Hash    │
+   │Scan     │          │   Build   │
+   │orders   │          │   (users) │
+   └─────────┘          └───────────┘</code></pre>
+<p><strong>关键洞察：</strong> 哈希表仅创建<strong>一次</strong>（由 leader 或 worker 共同创建）并存储在<strong>共享内存</strong>中。所有 worker 探测相同的哈希表。</p>
+<hr>
+<h2 id="4-设置：调整并行查询">4 设置：调整并行查询</h2>
+<p>PostgreSQL 提供多个 GUC（Grand Unified Configuration）来控制并行查询：</p>
+<h3 id="核心参数">核心参数</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_parallel_workers_per_gather</code></td>
+<td>2</td>
+<td>每个 Gather 节点的最大 worker 数</td>
+</tr>
+<tr>
+<td><code>max_parallel_workers</code></td>
+<td>8</td>
+<td>系统范围可用的 worker 总数</td>
+</tr>
+<tr>
+<td><code>max_parallel_maintenance_workers</code></td>
+<td>2</td>
+<td>用于维护的 worker（VACUUM、CREATE INDEX）</td>
+</tr>
+<tr>
+<td><code>parallel_leader_participation</code></td>
+<td>on</td>
+<td>leader 是否也参与工作</td>
+</tr>
+<tr>
+<td><code>min_parallel_table_scan_size</code></td>
+<td>8MB</td>
+<td>并行扫描的最小表大小</td>
+</tr>
+<tr>
+<td><code>min_parallel_index_scan_size</code></td>
+<td>512kB</td>
+<td>并行扫描的最小索引大小</td>
+</tr>
+<tr>
+<td><code>parallel_setup_cost</code></td>
+<td>1000.0</td>
+<td>规划器对并行设置的成本估算</td>
+</tr>
+<tr>
+<td><code>parallel_tuple_cost</code></td>
+<td>0.1</td>
+<td>规划器对每个传输元组的成本</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="参数深入探讨">参数深入探讨</h3>
+<h4 id="max-parallel-workers-per-gather"><code>max_parallel_workers_per_gather</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 默认：2</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- 对于单一大型查询</span>
+<span class="token keyword">SET</span> <span class="token keyword">LOCAL</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">8</span><span class="token punctuation">;</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> huge_table<span class="token punctuation">;</span></code></pre>
+<p><strong>权衡：</strong></p>
+<table>
+<thead>
+<tr>
+<th>值</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>低 (1-2)</td>
+<td>开销较小，更可预测</td>
+<td>加速有限</td>
+</tr>
+<tr>
+<td>高 (8+)</td>
+<td>最大化并行化</td>
+<td>报酬递减，资源竞争</td>
+</tr>
+</tbody>
+</table>
+<p><strong>经验法则：</strong> 从 4 开始，测量，调整。</p>
+<hr>
+<h4 id="max-parallel-workers"><code>max_parallel_workers</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 系统范围限制（postgresql.conf）</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">16</span>  <span class="token comment">-- 所有查询的 worker 总数</span>
+
+<span class="token comment">-- 检查当前使用情况</span>
+<span class="token keyword">SELECT</span> <span class="token function">count</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span>
+<span class="token keyword">FROM</span> pg_stat_activity
+<span class="token keyword">WHERE</span> backend_type <span class="token operator">=</span> <span class="token string">'parallel worker'</span><span class="token punctuation">;</span></code></pre>
+<p><strong>关系：</strong></p>
+<pre class="language-none"><code class="language-none">max_parallel_workers_per_gather ≤ max_parallel_workers
+
+示例：
+  max_parallel_workers = 8
+  max_parallel_workers_per_gather = 4
+
+  → 最多 2 个并发并行查询（8 / 4 = 2）</code></pre>
+<hr>
+<h4 id="parallel-leader-participation"><code>parallel_leader_participation</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 默认：on（leader 也参与工作）</span>
+<span class="token keyword">SET</span> parallel_leader_participation <span class="token operator">=</span> <span class="token keyword">on</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- Leader 协调并扫描表的一部分</span></code></pre>
+<p><strong>何时禁用：</strong></p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>设置</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>许多并发查询</td>
+<td><code>off</code></td>
+<td>Leader 处理协调，worker 执行所有扫描</td>
+</tr>
+<tr>
+<td>少量 worker</td>
+<td><code>on</code></td>
+<td>最大化并行化（leader + workers）</td>
+</tr>
+<tr>
+<td>I/O 绑定工作负载</td>
+<td><code>on</code></td>
+<td>Leader 可协助 I/O</td>
+</tr>
+<tr>
+<td>CPU 绑定工作负载</td>
+<td><code>off</code></td>
+<td>Leader 专注于协调</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h4 id="min-parallel-table-scan-size"><code>min_parallel_table_scan_size</code></h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 默认：8MB</span>
+<span class="token keyword">SET</span> min_parallel_table_scan_size <span class="token operator">=</span> <span class="token number">16</span>MB<span class="token punctuation">;</span>
+
+<span class="token comment">-- 小于 16MB 的表不会使用并行扫描</span></code></pre>
+<p><strong>存在原因：</strong> 对于小表，并行开销（~5-10ms）超过收益。</p>
+<p><strong>调整：</strong></p>
+<table>
+<thead>
+<tr>
+<th>工作负载</th>
+<th>建议值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OLTP（小查询）</td>
+<td>32MB+（不鼓励并行化）</td>
+</tr>
+<tr>
+<td>分析（大型扫描）</td>
+<td>4-8MB（鼓励并行化）</td>
+</tr>
+<tr>
+<td>混合</td>
+<td>8-16MB（平衡）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="规划器成本参数">规划器成本参数</h3>
+<p>规划器使用成本估算来决定并行化是否值得：</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 默认成本</span>
+parallel_setup_cost <span class="token operator">=</span> <span class="token number">1000.0</span>    <span class="token comment">-- 相当于 ~10ms 的工作</span>
+parallel_tuple_cost <span class="token operator">=</span> <span class="token number">0.1</span>       <span class="token comment">-- 每行传输成本</span></code></pre>
+<p><strong>规划器如何决定：</strong></p>
+<pre class="language-none"><code class="language-none">Total Parallel Cost = parallel_setup_cost
+                    + (parallel_tuple_cost × rows)
+                    + (scan_cost / workers)
+
+If Parallel Cost &lt; Serial Cost → Choose Parallel</code></pre>
+<p><strong>调整：</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 让并行化更具吸引力</span>
+<span class="token keyword">SET</span> parallel_setup_cost <span class="token operator">=</span> <span class="token number">500.0</span><span class="token punctuation">;</span>   <span class="token comment">-- 降低设置惩罚</span>
+<span class="token keyword">SET</span> parallel_tuple_cost <span class="token operator">=</span> <span class="token number">0.05</span><span class="token punctuation">;</span>    <span class="token comment">-- 降低传输成本</span>
+
+<span class="token comment">-- 让并行化较不具吸引力</span>
+<span class="token keyword">SET</span> parallel_setup_cost <span class="token operator">=</span> <span class="token number">2000.0</span><span class="token punctuation">;</span>  <span class="token comment">-- 提高设置惩罚</span></code></pre>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 调试规划器决策</p><div class="admonition-content"><p>使用 <code>EXPLAIN (VERBOSE, COSTS)</code> 查看规划器为何选择（或拒绝）并行化：</p>
+<pre><code class="language-sql">EXPLAIN (VERBOSE, COSTS)
+SELECT COUNT(*) FROM transactions;
+</code><p><code class="language-sql">– 寻找：<br>
+– "Workers Planned: 0" → 规划器拒绝并行化<br>
+– "Workers Planned: 4" → 规划器选择并行<br>
+</code></p></pre><p></p>
+</div></div>
+<hr>
+<h2 id="5-何时并行查询有帮助（何时有害）">5 何时并行查询有帮助（何时有害）</h2>
+<h3 id="并行查询的理想工作负载">并行查询的理想工作负载</h3>
+<table>
+<thead>
+<tr>
+<th>工作负载</th>
+<th>特征</th>
+<th>预期加速</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>大型表扫描</strong></td>
+<td>&gt;100MB 表，选择性过滤</td>
+<td>2-4 倍</td>
+</tr>
+<tr>
+<td><strong>大量聚合</strong></td>
+<td>数百万行的 COUNT、SUM、AVG</td>
+<td>3-5 倍</td>
+</tr>
+<tr>
+<td><strong>哈希连接</strong></td>
+<td>大型事实表连接到维度表</td>
+<td>2-4 倍</td>
+</tr>
+<tr>
+<td><strong>仅索引扫描</strong></td>
+<td>大型表的覆盖索引</td>
+<td>2-3 倍</td>
+</tr>
+<tr>
+<td><strong>并行 CREATE INDEX</strong></td>
+<td><code>CREATE INDEX CONCURRENTLY</code>（PG11+）</td>
+<td>2-3 倍</td>
+</tr>
+</tbody>
+</table>
+<p><strong>示例：大型聚合</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 之前：12 秒（单线程）</span>
+<span class="token comment">-- 之后：3.5 秒（4 个 worker）</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token keyword">SELECT</span>
+    DATE_TRUNC<span class="token punctuation">(</span><span class="token string">'hour'</span><span class="token punctuation">,</span> created_at<span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">hour</span><span class="token punctuation">,</span>
+    <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">as</span> <span class="token keyword">transactions</span><span class="token punctuation">,</span>
+    <span class="token function">SUM</span><span class="token punctuation">(</span>amount<span class="token punctuation">)</span> <span class="token keyword">as</span> total_amount
+<span class="token keyword">FROM</span> <span class="token keyword">transactions</span>
+<span class="token keyword">WHERE</span> created_at <span class="token operator">&gt;=</span> <span class="token string">'2025-01-01'</span>
+<span class="token keyword">GROUP</span> <span class="token keyword">BY</span> <span class="token keyword">hour</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="何时并行查询有害">何时并行查询有害</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>有害原因</th>
+<th>替代方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>小表（&lt;10MB）</strong></td>
+<td>开销 &gt; 收益</td>
+<td>禁用并行化</td>
+</tr>
+<tr>
+<td><strong>OLTP 查询（&lt;100ms）</strong></td>
+<td>设置时间主导</td>
+<td>保持 <code>max_parallel_workers_per_gather = 0</code></td>
+</tr>
+<tr>
+<td><strong>许多并发查询</strong></td>
+<td>Worker 饿死</td>
+<td>限制 <code>max_parallel_workers</code></td>
+</tr>
+<tr>
+<td><strong>内存绑定工作负载</strong></td>
+<td>Worker 竞争缓存</td>
+<td>减少 worker</td>
+</tr>
+<tr>
+<td><strong>标记为 UNSAFE 的函数</strong></td>
+<td>回退到串行</td>
+<td>尽可能标记函数为 SAFE</td>
+</tr>
+</tbody>
+</table>
+<p><strong>示例：并行开销</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 小表：并行更慢</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> small_table<span class="token punctuation">;</span>  <span class="token comment">-- 串行 50ms，并行 80ms</span>
+
+<span class="token comment">-- 为什么？</span>
+<span class="token comment">-- - 进程创建：5ms × 4 workers = 20ms</span>
+<span class="token comment">-- - DSM 设置：10ms</span>
+<span class="token comment">-- - 协调：5ms</span>
+<span class="token comment">-- - 实际扫描：5ms（表很小）</span>
+<span class="token comment">-- 总计并行：40ms 开销 + 5ms 扫描 = 45ms+（vs 50ms 串行）</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ OLTP 陷阱</p><div class="admonition-content"><p>对于 OLTP 工作负载（短暂、频繁的查询），并行查询通常会<strong>降低</strong>性能：</p>
+</div></div>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 典型 OLTP 查询</span>
+<span class="token keyword">SELECT</span> <span class="token operator">*</span> <span class="token keyword">FROM</span> users <span class="token keyword">WHERE</span> id <span class="token operator">=</span> <span class="token number">12345</span><span class="token punctuation">;</span>  <span class="token comment">-- 使用索引，返回 1 行</span>
+
+<span class="token comment">-- 并行开销：30-50ms</span>
+<span class="token comment">-- 串行执行：0.5ms</span>
+<span class="token comment">-- 结果：并行化慢 60-100 倍！</span></code></pre>
+<p><strong>解决方案：</strong> 为 OLTP 禁用并行化：</p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 在 OLTP 数据库的 postgresql.conf 中</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">0</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">0</span></code></pre>
+<hr>
+<h2 id="6-调试并行查询问题">6 调试并行查询问题</h2>
+<h3 id="常见问题">常见问题</h3>
+<h4 id="问题-1：Worker-未启动">问题 1：Worker 未启动</h4>
+<pre class="language-none"><code class="language-none">Workers Planned: 4
+Workers Launched: 2  -- 只启动了 2 个！</code></pre>
+<p><strong>原因：</strong></p>
+<table>
+<thead>
+<tr>
+<th>原因</th>
+<th>检查</th>
+<th>修复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>触及 worker 限制</td>
+<td><code>SHOW max_parallel_workers;</code></td>
+<td>增加限制</td>
+</tr>
+<tr>
+<td>内存压力</td>
+<td>检查 <code>work_mem × workers</code></td>
+<td>减少 <code>max_parallel_workers</code></td>
+</tr>
+<tr>
+<td>表太小</td>
+<td>检查表大小与 <code>min_parallel_table_scan_size</code></td>
+<td>降低阈值或接受串行</td>
+</tr>
+<tr>
+<td>函数是 UNSAFE</td>
+<td>检查 <code>pg_proc</code> 中的 <code>proparallel</code></td>
+<td>标记为 SAFE 或重写</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h4 id="问题-2：并行扫描回退到索引扫描">问题 2：并行扫描回退到索引扫描</h4>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 预期：Parallel Seq Scan</span>
+<span class="token comment">-- 实际：Index Scan（串行）</span></code></pre>
+<p><strong>原因：</strong> 规划器确定索引扫描更便宜。</p>
+<p><strong>强制并行扫描（仅测试）：</strong></p>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token keyword">SET</span> enable_indexscan <span class="token operator">=</span> <span class="token keyword">off</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> enable_seqscan <span class="token operator">=</span> <span class="token keyword">on</span><span class="token punctuation">;</span>
+<span class="token keyword">SET</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span><span class="token punctuation">;</span>
+
+<span class="token keyword">EXPLAIN</span> <span class="token keyword">ANALYZE</span>
+<span class="token keyword">SELECT</span> <span class="token function">COUNT</span><span class="token punctuation">(</span><span class="token operator">*</span><span class="token punctuation">)</span> <span class="token keyword">FROM</span> large_table<span class="token punctuation">;</span></code></pre>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 不要在生产环境强制</p><div class="admonition-content"><p>禁用索引扫描仅用于<strong>调试</strong>。规划器通常最清楚。如果并行顺序扫描确实更好，请改为调整成本参数。</p>
+</div></div>
+<hr>
+<h4 id="问题-3：Worker-负载不均">问题 3：Worker 负载不均</h4>
+<pre class="language-none"><code class="language-none">Worker 1: 50M rows, 3000ms
+Worker 2: 30M rows, 1800ms
+Worker 3: 15M rows, 900ms
+Worker 4: 5M rows, 300ms</code></pre>
+<p><strong>原因：</strong> 数据倾斜（worker 扫描不同大小的范围）。</p>
+<p><strong>影响：</strong> 最慢的 worker 决定总时间（Amdahl 定律）。</p>
+<p><strong>缓解：</strong></p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>更好的数据分布</td>
+<td>重组表（PARTITION BY）</td>
+</tr>
+<tr>
+<td>更多 worker</td>
+<td>更细粒度的范围</td>
+</tr>
+<tr>
+<td>接受不平衡</td>
+<td>通常不值得优化</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="监控并行查询">监控并行查询</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- 检查活跃的并行 worker</span>
+<span class="token keyword">SELECT</span>
+    pid<span class="token punctuation">,</span>
+    usename<span class="token punctuation">,</span>
+    query<span class="token punctuation">,</span>
+    backend_type
+<span class="token keyword">FROM</span> pg_stat_activity
+<span class="token keyword">WHERE</span> backend_type <span class="token operator">=</span> <span class="token string">'parallel worker'</span><span class="token punctuation">;</span>
+
+<span class="token comment">-- 检查并行查询统计（PG14+）</span>
+<span class="token keyword">SELECT</span>
+    datname<span class="token punctuation">,</span>
+    numbackends<span class="token punctuation">,</span>
+    xact_commit<span class="token punctuation">,</span>
+    xact_rollback
+<span class="token keyword">FROM</span> pg_stat_database<span class="token punctuation">;</span>
+
+<span class="token comment">-- 查看并行 worker 内存使用情况</span>
+<span class="token keyword">SELECT</span>
+    pid<span class="token punctuation">,</span>
+    usename<span class="token punctuation">,</span>
+    query<span class="token punctuation">,</span>
+    temp_blks_read<span class="token punctuation">,</span>
+    temp_blks_written
+<span class="token keyword">FROM</span> pg_stat_activity
+<span class="token keyword">WHERE</span> query <span class="token operator">LIKE</span> <span class="token string">'%parallel%'</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h2 id="7-高级：并行查询内部实现">7 高级：并行查询内部实现</h2>
+<h3 id="Dynamic-Shared-Memory-DSM">Dynamic Shared Memory (DSM)</h3>
+<p>Worker 通过<strong>动态共享内存</strong>通信：</p>
+<pre class="language-c" data-language="c"><code class="language-c"><span class="token comment">/* Simplified from src/backend/storage/ipc/dsm.c */</span>
+<span class="token keyword">typedef</span> <span class="token keyword">struct</span> <span class="token class-name">dsm_segment</span> <span class="token punctuation">{</span>
+    dsm_handle handle<span class="token punctuation">;</span>      <span class="token comment">/* Unique identifier */</span>
+    <span class="token keyword">void</span> <span class="token operator">*</span>mapped_address<span class="token punctuation">;</span>   <span class="token comment">/* Mapped memory address */</span>
+    Size size<span class="token punctuation">;</span>              <span class="token comment">/* Segment size */</span>
+<span class="token punctuation">}</span> dsm_segment<span class="token punctuation">;</span>
+
+<span class="token comment">/* Create shared memory segment */</span>
+dsm_segment <span class="token operator">*</span>
+<span class="token function">dsm_create</span><span class="token punctuation">(</span>Size size<span class="token punctuation">,</span> <span class="token keyword">int</span> flags<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">/* Allocate shared memory */</span>
+    <span class="token comment">/* Return segment handle */</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">/* Attach to shared memory (workers) */</span>
+<span class="token keyword">void</span> <span class="token operator">*</span>
+<span class="token function">dsm_attach</span><span class="token punctuation">(</span>dsm_handle handle<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+    <span class="token comment">/* Map shared memory into worker's address space */</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>DSM 中存储的内容：</strong></p>
+<table>
+<thead>
+<tr>
+<th>数据</th>
+<th>大小</th>
+<th>目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>查询计划</td>
+<td>~10-100KB</td>
+<td>Worker 需要知道执行什么</td>
+</tr>
+<tr>
+<td>表扫描范围</td>
+<td>每个 worker ~1KB</td>
+<td>每个 worker 扫描哪些区块</td>
+</tr>
+<tr>
+<td>哈希表</td>
+<td>可变（MB）</td>
+<td>并行哈希连接的共享哈希</td>
+</tr>
+<tr>
+<td>部分聚合</td>
+<td>每个 worker ~1KB</td>
+<td>中间结果</td>
+</tr>
+<tr>
+<td>元组队列</td>
+<td>可变</td>
+<td>从 worker 传输到 leader 的行</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3 id="并行上下文切换">并行上下文切换</h3>
+<pre class="language-none"><code class="language-none">┌─────────────────────────────────────────────────────────────┐
+│                     Parallel Leader                         │
+│  ────────────────────────────────────────────────────────   │
+│  1. Parse &amp; analyze query                                   │
+│  2. Generate parallel-aware plan                            │
+│  3. Create DSM segment                                      │
+│  4. Launch worker processes                                 │
+│  5. Send plan + context to workers via DSM                  │
+│  6. Wait for workers to start                               │
+│  7. Begin execution (Gather node pulls from workers)        │
+│  8. Collect results, return to client                       │
+│  9. Clean up DSM, terminate workers                         │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+<p><strong>时间轴：</strong></p>
+<pre class="language-none"><code class="language-none">0ms     5ms     10ms    15ms    20ms    100ms   3500ms
+│───────│───────│───────│───────│───────│───────│───────│
+│ DSM   │Worker │Workers│First  │       │       │Final  │
+│ setup │launch │ready  │row    │Scan   │Scan   │result │
+│       │       │       │       │       │       │       │
+└───────────────┘
+    Overhead (~20ms)</code></pre>
+<hr>
+<h2 id="8-实用调整指南">8 实用调整指南</h2>
+<h3 id="OLTP-数据库">OLTP 数据库</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- postgresql.conf</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">0</span>  <span class="token comment">-- 禁用并行查询</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">0</span>
+max_parallel_maintenance_workers <span class="token operator">=</span> <span class="token number">1</span>  <span class="token comment">-- 保留用于维护</span>
+
+<span class="token comment">-- 原因：OLTP 查询很短；并行开销弊大于利</span></code></pre>
+<hr>
+<h3 id="分析数据库">分析数据库</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- postgresql.conf</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">8</span>   <span class="token comment">-- 最大化并行化</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">32</span>             <span class="token comment">-- 支持多个并发查询</span>
+max_parallel_maintenance_workers <span class="token operator">=</span> <span class="token number">4</span>  <span class="token comment">-- 并行 VACUUM、CREATE INDEX</span>
+
+min_parallel_table_scan_size <span class="token operator">=</span> <span class="token number">4</span>MB    <span class="token comment">-- 鼓励并行化</span>
+parallel_setup_cost <span class="token operator">=</span> <span class="token number">500.0</span>           <span class="token comment">-- 降低并行化门槛</span>
+parallel_tuple_cost <span class="token operator">=</span> <span class="token number">0.05</span>
+
+<span class="token comment">-- 每个查询（用于关键报表）</span>
+<span class="token keyword">SET</span> <span class="token keyword">LOCAL</span> max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">16</span><span class="token punctuation">;</span>
+<span class="token keyword">SELECT</span> <span class="token comment">/* 复杂分析查询 */</span><span class="token punctuation">;</span></code></pre>
+<hr>
+<h3 id="混合工作负载">混合工作负载</h3>
+<pre class="language-sql" data-language="sql"><code class="language-sql"><span class="token comment">-- postgresql.conf</span>
+max_parallel_workers_per_gather <span class="token operator">=</span> <span class="token number">4</span>   <span class="token comment">-- 适度并行化</span>
+max_parallel_workers <span class="token operator">=</span> <span class="token number">16</span>             <span class="token comment">-- 支持约 4 个并发并行查询</span>
+max_parallel_maintenance_workers <span class="token operator">=</span> <span class="token number">2</span>
+
+min_parallel_table_scan_size <span class="token operator">=</span> <span class="token number">16</span>MB   <span class="token comment">-- 仅并行化大型扫描</span>
+
+<span class="token comment">-- 应用程序级别调整</span>
+<span class="token comment">-- OLTP 查询：使用默认（4 个 worker）</span>
+<span class="token comment">-- 分析查询：SET LOCAL max_parallel_workers_per_gather = 8</span></code></pre>
+<hr>
+<h3 id="调整检查清单">调整检查清单</h3>
+<pre class="language-none"><code class="language-none">□ 检查当前设置：
+  SHOW max_parallel_workers_per_gather;
+  SHOW max_parallel_workers;
+  SHOW min_parallel_table_scan_size;
+
+□ 识别候选查询：
+  -- 寻找在大型表上具有顺序扫描的查询
+  SELECT query, total_exec_time, calls
+  FROM pg_stat_statements
+  WHERE query LIKE '%Seq Scan%'
+  ORDER BY total_exec_time DESC;
+
+□ 测试并行化：
+  SET max_parallel_workers_per_gather = 4;
+  EXPLAIN (ANALYZE, BUFFERS) &lt;query&gt;;
+
+□ 测量加速：
+  -- 比较串行与并行执行时间
+  -- 检查 Workers Launched 是否符合 Workers Planned
+
+□ 根据结果调整：
+  -- 良好的加速（2x+）：保持设置
+  -- 边际加速（&lt;1.5x）：减少 worker 或禁用
+  -- 更慢：为此类查询禁用并行化</code></pre>
+<hr>
+<h2 id="总结：一张图看懂并行查询">总结：一张图看懂并行查询</h2>
+<div class="mermaid">flowchart BT
+    subgraph "Parallel Query Execution"
+        A[Client] --&gt; B[Gather Node]
+        B --&gt; C[Parallel Leader]
+        C --&gt; D[Worker 1]
+        C --&gt; E[Worker 2]
+        C --&gt; F[Worker 3]
+        C --&gt; G[Worker 4]
+
+        D --&gt; H[Parallel Seq Scan]
+        E --&gt; I[Parallel Seq Scan]
+        F --&gt; J[Parallel Seq Scan]
+        G --&gt; K[Parallel Seq Scan]
+
+        H --&gt; L[Table Range 1]
+        I --&gt; M[Table Range 2]
+        J --&gt; N[Table Range 3]
+        K --&gt; O[Table Range 4]
+    end
+
+    subgraph "Configuration"
+        P[max_parallel_workers_per_gather]
+        Q[max_parallel_workers]
+        R[min_parallel_table_scan_size]
+    end
+
+    subgraph "Best For"
+        S[Large table scans]
+        T[Bulk aggregations]
+        U[Hash joins]
+    end
+
+    style B fill:#fce4ec,stroke:#c2185b
+    style D fill:#fff3e0,stroke:#f57c00
+    style E fill:#fff3e0,stroke:#f57c00
+    style F fill:#fff3e0,stroke:#f57c00
+    style G fill:#fff3e0,stroke:#f57c00
+    style P fill:#e3f2fd,stroke:#1976d2
+    style Q fill:#e3f2fd,stroke:#1976d2
+    style R fill:#e3f2fd,stroke:#1976d2</div>
+<p><strong>关键要点：</strong></p>
+<table>
+<thead>
+<tr>
+<th>面向</th>
+<th>并行查询</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>架构</strong></td>
+<td>Leader + worker 通过 DSM</td>
+</tr>
+<tr>
+<td><strong>Gather 节点</strong></td>
+<td>收集 worker 的结果</td>
+</tr>
+<tr>
+<td><strong>Gather Merge</strong></td>
+<td>保持排序顺序</td>
+</tr>
+<tr>
+<td><strong>最适合</strong></td>
+<td>大型扫描、聚合、哈希连接</td>
+</tr>
+<tr>
+<td><strong>避免用于</strong></td>
+<td>OLTP、小表、低于 100ms 的查询</td>
+</tr>
+<tr>
+<td><strong>加速</strong></td>
+<td>通常 2-4 倍，理想工作负载可达 10 倍</td>
+</tr>
+<tr>
+<td><strong>开销</strong></td>
+<td>约 20-50ms 设置时间</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<p><strong>进一步阅读：</strong></p>
+<ul>
+<li>PostgreSQL Docs: <a target="_blank" rel="noopener" href="https://www.postgresql.org/docs/current/parallel-query.html">“Parallel Query”</a></li>
+<li>Robert Haas: <a target="_blank" rel="noopener" href="https://rhaas.blogspot.com/2015/10/parallel-query-in-postgresql.html">“Parallel Query in PostgreSQL”</a> (2015)</li>
+<li>Andres Freund: <a target="_blank" rel="noopener" href="https://www.postgresql.org/message-id/flat/20160929183442.GA1210147%40alap3.anarazel.de">“Parallelism in PostgreSQL”</a></li>
+<li>Source: <a target="_blank" rel="noopener" href="https://github.com/postgres/postgres/tree/master/src/backend/executor/nodeGather.c"><code>src/backend/executor/nodeGather.c</code></a></li>
+</ul>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-CN/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/" data-id="5891bf26" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "深入了解 PostgreSQL 并行查询执行：多核性能",
+        "image": "https://neo01.com/assets/architecture/sql_plan_thumbnail.jpg",
+        "keywords": "Parallel Query Performance PostgreSQL",
+        "genre": "Architecture",
+        "datePublished": "2026-02-16",
+        "dateCreated": "2026-02-16",
+        "dateModified": "2026-03-12",
+        "url": "https://neo01.com//zh-CN/2026/02/Understanding-PostgreSQL-Parallel-Query-Execution/",
+        "description": "深入探讨 PostgreSQL 并行查询执行——Gather 节点、并行 worker 进程与多核处理如何加速大型表扫描、哈希连接与聚合运算。了解何时使用并行化能提升性能，何时会造成反效果，以及如何调整设置。",
+        "wordCount": 5164
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>关注我 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">链接</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-CN/ai">AI 游乐场</a></li><li><a href="/zh-CN/tools">工具</a></li><li><a href="/zh-CN/games">游戏</a></li><li><a href="/zh-CN/pages/useful-information">实用信息</a></li><li><a href="/zh-CN/pages/Hexo-Blogging-Cheatsheet">Hexo 博客速查表</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                    
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：综合 SQL 解析器（DDL、DML、查询）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-SQL-Parser/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：综合 SQL 解析器（DDL、DML、查询）</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：通信协议与结果集序列化" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：通信协议与结果集序列化</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：WAL 与 ARIES 崩溃恢复" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：WAL 与 ARIES 崩溃恢复</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 构建 PostgreSQL 兼容数据库：MVCC 与事务管理" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-MVCC-Transaction-Manager/" class="title">使用 Rust 构建 PostgreSQL 兼容数据库：MVCC 与事务管理</a></p>
+                            <p class="item-date"><time datetime="2026-03-02T16:00:00.000Z" itemprop="datePublished">2026-03-03</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-CN/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="Rust 构建数据库：B+Tree 索引与并发访问" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">开发</a></p>
+                            <p class="item-title"><a href="/zh-CN/2026/03/Database-Rust-BPlusTree-Index-Concurrent-Access/" class="title">Rust 构建数据库：B+Tree 索引与并发访问</a></p>
+                            <p class="item-date"><time datetime="2026-03-01T16:00:00.000Z" itemprop="datePublished">2026-03-02</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">归档</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2026/">2026</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2025/">2025</a>
+                    <span class="archive-list-count">76</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-CN/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#03d116d5</div>
+                <img src="/qr/qr-07c0ccab71935867e2f3e8e90cfe3153.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#03d116d5">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. 版权所有.
+                  <a href="/zh-CN/terms-and-conditions">使用条款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
