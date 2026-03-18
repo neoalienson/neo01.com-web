@@ -1,0 +1,1796 @@
+<!DOCTYPE html><html lang="zh-TW"><head><!-- hexo injector head_begin start --><!-- Google tag (gtag.js) begins-->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+    
+      gtag('config', 'G-3DZR3TQYCY');
+    </script>
+    <!-- Google tag (gtag.js) ends-->
+    <!-- hexo injector head_begin end -->
+    <meta charset="utf-8">
+    <!-- security headers starts -->
+    <!-- meta http-equiv="content-security-policy" content="script-src 'sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=' 'sha256-lJjk3/dvd+wXqRFjV7T5L/nXJXr5NjUjmsKSPEe+ass=';" -->
+    <!-- security headers ends -->
+    <!-- favicon starts -->    
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <!-- favicon ends -->
+    
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="alternate" href="/atom.xml" title="Decoding Digital Anomalies" type="application/atom+xml">
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    
+        
+
+
+    
+    
+        
+
+
+    
+
+
+
+    
+    <title>按需環境（第一篇）：架構與實現 | Decoding Digital Anomalies</title>
+    
+    <meta name="keywords" content="DevOps,GitOps,Platform Engineering">
+    
+    
+    <meta name="description" content="Environment on Demand 三部曲之首篇。了解 EoD 是什麼、如何使用 GitOps 架構設計它，以及它的優勢與挑戰。另外探討：為什麼 AI 輔助編碼讓資源配置成為新的瓶頸。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="按需環境（第一篇）：架構與實現">
+<meta property="og:url" content="https://neo01.com/zh-TW/2026/02/Environment-on-Demand-Part1-Architecture/index.html">
+<meta property="og:site_name" content="Decoding Digital Anomalies">
+<meta property="og:description" content="Environment on Demand 三部曲之首篇。了解 EoD 是什麼、如何使用 GitOps 架構設計它，以及它的優勢與挑戰。另外探討：為什麼 AI 輔助編碼讓資源配置成為新的瓶頸。">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:image" content="https://neo01.com/assets/architecture/eod-thumbnail.jpg">
+<meta property="article:published_time" content="2026-02-17T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-03-18T13:37:08.796Z">
+<meta property="article:author" content="Neo Alienson">
+<meta property="article:tag" content="DevOps">
+<meta property="article:tag" content="GitOps">
+<meta property="article:tag" content="Platform Engineering">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://neo01.com/assets/architecture/eod-thumbnail.jpg">
+    
+    <!-- hexo injector head_end start --><link rel="stylesheet" type="text/css" href="/css/bundle.css"><script type="text/javascript" src="/js/bundle_first.js"></script><!-- hexo injector head_end end --><meta name="generator" content="Hexo 8.1.0">  <link rel="canonical" href="https://neo01.com/2026/02/Environment-on-Demand-Part1-Architecture/">
+  <link rel="alternate" hreflang="en" data-canonical="true" href="https://neo01.com/2026/02/Environment-on-Demand-Part1-Architecture/">
+  <link rel="alternate" hreflang="zh-TW" href="https://neo01.com/zh-TW/2026/02/Environment-on-Demand-Part1-Architecture/">
+  <link rel="alternate" hreflang="zh-CN" href="https://neo01.com/zh-CN/2026/02/Environment-on-Demand-Part1-Architecture/">
+<style id="admonition-styles">.admonition {
+  margin: 1em 0;
+  padding: 0rem;
+  border-left: 0.3rem solid;
+  border-radius: 0.4rem;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  page-break-inside: avoid;
+}
+
+.admonition-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 0rem 1rem 0.1rem 0.75rem;
+  font-size: 1.05em;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-top-left-radius: 0.4rem;
+  border-top-right-radius: 0.4rem;
+  margin: 0 !important;
+}
+
+.admonition-icon {
+  font-size: 1.2em;
+  margin-right: 0.6rem;
+  opacity: 0.85;
+  margin-top: 0.1rem;
+}
+
+/* 内容区域 margin */
+.admonition > *:not(.admonition-title) {
+  margin: 0.6rem 1rem 0.6rem 1rem;
+}
+
+/* NOTE 类型 */
+.admonition.anote {
+  border-color: #448aff;
+}
+.admonition.anote > .admonition-title {
+  background-color: #448aff1a;
+  color: #2962ff;
+}
+
+/* INFO / TODO 类型 */
+.admonition.info,
+.admonition.todo {
+  border-color: #00b8d4;
+}
+.admonition.info > .admonition-title,
+.admonition.todo > .admonition-title {
+  background-color: rgba(0, 184, 212, 0.1);
+  color: #007c91;
+}
+
+/* 警告类 */
+.admonition.warning,
+.admonition.attention,
+.admonition.caution {
+  border-color: #ff9100;
+}
+.admonition.warning > .admonition-title,
+.admonition.attention > .admonition-title,
+.admonition.caution > .admonition-title {
+  background-color: rgba(255, 145, 0, 0.1);
+  color: #c66900;
+}
+
+/* 错误类 */
+.admonition.failure,
+.admonition.missing,
+.admonition.fail,
+.admonition.error,
+.admonition.danger,
+.admonition.bug {
+  border-color: #ff5252;
+}
+.admonition.failure > .admonition-title,
+.admonition.missing > .admonition-title,
+.admonition.fail > .admonition-title,
+.admonition.error > .admonition-title,
+.admonition.danger > .admonition-title,
+.admonition.bug > .admonition-title {
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #b71c1c;
+}
+
+/* TIP 类型 */
+.admonition.tip {
+  border-color: #00bfa5;
+}
+.admonition.tip > .admonition-title {
+  background-color: #00bfa51a;
+  color: #00796b;
+}
+
+/* SUCCESS 类型 */
+.admonition.success {
+  border-color: #00c853;
+}
+.admonition.success > .admonition-title {
+  background-color: #00c8531a;
+  color: #2e7d32;
+}
+
+/* QUESTION 类型 */
+.admonition.question {
+  border-color: #64dd17;
+}
+.admonition.question > .admonition-title {
+  background-color: #64dd171a;
+  color: #558b2f;
+}
+
+/* EXAMPLE 类型 */
+.admonition.example {
+  border-color: #7c4dff;
+}
+.admonition.example > .admonition-title {
+  background-color: #7c4dff1a;
+  color: #512da8;
+}
+
+/* QUOTE 类型 */
+.admonition.quote {
+  border-color: #9e9e9e;
+}
+.admonition.quote > .admonition-title {
+  background-color: #9e9e9e1a;
+  color: #424242;
+}
+
+/*黑暗模式*/
+/* 夜间模式基础样式 */
+[data-theme="dark"] .admonition {
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .admonition-title {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* anote */
+[data-theme="dark"] .admonition.anote {
+  border-color: #82b1ff;
+}
+[data-theme="dark"] .admonition.anote > .admonition-title {
+  background-color: #82b1ff1a;
+  color: #bbdefb;
+}
+
+/* tip */
+[data-theme="dark"] .admonition.tip {
+  border-color: #64ffda;
+}
+[data-theme="dark"] .admonition.tip > .admonition-title {
+  background-color: #64ffda1a;
+  color: #1de9b6;
+}
+
+/* success */
+[data-theme="dark"] .admonition.success {
+  border-color: #69f0ae;
+}
+[data-theme="dark"] .admonition.success > .admonition-title {
+  background-color: #69f0ae1a;
+  color: #00e676;
+}
+
+/* question */
+[data-theme="dark"] .admonition.question {
+  border-color: #b2ff59;
+}
+[data-theme="dark"] .admonition.question > .admonition-title {
+  background-color: #b2ff591a;
+  color: #aeea00;
+}
+
+/* example */
+[data-theme="dark"] .admonition.example {
+  border-color: #b388ff;
+}
+[data-theme="dark"] .admonition.example > .admonition-title {
+  background-color: #b388ff1a;
+  color: #b39ddb;
+}
+
+/* quote */
+[data-theme="dark"] .admonition.quote {
+  border-color: #bdbdbd;
+}
+[data-theme="dark"] .admonition.quote > .admonition-title {
+  background-color: #bdbdbd1a;
+  color: #eeeeee;
+}
+
+/* warning / attention / caution */
+[data-theme="dark"] .admonition.warning,
+[data-theme="dark"] .admonition.attention,
+[data-theme="dark"] .admonition.caution {
+  border-color: #ffb300;
+}
+[data-theme="dark"] .admonition.warning > .admonition-title,
+[data-theme="dark"] .admonition.attention > .admonition-title,
+[data-theme="dark"] .admonition.caution > .admonition-title {
+  background-color: #ffb3001a;
+  color: #ffe082;
+}
+
+/* error / fail / failure / bug / danger / missing */
+[data-theme="dark"] .admonition.error,
+[data-theme="dark"] .admonition.fail,
+[data-theme="dark"] .admonition.failure,
+[data-theme="dark"] .admonition.bug,
+[data-theme="dark"] .admonition.missing,
+[data-theme="dark"] .admonition.danger {
+  border-color: #ef5350;
+}
+[data-theme="dark"] .admonition.error > .admonition-title,
+[data-theme="dark"] .admonition.fail > .admonition-title,
+[data-theme="dark"] .admonition.failure > .admonition-title,
+[data-theme="dark"] .admonition.bug > .admonition-title,
+[data-theme="dark"] .admonition.missing > .admonition-title,
+[data-theme="dark"] .admonition.danger > .admonition-title {
+  background-color: #ef53501a;
+  color: #ff8a80;
+}</style><style>
+        .mermaid-wrapper{position:relative;width:100%;overflow:hidden;user-select:none}
+        .mermaid-wrapper.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#fff}
+        .mermaid-wrapper.fullscreen .mermaid-controls{margin-right:20px}
+        .mermaid-controls{position:absolute;bottom:8px;right:8px;display:flex;gap:4px;z-index:10;cursor:move}
+        .mermaid-controls button{width:32px;height:32px;border:none;background:rgba(255,255,255,0.9);border-radius:4px;cursor:pointer;font-size:16px;box-shadow:0 2px 4px rgba(0,0,0,0.2)}
+        .mermaid-controls button:hover{background:#fff}
+    </style><script id="mermaid-scripts" src="/cache/mermaid.min.local.js"></script>
+<script>mermaid.initialize({theme: 'default'});</script>
+<script>(function(){
+        document.addEventListener('DOMContentLoaded',function(){
+            setTimeout(function(){
+                document.querySelectorAll('.mermaid').forEach(function(el){
+                    const w=document.createElement('div');
+                    w.className='mermaid-wrapper';
+                    el.parentNode.insertBefore(w,el);
+                    w.appendChild(el);
+                    const c=document.createElement('div');
+                    c.className='mermaid-controls';
+                    const zi=document.createElement('button');zi.innerHTML='🔍';zi.title='Zoom In';zi.dataset.action='zoom-in';c.appendChild(zi);const zo=document.createElement('button');zo.innerHTML='🔎';zo.title='Zoom Out';zo.dataset.action='zoom-out';c.appendChild(zo);const r=document.createElement('button');r.innerHTML='↺';r.title='Reset';r.dataset.action='reset';c.appendChild(r);const d=document.createElement('button');d.innerHTML='💾';d.title='Download SVG';d.dataset.action='download';c.appendChild(d);const f=document.createElement('button');f.innerHTML='⛶';f.title='Fullscreen';f.dataset.action='fullscreen';c.appendChild(f);let sc=1,tx=0,ty=0;c.addEventListener('click',function(e){
+        const btn=e.target.closest('button');if(!btn)return;
+        const s=el.querySelector('svg');if(!s)return;
+        const action=btn.dataset.action;
+        if(action==='zoom-in'){
+            sc=sc*1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='zoom-out'){
+            sc=sc/1.2;
+            s.style.transform='scale('+sc+')';s.style.transformOrigin='top left'
+        }else if(action==='reset'){
+            sc=1;tx=0;ty=0;s.style.transform='';s.style.transformOrigin='top left'
+        }else if(action==='download'){
+            const clone=s.cloneNode(true);clone.removeAttribute('style');
+            const svg=clone.outerHTML.replace(/<br\s*\/?>/gi,'').replace(/<\/p>/gi,'').replace(/&nbsp;/gi,'&#160;');
+            const b=new Blob([svg],{type:'image/svg+xml'});const u=URL.createObjectURL(b);
+            const a=document.createElement('a');a.href=u;a.download='mermaid-diagram.svg';a.click();URL.revokeObjectURL(u)
+        }else if(action==='fullscreen'){
+            if(w.classList.contains('fullscreen')){
+                w.classList.remove('fullscreen');btn.innerHTML='⛶';btn.title='Fullscreen';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }else{
+                w.classList.add('fullscreen');btn.innerHTML='✕';btn.title='Close';
+                c.style.top='';c.style.left='';c.style.right='';c.style.bottom='';c.style.marginRight=''
+            }
+        }
+    });let dx=0,dy=0,px=0,py=0;
+            c.onmousedown=(e)=>{e.preventDefault();px=e.clientX;py=e.clientY;
+            document.onmousemove=(e)=>{e.preventDefault();dx=px-e.clientX;dy=py-e.clientY;px=e.clientX;py=e.clientY;
+            c.style.top=(c.offsetTop-dy)+'px';c.style.left=(c.offsetLeft-dx)+'px';c.style.right='auto';c.style.bottom='auto'};
+            document.onmouseup=()=>{document.onmousemove=null;document.onmouseup=null}};w.appendChild(c);const s=el.querySelector('svg');if(s){
+            w.style.cursor='grab';s.style.userSelect='none';s.style.position='relative';
+            let px=0,py=0,dragging=false;
+            w.addEventListener('mousedown',function(e){
+                if(e.target.closest('.mermaid-controls')||e.target.closest('button'))return;
+                dragging=true;w.style.cursor='grabbing';e.preventDefault();px=e.clientX;py=e.clientY;
+                const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}});
+            document.addEventListener('mousemove',function(e){
+                if(!dragging)return;e.preventDefault();
+                const dx=e.clientX-px;const dy=e.clientY-py;const nt=tx+dx;const nty=ty+dy;
+                const scaleStr=sc!==1?' scale('+sc+')':'';
+                s.style.transform='translate('+nt+'px, '+nty+'px)'+scaleStr;s.style.transformOrigin='top left'})
+            document.addEventListener('mouseup',function(){
+                if(dragging){
+                    const t=s.style.transform.match(/translate\(([\d.-]+)px,\s*([\d.-]+)px\)/);
+                    if(t){tx=parseFloat(t[1]);ty=parseFloat(t[2])}else{tx=0;ty=0}
+                    dragging=false;w.style.cursor='grab'}})}
+                })
+            },100)
+        })
+    })();</script></head>
+
+<body>
+    <div id="wrap">
+        
+        
+<header id="header">
+    <div id="header-outer" class="outer">
+        <div class="container">
+            <div class="container-inner">
+                <div id="header-title">
+                    <h1 class="logo-wrap">
+                        <div class="logo"></div>
+                    </h1>
+
+                        <h2 class="subtitle-wrap">
+                            <p class="title">解碼數位異象</p>
+                          <p class="subtitle">有時功能就是數位兔子洞中的錯誤，反之亦然</p>
+                        </h2>
+
+
+
+
+                    <div id="lang-selector">
+                        <span class="lang-icon">🌐</span>
+                        
+                            <a href="#" class="lang-link" data-lang="en">English</a>
+<span class="lang-sep">|</span>                            <a href="#" class="lang-link" data-lang="zh-CN">简体中文</a>
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            var currentLang = 'zh-TW';
+                            var currentPath = window.location.pathname;
+                            var basePath;
+                            
+                            if (currentLang === 'en') {
+                                basePath = currentPath;
+                            } else {
+                                basePath = currentPath.replace(new RegExp('^/' + currentLang + '/'), '/');
+                            }
+                            
+                            document.querySelectorAll('.lang-link').forEach(function(link) {
+                                var targetLang = link.getAttribute('data-lang');
+                                var targetPath;
+                                if (targetLang === 'en') {
+                                    targetPath = basePath;
+                                } else {
+                                    targetPath = '/' + targetLang + basePath;
+                                }
+                                link.href = targetPath;
+                            });
+                        });
+                        </script>
+                    </div>
+
+
+                </div>
+                <div id="header-inner" class="nav-container">
+                    <a id="main-nav-toggle" class="nav-icon fa fa-bars"></a>
+                    <div class="nav-container-inner">
+                        <ul id="main-nav">
+                            
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/">首頁</a>
+                                </li>
+                                                                    <ul class="main-nav-list"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/">人工智慧</a><ul class="main-nav-list-child"><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/AI/Art-Gallery/">藝術畫廊</a></li></ul></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Architecture/">架構</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Cybersecurity/">資訊安全</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Development/">開發</a></li><li class="main-nav-list-item"><a class="main-nav-list-link" href="/zh-TW/categories/Misc/">雜項</a></li></ul>
+                                <li class="main-nav-list-item">
+                                    <a class="main-nav-list-link" href="/zh-TW/about-me/">關於</a>
+                                </li>
+                            
+                        </ul>
+                        <nav id="sub-nav">
+                            <div id="search-form-wrap">
+
+    <form class="search-form">
+        <input type="text" class="ins-search-input search-form-input" id="search-form-input" placeholder="搜尋">
+        <button type="submit" title="搜尋" class="search-form-submit"></button>
+    </form>
+    <div class="ins-search">
+    <div class="ins-search-mask"></div>
+    <div class="ins-search-container">
+        <div class="ins-input-wrapper">
+            <input type="text" class="ins-search-input" id="ins-search-input" placeholder="輸入關鍵字...">
+            <span class="ins-close ins-selectable"><i class="fa fa-times-circle"></i></span>
+        </div>
+        <div class="ins-section-wrapper">
+            <div class="ins-section-container"></div>
+        </div>
+    </div>
+</div>
+<script integrity="sha256-B5nfCL2Dym3Ba4YJFI7wB3f4vtClbrYJZ32A5erBEdg=">
+(function (window) {
+    var INSIGHT_CONFIG = {
+        TRANSLATION: {
+            POSTS: '文章',
+            PAGES: '頁面',
+            CATEGORIES: '分類',
+            TAGS: '標籤',
+            UNTITLED: '(未命名)',
+        },
+        ROOT_URL: '/',
+        CONTENT_URL: '/content.json',
+        LANG: 'zh-TW',
+    };
+    window.INSIGHT_CONFIG = INSIGHT_CONFIG;
+})(window);
+</script>
+
+
+
+
+</div>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+        
+        <div class="container">
+            <div class="main-body container-inner">
+                <div class="main-body-inner">
+                    <section id="main">
+                        <div class="main-body-header">
+    <h1 class="header">
+    
+    <a class="page-title-link" href="/categories/Architecture/">Architecture</a>
+    </h1>
+</div>
+
+                        <div class="main-body-content">
+                            <article id="post-2026/02/Environment-on-Demand-Part1-Architecture-zh-TW" class="article article-single article-type-post" itemscope="" itemprop="blogPost">
+    <div class="article-inner responsive-content">
+        
+            <header class="article-header">
+                
+    
+        <h1 class="article-title" itemprop="name">
+        按需環境（第一篇）：架構與實現
+        </h1>
+    
+
+            </header>
+        
+        
+            <div class="article-meta">
+                
+    <div class="article-date">
+      <i class="fa fa-calendar"></i>
+        
+          Created <time datetime="2026-02-17T16:00:00.000Z" itemprop="datePublished">2026-02-18</time>
+          &nbsp;<i class="fa fa-calendar"></i>
+          Updated <time datetime="2026-03-18T13:37:08.796Z" itemprop="datePublished">2026-03-18</time>
+        
+    </div>
+
+
+                
+
+                
+    <div class="article-tag">
+        <i class="fa fa-tag"></i>
+        <a class="tag-link" href="/zh-TW/tags/DevOps/">DevOps</a> <a class="tag-link" href="/zh-TW/tags/GitOps/">GitOps</a> <a class="tag-link" href="/zh-TW/tags/Platform-Engineering/">Platform Engineering</a>
+    </div>
+
+            </div>
+        
+        
+        
+        <div class="article-entry" itemprop="articleBody">
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#1-%E4%BB%80%E9%BA%BC%E6%98%AF%E6%8C%89%E9%9C%80%E7%92%B0%E5%A2%83%EF%BC%9F"><span class="toc-text">1 什麼是按需環境？</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#2-GitOps-%E6%8E%A5%E5%8F%A3%EF%BC%9AArgo-CD-ApplicationSets"><span class="toc-text">2 GitOps 接口：Argo CD ApplicationSets</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#3-%E5%9F%BA%E7%A4%8E%E8%A8%AD%E6%96%BD%E6%A8%B9%EF%BC%9A%E7%92%B0%E5%A2%83%E5%A6%82%E4%BD%95%E6%88%90%E7%82%BA%E8%B3%87%E6%BA%90"><span class="toc-text">3 基礎設施樹：環境如何成為資源</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#4-%E9%85%8D%E7%BD%AE%E6%A8%A1%E5%9E%8B%EF%BC%9A%E5%A5%BD%E7%9A%84%E3%80%81%E5%A3%9E%E7%9A%84%E5%92%8C%E6%85%A2%E7%9A%84"><span class="toc-text">4 配置模型：好的、壞的和慢的</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#5-%E9%9B%B2%E5%AF%A6%E7%8F%BE%EF%BC%9AKubernetes-Serverless-IaC-%E7%A4%BA%E4%BE%8B"><span class="toc-text">5 雲實現：Kubernetes + Serverless + IaC 示例</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#6-%E6%80%A7%E8%83%BD%E5%BD%B1%E9%9F%BF%EF%BC%9AEoD-%E4%BD%95%E6%99%82%E6%93%85%E9%95%B7-vs-%E6%8E%99%E6%89%8E"><span class="toc-text">6 性能影響：EoD 何時擅長 vs. 掙扎</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#7-%E6%9B%BF%E4%BB%A3%E6%96%B9%E6%B3%95%EF%BC%9A%E6%AC%8A%E8%A1%A1"><span class="toc-text">7 替代方法：權衡</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%B8%BD%E7%B5%90%EF%BC%9A%E6%8C%89%E9%9C%80%E7%92%B0%E5%A2%83%E6%9E%B6%E6%A7%8B"><span class="toc-text">總結：按需環境架構</span></a></li></ol>
+            <p>你的團隊開啟的每個 pull request——無論是簡單的 bug 修復還是橫跨多個微服務的複雜功能——都可以擁有自己獨立的、類生產環境：<strong>按需環境</strong> (EoD，Environment on Demand)。</p>
+<p>這個模式讓團隊能夠：</p>
+<ul>
+<li>在幾分鐘內（而非幾天）啟動預覽環境</li>
+<li>在合併到 main 分支前，在隔離環境中測試變更</li>
+<li>使用基礎設施即代碼 (IaC) 安全地驗證基礎設施變更</li>
+<li>在 PR 關閉時自動清理，避免成本浪費</li>
+</ul>
+<p>但這也是為什麼採用 EoD 的團隊會在<strong>配置延遲</strong>、<strong>CDN 傳播延遲</strong>、<strong>成本超支</strong>和<strong>運營複雜性</strong>方面遇到類似的痛點。以下是深入探討：什麼是按需環境、為什麼團隊需要它、如何架構設計它，以及現實中的挑戰。</p>
+<p>有了這個概述，讓我們深入探討按需環境的真正含義，首先從其核心定義開始。</p>
+<hr>
+<h2 id="1-什麼是按需環境？">1 什麼是按需環境？</h2>
+<p><strong>按需環境</strong> 是一種基礎設施模式，其中開發、staging 和預覽環境通過 GitOps 工作流<strong>自動</strong>配置，通常由 pull request 或分支推送觸發。</p>
+<p>每個環境包括：</p>
+<ul>
+<li>計算命名空間或集群（Kubernetes，使用 serverless 或節點組）</li>
+<li>應用部署（微服務、前端、後端）</li>
+<li>支持基礎設施（託管數據庫、消息隊列、對象存儲）</li>
+<li>網絡（負載均衡器入口、DNS、CDN 分發）</li>
+<li>策略（准入控制、IAM 角色、服務網格）</li>
+</ul>
+<p>這種<strong>拉取式</strong>模型意味著基礎設施從 Git 流出，一次一個提交，直到環境準備好進行測試。</p>
+<div class="admonition info"><p class="admonition-title"><span class="mdi mdi-information-outline admonition-icon"></span>第一次接觸這些概念？</p><div class="admonition-content"><ul>
+<li><strong>GitOps</strong>：一種運營框架，將應用開發中使用的 DevOps 最佳實踐（如版本控制、協作、合規性和 CI/CD）應用於基礎設施自動化。這意味著使用 Git 作為單一事實來源來管理基礎設施和應用。</li>
+<li><strong>Argo CD</strong>：一種用於 Kubernetes 的聲明式 GitOps 持續交付工具。它自動將 Git 倉庫中指定的期望應用狀態部署到 Kubernetes 集群。</li>
+<li><strong>Terraform</strong>：一種開源的基礎設施即代碼 (IaC) 工具，允許使用聲明式配置語言定義和配置基礎設施。它可以管理廣泛的雲服務和本地資源。</li>
+<li><strong>PR (Pull Request)</strong>：版本控制系統（如 Git）中的一種機制，開發人員用它通知團隊成員他們已完成功能或 bug 修復，並準備將他們從獨立分支的變更合併到主代碼庫中。它啟動審查流程。</li>
+</ul>
+</div></div>
+<p>有了這個基礎理解，正確分類按需環境至關重要。它是一個平台、一個模式，還是其他什麼？</p>
+<h3 id="它是一個平台？一個模式？還是其他什麼？">它是一個平台？一個模式？還是其他什麼？</h3>
+<p>按需環境經常使用不同的術語來描述。以下是精確的分類：</p>
+<table>
+<thead>
+<tr>
+<th>術語</th>
+<th>EoD 是這個嗎？</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>部署模式</strong></td>
+<td>✅ <strong>最準確</strong></td>
+<td>定義了<em>如何</em>創建和管理環境</td>
+</tr>
+<tr>
+<td><strong>架構模式</strong></td>
+<td>✅ <strong>也正確</strong></td>
+<td>定義高層結構（GitOps 驅動、臨時資源）</td>
+</tr>
+<tr>
+<td><strong>平台</strong></td>
+<td>⚠️ <strong>部分</strong></td>
+<td>構建<em>在</em>Kubernetes + CI/CD 工具<em>之上</em>，但不僅僅是一個平台</td>
+</tr>
+<tr>
+<td><strong>軟件架構</strong></td>
+<td>❌ <strong>太寬泛</strong></td>
+<td>它是團隊 DevOps 架構的<em>一部分</em>，而不是整個架構</td>
+</tr>
+<tr>
+<td><strong>方法論</strong></td>
+<td>❌ <strong>不是</strong></td>
+<td>它是一個實現模式，而不是流程方法論</td>
+</tr>
+</tbody>
+</table>
+<p><strong>關係：</strong></p>
+<pre class="language-none"><code class="language-none">GitOps（方法論）
+        ↓
+    啟用
+        ↓
+Environment on Demand（部署模式 / 架構模式）
+        ↓
+    實現於
+        ↓
+Argo CD + Terraform + Kubernetes（平台棧）</code></pre>
+<p><strong>為什麼會混淆？</strong></p>
+<table>
+<thead>
+<tr>
+<th>來源</th>
+<th>使用術語</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>DevOps 博客</strong></td>
+<td>“平台”</td>
+<td>營銷；聽起來更實質</td>
+</tr>
+<tr>
+<td><strong>工程團隊</strong></td>
+<td>“模式”</td>
+<td>來自架構詞彙的熟悉感</td>
+</tr>
+<tr>
+<td><strong>供應商文檔</strong></td>
+<td>“解決方案”</td>
+<td>產品導向的命名</td>
+</tr>
+<tr>
+<td><strong>SRE 團隊</strong></td>
+<td>“工作流”</td>
+<td>運營導向的命名</td>
+</tr>
+</tbody>
+</table>
+<p><strong>精確答案：</strong></p>
+<p>按需環境最好描述為一種<strong>基礎設施部署模式</strong>，它：</p>
+<ul>
+<li>使用 <strong>GitOps 方法論</strong> 作為基礎</li>
+<li>定義<strong>配置模型</strong>（自動、臨時、每 PR）</li>
+<li>是團隊整體 DevOps 架構的<strong>一部分</strong></li>
+</ul>
+<p>這樣理解：</p>
+<ul>
+<li><strong>GitOps</strong> = “我如何通過 Git 管理基礎設施？”</li>
+<li><strong>按需環境</strong> = “我如何為每個 PR 創建隔離環境？”</li>
+<li><strong>Argo CD + Terraform + Kubernetes</strong> = “實現 EoD 的實際工具”</li>
+</ul>
+<p>為了說明這個概念，讓我們通過一個簡單的按需環境配置流程示例。</p>
+<hr>
+<p><strong>簡單示例：</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># PR #123 開啟 → GitOps 工作流觸發</span>
+<span class="token comment"># 環境：pr-123.neo01.com</span></code></pre>
+<p>配置如下：</p>
+<div class="mermaid">flowchart BT
+    A[GitHub PR #123] --&gt; B[Argo CD ApplicationSet]
+    B --&gt; C[EKS Namespace: pr-123]
+    C --&gt; D[Fargate Pods + Istio Sidecars]
+    D --&gt; E[Aurora DB Subset]
+    E --&gt; F[S3 + CloudFront]
+    F --&gt; G[Route 53: pr-123.neo01.com]
+    G --&gt; H[Environment Ready]
+
+    style A fill:#e3f2fd,stroke:#1976d2
+    style B fill:#fff3e0,stroke:#f57c00
+    style C fill:#e8f5e9,stroke:#388e3c
+    style H fill:#fce4ec,stroke:#c2185b</div>
+<p><strong>配置流程：</strong></p>
+<pre class="language-none"><code class="language-none">開發人員："開啟 PR #123"
+  ↓
+GitHub Actions："觸發 Terraform Cloud"
+  ↓
+Terraform："創建命名空間 + 資源"
+  ↓
+Argo CD："同步應用到命名空間"
+  ↓
+環境："就緒於 pr-123.neo01.com"</code></pre>
+<p>每個組件都是<strong>獨立的</strong>。命名空間不知道 pod 是運行在 Fargate 還是 EC2 上。DNS 不知道它是預覽環境還是 staging 環境。這種<strong>模塊化</strong>是 EoD 的超能力。</p>
+<p>現在我們已經看到了高級概述，讓我們放大核心機制，首先從 GitOps 接口和 Argo CD ApplicationSets 開始。</p>
+<hr>
+<h2 id="2-GitOps-接口：Argo-CD-ApplicationSets">2 GitOps 接口：Argo CD ApplicationSets</h2>
+<p>在 GitOps 驅動的设置中，每個環境都表示為一個 <strong>Argo CD Application</strong>（或 ApplicationSet，用於模板化環境）：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># 簡化的 Argo CD ApplicationSet</span>
+<span class="token key atrule">apiVersion</span><span class="token punctuation">:</span> argoproj.io/v1alpha1
+<span class="token key atrule">kind</span><span class="token punctuation">:</span> ApplicationSet
+<span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+  <span class="token key atrule">name</span><span class="token punctuation">:</span> preview<span class="token punctuation">-</span>environments
+<span class="token key atrule">spec</span><span class="token punctuation">:</span>
+  <span class="token key atrule">generators</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">pullRequest</span><span class="token punctuation">:</span>
+        <span class="token key atrule">github</span><span class="token punctuation">:</span>
+          <span class="token key atrule">api</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//api.github.com
+          <span class="token key atrule">tokenRef</span><span class="token punctuation">:</span>
+            <span class="token key atrule">secretName</span><span class="token punctuation">:</span> github<span class="token punctuation">-</span>token
+            <span class="token key atrule">key</span><span class="token punctuation">:</span> token
+          <span class="token key atrule">repo</span><span class="token punctuation">:</span> neo01/neo01.com
+          <span class="token key atrule">branch</span><span class="token punctuation">:</span> main
+  <span class="token key atrule">template</span><span class="token punctuation">:</span>
+    <span class="token key atrule">metadata</span><span class="token punctuation">:</span>
+      <span class="token key atrule">name</span><span class="token punctuation">:</span> <span class="token string">'pr-{{number}}'</span>
+    <span class="token key atrule">spec</span><span class="token punctuation">:</span>
+      <span class="token key atrule">project</span><span class="token punctuation">:</span> default
+      <span class="token key atrule">source</span><span class="token punctuation">:</span>
+        <span class="token key atrule">repoURL</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//github.com/neo01/neo01.com
+        <span class="token key atrule">targetRevision</span><span class="token punctuation">:</span> <span class="token string">'pr-{{number}}'</span>
+        <span class="token key atrule">path</span><span class="token punctuation">:</span> <span class="token string">'environments/preview'</span>
+      <span class="token key atrule">destination</span><span class="token punctuation">:</span>
+        <span class="token key atrule">server</span><span class="token punctuation">:</span> https<span class="token punctuation">:</span>//kubernetes.default.svc
+        <span class="token key atrule">namespace</span><span class="token punctuation">:</span> <span class="token string">'pr-{{number}}'</span>
+      <span class="token key atrule">syncPolicy</span><span class="token punctuation">:</span>
+        <span class="token key atrule">automated</span><span class="token punctuation">:</span>
+          <span class="token key atrule">prune</span><span class="token punctuation">:</span> <span class="token boolean important">true</span>
+          <span class="token key atrule">selfHeal</span><span class="token punctuation">:</span> <span class="token boolean important">true</span></code></pre>
+<p><strong>合約：</strong></p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>generators.pullRequest</code></td>
+<td>監視 PR，為每個 PR 創建環境</td>
+</tr>
+<tr>
+<td><code>template.metadata.name</code></td>
+<td>環境名稱（例如 <code>pr-123</code>）</td>
+</tr>
+<tr>
+<td><code>destination.namespace</code></td>
+<td>Kubernetes 命名空間隔離</td>
+</tr>
+<tr>
+<td><code>syncPolicy.automated</code></td>
+<td>Git 變更時自動同步，刪除時清理</td>
+</tr>
+</tbody>
+</table>
+<p><strong>通用同步循環：</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># Argo CD 持續協調</span>
+while true; do
+  desired_state = git_repo.get_latest()
+  current_state = k8s_cluster.get_current()
+
+  if desired_state <span class="token tag">!=</span> current_state
+    k8s_cluster.apply(desired_state)
+
+  sleep 3s  <span class="token comment"># 協調間隔</span>
+end</code></pre>
+<p>這個循環——<strong>將 Git 協調到集群，重複</strong>——就是整個 GitOps 模型。每個環境，無論多麼複雜，都歸結為這個模式。</p>
+<p>理解了 GitOps 同步機制，讓我們探討這些環境如何轉換為實際的雲資源，形成一個「基礎設施樹」。</p>
+<hr>
+<h2 id="3-基礎設施樹：環境如何成為資源">3 基礎設施樹：環境如何成為資源</h2>
+<p>當你開啟 PR 時，Terraform 構建一個<strong>基礎設施樹</strong>。每個節點是一個具有特定依賴關係的資源類型。</p>
+<h3 id="常見資源類型">常見資源類型</h3>
+<table>
+<thead>
+<tr>
+<th>資源</th>
+<th>作用</th>
+<th>配置時間</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Kubernetes Namespace</strong></td>
+<td>集群中的邏輯隔離</td>
+<td>&lt; 1 分鐘</td>
+</tr>
+<tr>
+<td><strong>Serverless Pods</strong></td>
+<td>計算（無需節點管理）</td>
+<td>2-5 分鐘</td>
+</tr>
+<tr>
+<td><strong>Service Mesh Sidecars</strong></td>
+<td>mTLS、流量整形</td>
+<td>1-2 分鐘</td>
+</tr>
+<tr>
+<td><strong>Admission Policies</strong></td>
+<td>安全性、合規性</td>
+<td>&lt; 1 分鐘</td>
+</tr>
+<tr>
+<td><strong>Managed Database</strong></td>
+<td>PostgreSQL/MySQL（可以是 serverless）</td>
+<td>10-15 分鐘</td>
+</tr>
+<tr>
+<td><strong>Message Queue Topics</strong></td>
+<td>Kafka/RabbitMQ（或使用共享集群）</td>
+<td>5-10 分鐘</td>
+</tr>
+<tr>
+<td><strong>Object Storage</strong></td>
+<td>桶（資產、上傳）</td>
+<td>&lt; 1 分鐘</td>
+</tr>
+<tr>
+<td><strong>CDN</strong></td>
+<td>靜態資產分發</td>
+<td>5-15 分鐘</td>
+</tr>
+<tr>
+<td><strong>DNS Records</strong></td>
+<td>每個環境的 CNAME/ALIAS</td>
+<td>1-5 分鐘</td>
+</tr>
+<tr>
+<td><strong>Load Balancer</strong></td>
+<td>基於路徑的路由</td>
+<td>2-5 分鐘</td>
+</tr>
+</tbody>
+</table>
+<h3 id="示例：完整預覽環境">示例：完整預覽環境</h3>
+<pre class="language-hcl" data-language="hcl"><code class="language-hcl"><span class="token comment"># 簡化的 Terraform 模組</span>
+<span class="token keyword">module<span class="token type variable"> "preview_env" </span></span><span class="token punctuation">{</span>
+  <span class="token property">source</span> <span class="token punctuation">=</span> <span class="token string">"./modules/preview"</span>
+
+  <span class="token property">pr_number</span>      <span class="token punctuation">=</span> var.pr_number
+  <span class="token property">namespace</span>      <span class="token punctuation">=</span> <span class="token string">"pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>"</span>
+  <span class="token property">domain</span>         <span class="token punctuation">=</span> <span class="token string">"pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>.neo01.com"</span>
+  <span class="token property">image_tag</span>      <span class="token punctuation">=</span> var.image_tag
+  <span class="token property">cloud_region</span>   <span class="token punctuation">=</span> <span class="token string">"ap-east-1"</span>
+
+  <span class="token comment"># 共享資源（更便宜、更快）</span>
+  <span class="token property">shared_mq_cluster_arn</span> <span class="token punctuation">=</span> data.aws_mq_cluster.shared.arn
+  <span class="token property">shared_vpc_id</span>          <span class="token punctuation">=</span> data.aws_vpc.main.id
+
+  <span class="token comment"># 不活動後自動銷毀</span>
+  <span class="token property">ttl_hours</span> <span class="token punctuation">=</span> <span class="token number">24</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>基礎設施計劃（簡化）：</strong></p>
+<div class="mermaid">flowchart BT
+    A[IaC Apply] --&gt; B[Kubernetes Namespace: pr-123]
+    B --&gt; C[Load Balancer + DNS]
+    C --&gt; D[CDN Distribution]
+    D --&gt; E[Compute Pods + Service Mesh]
+    E --&gt; F[Managed Database]
+    F --&gt; G[Message Queue Topics]
+    G --&gt; H[Object Storage]
+    H --&gt; I[Admission Policies]
+    I --&gt; J[GitOps Sync]
+    J --&gt; K[Environment Ready]
+
+    style A fill:#e3f2fd,stroke:#1976d2
+    style B fill:#e8f5e9,stroke:#388e3c
+    style D fill:#fff3e0,stroke:#f57c00
+    style F fill:#fff3e0,stroke:#f57c00
+    style K fill:#fce4ec,stroke:#c2185b</div>
+<p><strong>配置流程（第一個環境）：</strong></p>
+<pre class="language-none"><code class="language-none">1. 開發人員開啟 PR #123
+2. CI/CD 觸發 IaC apply
+3. IaC 創建命名空間（1 分鐘）
+4. IaC 配置託管數據庫（10-15 分鐘）← 阻塞
+5. IaC 創建 CDN 分發（5-15 分鐘）← 阻塞
+6. IaC 設置 DNS 記錄（1-5 分鐘）
+7. GitOps 同步應用到命名空間（2-5 分鐘）
+8. 帶有 sidecar 的計算 pod 啟動（2-5 分鐘）
+9. 健康檢查通過，環境標記為就緒
+10. 通知："pr-123.neo01.com 已就緒"</code></pre>
+<p>注意：<strong>數據庫和 CDN 必須在環境可用之前完成</strong>。這些是<strong>阻塞資源</strong>——它們破壞了快速反饋循環。</p>
+<div class="admonition question"><p class="admonition-title"><span class="mdi mdi-comment-question-outline admonition-icon"></span>🤔 為什麼這很重要？</p><div class="admonition-content"><p>像數據庫、CDN 和消息隊列這樣的阻塞資源迫使 IaC <strong>等待雲提供商 API</strong> 然後才能繼續。這意味著：</p>
+<ul>
+<li><strong>開發人員等待時間</strong> — 測試前等待 15-30 分鐘</li>
+<li><strong>成本累積</strong> — 資源在等待時也在計費</li>
+<li><strong>反饋延遲</strong> — 無法快速驗證變更</li>
+</ul>
+<p>當你在 IaC 計劃中看到這些時，問自己：<em>"我可以使用共享資源而不是每環境配置嗎？"</em></p>
+</div></div>
+<p>掌握了配置流程，是時候通過檢視其優缺點來分析按需環境的有效性了。</p>
+<hr>
+<h2 id="4-配置模型：好的、壞的和慢的">4 配置模型：好的、壞的和慢的</h2>
+<h3 id="好的：為什麼-EoD-運作良好">好的：為什麼 EoD 運作良好</h3>
+<p><strong>1. 隔離</strong></p>
+<p>每個 PR 獲得具有專用資源的自己命名空間：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># pr-123 不能影響 pr-124</span>
+<span class="token key atrule">namespace</span><span class="token punctuation">:</span> pr<span class="token punctuation">-</span><span class="token number">123</span>
+<span class="token key atrule">resources</span><span class="token punctuation">:</span>
+  <span class="token key atrule">cpu_limit</span><span class="token punctuation">:</span> <span class="token number">2</span>
+  <span class="token key atrule">memory_limit</span><span class="token punctuation">:</span> 4Gi
+  <span class="token key atrule">network_policy</span><span class="token punctuation">:</span> deny<span class="token punctuation">-</span>cross<span class="token punctuation">-</span>namespace</code></pre>
+<p><strong>爆炸半徑：</strong> 每個環境 O(1)（僅該命名空間）</p>
+<hr>
+<p><strong>2. 模塊化</strong></p>
+<p>環境由可重用模組組成。相同的 IaC 模組適用於：</p>
+<ul>
+<li>預覽環境（每 PR）</li>
+<li>Staging 環境（共享、長期存在）</li>
+<li>開發環境（持久、團隊特定）</li>
+</ul>
+<p>不需要為每個層級編寫自定義代碼。</p>
+<hr>
+<p><strong>3. 自動清理</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># GitOps + cron job</span>
+<span class="token key atrule">when PR.closed OR TTL.expired</span><span class="token punctuation">:</span>
+  delete namespace
+  destroy IaC resources
+  invalidate CDN cache (if needed)
+  <span class="token key atrule">notify team</span><span class="token punctuation">:</span> <span class="token string">"Environment pr-123 destroyed"</span></code></pre>
+<p>環境在不活動 24 小時後自毀——無需手動清理。</p>
+<hr>
+<p><strong>4. 審計追蹤</strong></p>
+<p>每個環境變更都在 Git 中追蹤：</p>
+<pre class="language-bash" data-language="bash"><code class="language-bash">$ <span class="token function">git</span> log <span class="token parameter variable">--oneline</span> environments/preview/
+a1b2c3d  feat: Add payment <span class="token function">service</span> to pr-123
+e4f5g6h  fix: Update database config <span class="token keyword">for</span> pr-122
+i7j8k9l  chore: Bump TTL to 24h <span class="token keyword">for</span> all previews</code></pre>
+<p>約 3 行 Git 歷史。易於審計。易於回滾。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="mdi mdi-lightbulb-on-outline admonition-icon"></span>💡 關鍵洞察：簡單性實現治理</p><div class="admonition-content"><p>因為每個環境都在 Git 中定義，合規團隊可以像審查代碼變更一樣審查基礎設施變更。這就是為什麼 EoD 在受監管行業（金融、醫療保健、博彩）中有效。<strong>GitOps 審計追蹤</strong>是 EoD 合規的原因。</p>
+</div></div>
+<hr>
+<h3 id="壞的：EoD-遇到困難的地方">壞的：EoD 遇到困難的地方</h3>
+<p><strong>1. 配置延遲</strong></p>
+<p>每個環境需要：</p>
+<ul>
+<li>IaC apply（5-30 分鐘）</li>
+<li>GitOps sync（2-5 分鐘）</li>
+<li>Health checks（1-3 分鐘）</li>
+<li>DNS propagation（1-5 分鐘，或 CDN 需 10-15 分鐘）</li>
+</ul>
+<p>對於 10 個並發 PR：<strong>累計等待時間 50-300 分鐘</strong>。</p>
+<hr>
+<p><strong>2. CDN 傳播</strong></p>
+<p>靜態資產的 CDN 失效在全球範圍內幾秒到約 2-5 分鐘內完成，但可能飆升到 10-15+ 分鐘（或在雲提供商高峰/API 限流期間罕見地達到數小時）。</p>
+<p><strong>EoD 中的挑戰：</strong></p>
+<pre class="language-none"><code class="language-none">每個臨時環境需要：
+  - 自定義域名：pr-123.neo01.com
+  - CDN 行為：/assets/* → Object Storage
+  - DNS 記錄：CNAME to CDN
+  - 失效：/*（或使用版本化路徑）</code></pre>
+<p>當 CI/CD/GitOps 流程觸發每個 PR 的失效時：</p>
+<ul>
+<li>PR 合併 → 部署 → 失效 → 用戶看到舊內容</li>
+<li>“為什麼我的變更沒有上線？！”</li>
+</ul>
+<hr>
+<p><strong>3. 成本累積</strong></p>
+<pre class="language-none"><code class="language-none">10-30 個並發預覽環境：
+  - Serverless compute: $0.04/vCPU-hour × 2 vCPU × 24h = ~$2/環境/天
+  - Managed database: $0.12/unit-hour × 2 units × 24h = ~$6/環境/天
+  - CDN: $0.085/GB (egress) + $0.009/10k requests
+  - DNS: $0.50/hosted zone + $0.40/million queries
+  - Load Balancer: $0.0225/hour + $0.008/LCU-hour</code></pre>
+<p><strong>20 個環境的月成本：</strong> 約 $500-1500（如果積極清理）到 $3000-5000（如果留著運行）</p>
+<hr>
+<p><strong>4. 依賴複雜性</strong></p>
+<p>一些資源必須跨服務協調：</p>
+<table>
+<thead>
+<tr>
+<th>阻塞依賴</th>
+<th>為什麼阻塞</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Database init</strong></td>
+<td>必須在應用啟動前完成遷移</td>
+</tr>
+<tr>
+<td><strong>CDN deploy</strong></td>
+<td>必須有有效的 SSL 證書（驗證可能需要幾分鐘）</td>
+</tr>
+<tr>
+<td><strong>Message Queue topic creation</strong></td>
+<td>必須在生產者/消費者啟動前存在</td>
+</tr>
+<tr>
+<td><strong>Secrets sync</strong></td>
+<td>必須在 pod 啟動前有 secrets manager 條目</td>
+</tr>
+</tbody>
+</table>
+<p>當計劃中存在阻塞依賴時，<strong>上游資源無法繼續</strong>——它們必須等待。</p>
+<p>探討了權衡之後，讓我們看看按需環境的具體雲實現，重點關注 Kubernetes、serverless 和基礎設施即代碼。</p>
+<hr>
+<h2 id="5-雲實現：Kubernetes-Serverless-IaC-示例">5 雲實現：Kubernetes + Serverless + IaC 示例</h2>
+<p>在生產設置中，EoD 棧通常使用雲原生服務。以下示例使用 AWS，但這些模式適用於 Azure（AKS + Container Apps）、GCP（GKE + Cloud Run）或任何 Kubernetes 平台：</p>
+<pre class="language-hcl" data-language="hcl"><code class="language-hcl"><span class="token comment"># 簡化的 Kubernetes namespace Terraform</span>
+<span class="token keyword">resource <span class="token type variable">"kubernetes_namespace"</span></span> <span class="token string">"preview"</span> <span class="token punctuation">{</span>
+  <span class="token keyword">metadata</span> <span class="token punctuation">{</span>
+    <span class="token property">name</span> <span class="token punctuation">=</span> <span class="token string">"pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>"</span>
+
+    <span class="token property">labels</span> <span class="token punctuation">=</span> <span class="token punctuation">{</span>
+      <span class="token property">"app.kubernetes.io/name"</span>       <span class="token punctuation">=</span> <span class="token string">"preview"</span>
+      <span class="token property">"app.kubernetes.io/instance"</span>   <span class="token punctuation">=</span> <span class="token string">"pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>"</span>
+      <span class="token property">"environment.on-demand/owner"</span>  <span class="token punctuation">=</span> var.github_user
+      <span class="token property">"environment.on-demand/ttl"</span>    <span class="token punctuation">=</span> var.ttl_hours
+    <span class="token punctuation">}</span>
+
+    <span class="token property">annotations</span> <span class="token punctuation">=</span> <span class="token punctuation">{</span>
+      <span class="token property">"environment.on-demand/created-at"</span> <span class="token punctuation">=</span> timestamp()
+      <span class="token property">"environment.on-demand/pr-url"</span>     <span class="token punctuation">=</span> var.pr_url
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">resource <span class="token type variable">"kubernetes_pod"</span></span> <span class="token string">"app"</span> <span class="token punctuation">{</span>
+  <span class="token comment"># ... 帶有服務網格 sidecar 的 Serverless pod spec ...</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">resource <span class="token type variable">"dns_record"</span></span> <span class="token string">"preview"</span> <span class="token punctuation">{</span>
+  <span class="token property">zone_id</span> <span class="token punctuation">=</span> data.dns_zone.main.zone_id
+  <span class="token property">name</span>    <span class="token punctuation">=</span> <span class="token string">"pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>.neo01.com"</span>
+  <span class="token property">type</span>    <span class="token punctuation">=</span> <span class="token string">"A"</span>
+
+  <span class="token keyword">alias</span> <span class="token punctuation">{</span>
+    <span class="token property">name</span>                   <span class="token punctuation">=</span> cdn_distribution.preview.domain_name
+    <span class="token property">zone_id</span>                <span class="token punctuation">=</span> cdn_distribution.preview.hosted_zone_id
+    <span class="token property">evaluate_target_health</span> <span class="token punctuation">=</span> <span class="token boolean">true</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span></code></pre>
+<p>每個資源類型實現自己的配置邏輯：</p>
+<table>
+<thead>
+<tr>
+<th>資源類型</th>
+<th>IaC 資源</th>
+<th>配置複雜度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kubernetes Namespace</td>
+<td><code>kubernetes_namespace</code></td>
+<td>低 (&lt; 1 分鐘)</td>
+</tr>
+<tr>
+<td>Serverless Pods</td>
+<td><code>kubernetes_pod</code></td>
+<td>中 (2-5 分鐘)</td>
+</tr>
+<tr>
+<td>Managed Database</td>
+<td><code>managed_database_cluster</code></td>
+<td>高 (10-15 分鐘)</td>
+</tr>
+<tr>
+<td>CDN</td>
+<td><code>cdn_distribution</code></td>
+<td>高 (5-15 分鐘)</td>
+</tr>
+<tr>
+<td>DNS</td>
+<td><code>dns_record</code></td>
+<td>低 (1-5 分鐘)</td>
+</tr>
+<tr>
+<td>Message Queue Topics</td>
+<td><code>mq_topic</code> (或共享)</td>
+<td>中 (5-10 分鐘)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="示例：使用版本化資產的-CDN">示例：使用版本化資產的 CDN</h3>
+<pre class="language-hcl" data-language="hcl"><code class="language-hcl"><span class="token comment"># 使用版本化路徑避免 CDN 失效</span>
+<span class="token keyword">resource <span class="token type variable">"cdn_distribution"</span></span> <span class="token string">"preview"</span> <span class="token punctuation">{</span>
+  <span class="token keyword">origin</span> <span class="token punctuation">{</span>
+    <span class="token property">domain_name</span> <span class="token punctuation">=</span> object_storage.assets.bucket_regional_domain_name
+    <span class="token property">origin_id</span>   <span class="token punctuation">=</span> <span class="token string">"Storage-pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>"</span>
+
+    <span class="token comment"># 每個 PR 的自定義 origin 路徑</span>
+    <span class="token property">origin_path</span> <span class="token punctuation">=</span> <span class="token string">"/pr-<span class="token interpolation"><span class="token punctuation">$</span><span class="token punctuation">{</span><span class="token keyword">var</span><span class="token punctuation">.</span><span class="token type variable">pr_number</span><span class="token punctuation">}</span></span>"</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token comment"># 如果使用 /assets/v123/ 路徑，則不需要失效</span>
+  <span class="token comment"># 與其失效 /*，不如使用不可變緩存</span>
+  <span class="token keyword">default_cache_behavior</span> <span class="token punctuation">{</span>
+    <span class="token comment"># ... 版本化資產的 1 年 TTL 緩存策略 ...</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token comment"># 僅在實際內容變更時失效</span>
+  <span class="token comment"># （由 CI/CD 處理，而不是每次部署）</span>
+<span class="token punctuation">}</span></code></pre>
+<p><strong>關鍵觀察：</strong></p>
+<ol>
+<li><strong>版本化路徑</strong> 完全避免 CDN 失效</li>
+<li><strong>命名空間隔離</strong> 防止跨環境污染</li>
+<li><strong>TTL 註解</strong> 實現自動清理</li>
+<li><strong>通過 IaC 依賴委託給子</strong> 資源</li>
+</ol>
+<p>這個模式在每個環境的約 20-30 個資源類型中重複。</p>
+<p>理解了 EoD 如何實現，讓我們現在分析其性能影響，並識別它真正擅長或掙扎的場景。</p>
+<hr>
+<h2 id="6-性能影響：EoD-何時擅長-vs-掙扎">6 性能影響：EoD 何時擅長 vs. 掙扎</h2>
+<h3 id="EoD-擅長：">EoD 擅長：</h3>
+<table>
+<thead>
+<tr>
+<th>工作負載</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>功能開發</strong>（隔離測試）</td>
+<td>每個開發人員獲得自己的環境；無衝突</td>
+</tr>
+<tr>
+<td><strong>集成測試</strong>（多服務）</td>
+<td>每個 PR 可用完整棧</td>
+</tr>
+<tr>
+<td><strong>利益相關者演示</strong></td>
+<td>可分享 URL (<a target="_blank" rel="noopener" href="http://pr-123.neo01.com">pr-123.neo01.com</a>)</td>
+</tr>
+<tr>
+<td><strong>基礎設施變更</strong></td>
+<td>PR 中的 IaC plan，合併時 apply</td>
+</tr>
+</tbody>
+</table>
+<p><strong>示例：功能分支測試</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># PR #123: 添加支付網關</span>
+<span class="token key atrule">environment</span><span class="token punctuation">:</span> pr<span class="token punctuation">-</span>123.neo01.com
+<span class="token key atrule">services</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> frontend<span class="token punctuation">:</span>v1.2.3<span class="token punctuation">-</span>pr123
+  <span class="token punctuation">-</span> backend<span class="token punctuation">:</span>v1.2.3<span class="token punctuation">-</span>pr123
+  <span class="token punctuation">-</span> payment<span class="token punctuation">-</span>service<span class="token punctuation">:</span>v2.0.0<span class="token punctuation">-</span>pr123  <span class="token comment"># 新服務</span>
+<span class="token key atrule">database</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> Managed database (migrated)
+<span class="token key atrule">testing</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> E2E tests pass
+  <span class="token punctuation">-</span> Stakeholder approval</code></pre>
+<ul>
+<li>開發人員開啟 PR → 環境在 15-30 分鐘內配置</li>
+<li>QA 在實時環境上測試</li>
+<li>產品負責人在可分享 URL 上審查</li>
+<li><strong>總反饋時間：</strong> 30-60 分鐘（包括配置）</li>
+<li><strong>EoD 開銷：</strong> 對於功能工作可接受</li>
+</ul>
+<hr>
+<h3 id="EoD-掙扎之處：">EoD 掙扎之處：</h3>
+<table>
+<thead>
+<tr>
+<th>工作負載</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>快速修復</strong>（錯字、CSS 調整）</td>
+<td>5 分鐘的變更需要 15-30 分鐘配置</td>
+</tr>
+<tr>
+<td><strong>高頻迭代</strong>（A/B 測試）</td>
+<td>配置時間超過開發時間</td>
+</tr>
+<tr>
+<td><strong>資源密集型測試</strong>（負載測試）</td>
+<td>每個環境的計算/數據庫限制</td>
+</tr>
+<tr>
+<td><strong>跨 PR 依賴</strong>（PR #123 需要 PR #124 的變更）</td>
+<td>協調開銷</td>
+</tr>
+</tbody>
+</table>
+<p><strong>示例：熱修復部署</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># Hotfix: 修復首頁錯字</span>
+<span class="token comment"># 預期：5 分鐘內部署</span>
+<span class="token comment"># 實際：20-30 分鐘（配置 + 測試）</span></code></pre>
+<ul>
+<li>開發人員開啟 PR → 環境在 15-20 分鐘內配置</li>
+<li>QA 驗證修復（2 分鐘）</li>
+<li>合併 → 生產部署（5 分鐘）</li>
+<li><strong>總時間：</strong> 25-30 分鐘</li>
+<li><strong>EoD 開銷：</strong> 總時間的 80-90%</li>
+</ul>
+<div class="admonition warning"><p class="admonition-title"><span class="mdi mdi-alert-outline admonition-icon"></span>⚠️ 隱藏成本：不僅是等待時間</p><div class="admonition-content"><p>配置延遲只是問題的一部分。EoD 還引入了：</p>
+<ol>
+<li><strong>上下文切換</strong> — 開發人員在等待環境時失去動力</li>
+<li><strong>調試複雜性</strong> — 哪個環境有問題？</li>
+<li><strong>成本不確定性</strong> — 孤兒環境的意外賬單</li>
+<li><strong>治理摩擦</strong> — 合規門減慢「自助服務」</li>
+</ol>
+<p>對於快速迭代，這些工作流低效通常比配置時間本身更重要。</p>
+</div></div>
+<p>鑑於這些性能挑戰和潛在開銷，值得探討按需環境的替代方法並了解它們各自的權衡。</p>
+<hr>
+<h2 id="7-替代方法：權衡">7 替代方法：權衡</h2>
+<p><strong>輕量級替代方案</strong>（虛擬集群、僅命名空間、共享 staging）減少配置時間但犧牲隔離：</p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml"><span class="token comment"># 替代方案 1：僅命名空間（無數據庫、無 CDN）</span>
+<span class="token key atrule">environment</span><span class="token punctuation">:</span>
+  <span class="token key atrule">type</span><span class="token punctuation">:</span> namespace<span class="token punctuation">-</span>isolation
+  <span class="token key atrule">shared_resources</span><span class="token punctuation">:</span>
+    <span class="token punctuation">-</span> <span class="token key atrule">database-cluster</span><span class="token punctuation">:</span> shared<span class="token punctuation">-</span>staging
+    <span class="token punctuation">-</span> <span class="token key atrule">cdn</span><span class="token punctuation">:</span> shared<span class="token punctuation">-</span>cdn
+  <span class="token key atrule">provision_time</span><span class="token punctuation">:</span> 2<span class="token punctuation">-</span>5 分鐘
+  <span class="token key atrule">isolation</span><span class="token punctuation">:</span> medium</code></pre>
+<p><strong>執行：</strong></p>
+<pre class="language-yaml" data-language="yaml"><code class="language-yaml">while (pr = pull_request.opened) <span class="token punctuation">{</span>
+  <span class="token comment"># 僅創建命名空間（無新數據庫/CDN）</span>
+  kubectl.create_namespace(`pr<span class="token punctuation">-</span>$<span class="token punctuation">{</span>pr.number<span class="token punctuation">}</span>`)
+
+  <span class="token comment"># 使用共享 DB 部署應用（schema 隔離）</span>
+  helm.install(apps<span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token key atrule">namespace</span><span class="token punctuation">:</span> `pr<span class="token punctuation">-</span>$<span class="token punctuation">{</span>pr.number<span class="token punctuation">}</span>` <span class="token punctuation">}</span>)
+
+  <span class="token comment"># 就緒時通知（總共 2-5 分鐘）</span>
+  notify(`PR $<span class="token punctuation">{</span>pr.number<span class="token punctuation">}</span> env ready<span class="token punctuation">:</span> pr<span class="token punctuation">-</span>$<span class="token punctuation">{</span>pr.number<span class="token punctuation">}</span>.neo01.com`)
+<span class="token punctuation">}</span></code></pre>
+<p><strong>好處（示例）：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>完整 EoD（每環境資源）</th>
+<th>輕量級（命名空間 + 共享）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>配置時間</td>
+<td>15-30 分鐘</td>
+<td>2-5 分鐘</td>
+</tr>
+<tr>
+<td>隔離</td>
+<td>高（專用數據庫、MQ）</td>
+<td>中（共享 DB、schema 隔離）</td>
+</tr>
+<tr>
+<td>成本每環境</td>
+<td>$25-75/天</td>
+<td>$5-15/天</td>
+</tr>
+<tr>
+<td>複雜度</td>
+<td>高（IaC + GitOps）</td>
+<td>中（僅 GitOps）</td>
+</tr>
+<tr>
+<td>使用場景</td>
+<td>功能測試、合規</td>
+<td>快速修復、高頻迭代</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition question"><p class="admonition-title"><span class="mdi mdi-comment-question-outline admonition-icon"></span>🤔 那麼為什麼不總是使用輕量級？</p><div class="admonition-content"><p>如果僅命名空間快 6 倍且便宜 5 倍，為什麼要配置完整環境？</p>
+<ul>
+<li><strong>數據隔離</strong> — 一些測試需要專用 DB（遷移、數據播種）</li>
+<li><strong>性能測試</strong> — 共享資源扭曲負載測試結果</li>
+<li><strong>合規</strong> — 受監管行業需要環境隔離（審計追蹤）</li>
+<li><strong>爆炸半徑</strong> — 一個環境中的錯誤配置不應影響其他環境</li>
+</ul>
+<p>答案：<strong>分層環境</strong>（快速修復使用輕量級，功能使用完整 EoD）。</p>
+</div></div>
+<hr>
+<h3 id="為什麼團隊不標準化於一種方法">為什麼團隊不標準化於一種方法</h3>
+<p><strong>1. 權衡複雜性</strong></p>
+<p>不同的 PR 需要不同的隔離級別：</p>
+<ul>
+<li>錯字修復 → 僅命名空間（2 分鐘）</li>
+<li>數據庫遷移 → 完整數據庫（20 分鐘）</li>
+<li>前端調整 → 無 CDN（直接負載均衡器）</li>
+<li>支付功能 → 完整隔離（合規）</li>
+</ul>
+<p><strong>2. 成本耦合</strong></p>
+<p>所有 PR 使用完整 EoD = 成本增加 10 倍，而簡單變更沒有速度增益。</p>
+<p><strong>3. 治理要求</strong></p>
+<p>受監管行業需要審計追蹤、某些資源的審批門（例如預覽中無公共存儲）。</p>
+<p>自助服務理想與敏感變更「需要審查」衝突。</p>
+<p>將所有這些概念結合在一起，讓我們總結按需環境的架構組件和關鍵特徵。</p>
+<hr>
+<h2 id="總結：按需環境架構">總結：按需環境架構</h2>
+<div class="mermaid">flowchart LR
+    subgraph "GitOps Workflow"
+        A[Pull Request] --&gt; B[GitOps ApplicationSet]
+        B --&gt; C[IaC Apply]
+    end
+
+    subgraph "Infrastructure"
+        C --&gt; D[Kubernetes Namespace]
+        D --&gt; E[Compute Pods + Service Mesh]
+        D --&gt; F[Managed Database]
+        D --&gt; G[CDN + Object Storage]
+        D --&gt; H[DNS]
+    end
+
+    subgraph "Governance"
+        I[Admission Policies] --&gt; D
+        J[Compliance Checks] --&gt; F
+        K[Cost Allocation Tags] --&gt; D
+    end
+
+    style A fill:#e3f2fd,stroke:#1976d2
+    style B fill:#fff3e0,stroke:#f57c00
+    style D fill:#e8f5e9,stroke:#388e3c</div>
+<p><strong>關鍵要點：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方面</th>
+<th>按需環境</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>接口</strong></td>
+<td>GitOps（ApplicationSets + IaC）</td>
+</tr>
+<tr>
+<td><strong>結構</strong></td>
+<td>分層環境（輕量級到完整）</td>
+</tr>
+<tr>
+<td><strong>數據流</strong></td>
+<td>Git → IaC → Kubernetes → 環境</td>
+</tr>
+<tr>
+<td><strong>內存</strong></td>
+<td>臨時（基於 TTL 的清理）</td>
+</tr>
+<tr>
+<td><strong>最適合</strong></td>
+<td>功能測試、集成、利益相關者演示</td>
+</tr>
+<tr>
+<td><strong>最不適合</strong></td>
+<td>快速修復、高頻迭代</td>
+</tr>
+</tbody>
+</table>
+<p>按需環境並不完美——但對於在 Kubernetes 上快速交付的團隊（無論是 EKS、AKS、GKE 還是 vanilla），它是「等待幾天獲得環境」和「15 分鐘內測試」之間的區別。了解權衡有助於你構建與團隊工作流配合的 EoD，而不是對抗它。</p>
+<div class="admonition success"><p class="admonition-title"><span class="mdi mdi-check-circle-outline admonition-icon"></span>✅ 關鍵要點</p><div class="admonition-content"><p>按需環境是一種<strong>權衡</strong>，不是銀彈：</p>
+<ul>
+<li><strong>收穫：</strong> 隔離、自助服務、審計追蹤、更快反饋</li>
+<li><strong>損失：</strong> 配置延遲、成本累積、運營複雜性</li>
+</ul>
+<p>關鍵是根據你的團隊需求選擇正確的層級。</p>
+</div></div>
+<hr>
+<p><strong>下一篇文章：</strong> <a href="/zh-TW/2026/02/Environment-on-Demand-Part2-Lifecycle/">按需環境（第二篇）：生命週期、AI 編碼與優化</a></p>
+<!-- commentbox plugin begins -->
+    <div class="commentbox"></div>
+    <script src="https://unpkg.com/commentbox.io/dist/commentBox.min.js"></script>
+    <script>commentBox('5765834504929280-proj')</script>
+    <!-- commentbox plugin ends -->
+    
+        </div>
+        
+        <footer class="article-footer">
+            
+    <a data-url="https://neo01.com/zh-TW/2026/02/Environment-on-Demand-Part1-Architecture/" data-id="5ee19c3d" class="article-share-link"><i class="fa fa-share"></i>分享到</a>
+<script>
+    (function ($) {
+        $('body').on('click', function() {
+            $('.article-share-box.on').removeClass('on');
+        }).on('click', '.article-share-link', function(e) {
+            e.stopPropagation();
+
+            var $this = $(this),
+                url = $this.attr('data-url').replace("http://","https://"),
+                encodedUrl = encodeURIComponent(url),
+                id = 'article-share-box-' + $this.attr('data-id'),
+                offset = $this.offset(),
+                box;
+
+            if ($('#' + id).length) {
+                box = $('#' + id);
+
+                if (box.hasClass('on')){
+                    box.removeClass('on');
+                    return;
+                }
+            } else {
+                var html = [
+                    '<div id="' + id + '" class="article-share-box">',
+                        '<input class="article-share-input" value="' + url + '">',
+                        '<div class="article-share-links">',
+                            '<a href="https://twitter.com/intent/tweet?url=' + encodedUrl + '" class="article-share-twitter" target="_blank" title="Twitter"></a>',
+                            '<a href="https://www.facebook.com/sharer.php?u=' + encodedUrl + '" class="article-share-facebook" target="_blank" title="Facebook"></a>',
+                            '<a href="http://pinterest.com/pin/create/button/?url=' + encodedUrl + '" class="article-share-pinterest" target="_blank" title="Pinterest"></a>',
+                        '</div>',
+                    '</div>'
+                ].join('');
+
+              box = $(html);
+
+              $('body').append(box);
+            }
+
+            $('.article-share-box.on').hide();
+
+            box.css({
+                top: offset.top + 25,
+                left: offset.left
+            }).addClass('on');
+
+        }).on('click', '.article-share-box', function (e) {
+            e.stopPropagation();
+        }).on('click', '.article-share-box-input', function () {
+            $(this).select();
+        }).on('click', '.article-share-box-link', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            window.open(this.href, 'article-share-box-window-' + Date.now(), 'width=500,height=450');
+        });
+    })(jQuery);
+</script>
+
+        </footer>
+    </div>
+    <!--script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "author": {
+            "@type": "Person",
+            "name": "Neo Alienson"
+        },
+        "headline": "按需環境（第一篇）：架構與實現",
+        "image": "https://neo01.com/assets/architecture/eod-thumbnail.jpg",
+        "keywords": "DevOps GitOps Platform Engineering",
+        "genre": "Architecture",
+        "datePublished": "2026-02-18",
+        "dateCreated": "2026-02-18",
+        "dateModified": "2026-03-18",
+        "url": "https://neo01.com//zh-TW/2026/02/Environment-on-Demand-Part1-Architecture/",
+        "description": "Environment on Demand 三部曲之首篇。了解 EoD 是什麼、如何使用 GitOps 架構設計它，以及它的優勢與挑戰。另外探討：為什麼 AI 輔助編碼讓資源配置成為新的瓶頸。",
+        "wordCount": 2296
+    }
+</script-->
+
+</article>
+
+                        </div>
+                    </section>
+                    
+<aside id="sidebar">
+    <a class="sidebar-toggle" title="Expand Sidebar"><i class="toggle icon"></i></a>
+    <div class="sidebar-top">
+        <p>追蹤 :</p>
+        <ul class="social-links">
+                <li>
+                    <a class="social-tooltip" title="stack-exchange" href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-exchange"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="stack-overflow" href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-stack-overflow"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="github" href="https://github.com/neoalienson" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-github"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="linkedin" href="https://linkedin.com/in/neo01" target="_blank" rel="noopener">
+                        <i class="icon fa-brands fa-linkedin"></i>
+                    </a>
+                </li>
+                <li>
+                    <a class="social-tooltip" title="rss" href="/atom.xml" target="_blank" rel="noopener">
+                        <i class="icon fa fa-rss"></i>
+                    </a>
+                </li>
+        </ul>
+    </div>
+    <div class="widgets-container">
+
+        
+            
+                
+                    
+                        <div class="widget-wrap widget-list">
+    <h3 class="widget-title">連結</h3>
+    <div class="widget">
+        <ul><li><a href="/zh-TW/ai">AI 遊樂場</a></li><li><a href="/zh-TW/tools">工具</a></li><li><a href="/zh-TW/games">遊戲</a></li><li><a href="/zh-TW/pages/useful-information">實用資訊</a></li><li><a href="/zh-TW/pages/Hexo-Blogging-Cheatsheet">Hexo 部落格速查表</a></li></ul>
+    </div>
+</div>
+
+                    
+                
+            
+                
+                        <div class="widget-wrap">
+        <h3 class="widget-title">系列文章</h3>
+        <div class="widget-series">
+            <ul>
+<li>📐 <strong>Environment on Demand</strong>
+<ul>
+<li><a href="/2026/02/Environment-on-Demand-Part1-Architecture/">Arhictecture &amp; Implementation</a></li>
+<li><a href="/2026/02/Environment-on-Demand-Part2-Lifecycle/">Lifecycle, AI Coding &amp; Optimization</a></li>
+<li><a href="/2026/02/Environment-on-Demand-Part3-Alternatives/">Alternative Productivity Accelerators</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    </div>
+
+                
+            
+                
+                    
+                            <div class="widget-wrap">
+        <h3 class="widget-title">最新文章</h3>
+        <div class="widget">
+            <ul id="recent-post" class="">
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-Histogram-Statistics/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：用於準確選擇性估計的直方圖統計" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-Histogram-Statistics/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：用於準確選擇性估計的直方圖統計</a></p>
+                            <p class="item-date"><time datetime="2026-03-07T16:00:00.000Z" itemprop="datePublished">2026-03-08</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-Query-Optimizer/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：帶統計資料的基於成本的查詢最佳化器" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-Query-Optimizer/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：帶統計資料的基於成本的查詢最佳化器</a></p>
+                            <p class="item-date"><time datetime="2026-03-06T16:00:00.000Z" itemprop="datePublished">2026-03-07</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-SQL-Parser/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：綜合 SQL 解析器（DDL、DML、查詢）" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-SQL-Parser/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：綜合 SQL 解析器（DDL、DML、查詢）</a></p>
+                            <p class="item-date"><time datetime="2026-03-05T16:00:00.000Z" itemprop="datePublished">2026-03-06</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-Wire-Protocol-Result-Set/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化</a></p>
+                            <p class="item-date"><time datetime="2026-03-04T16:00:00.000Z" itemprop="datePublished">2026-03-05</time></p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="item-thumbnail">
+                            <a href="/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="thumbnail">
+        <span style="background-image:url(/assets/architecture/vaultgres_thumbnail_80.jpg)" alt="使用 Rust 建構 PostgreSQL 相容資料庫：WAL 與 ARIES 崩潰恢復" class="thumbnail-image"></span>
+</a>
+                        </div>
+                        <div class="item-inner">
+                            <p class="item-category"><a class="article-category-link" style="cursor: default; pointer-events: none;">開發</a></p>
+                            <p class="item-title"><a href="/zh-TW/2026/03/Database-Rust-WAL-Crash-Recovery-ARIES/" class="title">使用 Rust 建構 PostgreSQL 相容資料庫：WAL 與 ARIES 崩潰恢復</a></p>
+                            <p class="item-date"><time datetime="2026-03-03T16:00:00.000Z" itemprop="datePublished">2026-03-04</time></p>
+                        </div>
+                    </li>
+            </ul>
+        </div>
+    </div>
+
+                    
+                
+            
+                
+                    
+                        
+    
+    
+    <div class="widget-wrap widget-list">
+        <h3 class="widget-title">所有文章</h3>
+        <div class="widget">
+            <ul class="archive-list">
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2026/">2026</a>
+                    <span class="archive-list-count">15</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2025/">2025</a>
+                    <span class="archive-list-count">77</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2024/">2024</a>
+                    <span class="archive-list-count">25</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2023/">2023</a>
+                    <span class="archive-list-count">16</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2022/">2022</a>
+                    <span class="archive-list-count">17</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2021/">2021</a>
+                    <span class="archive-list-count">14</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2020/">2020</a>
+                    <span class="archive-list-count">13</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2019/">2019</a>
+                    <span class="archive-list-count">12</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2018/">2018</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2017/">2017</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2016/">2016</a>
+                    <span class="archive-list-count">5</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2015/">2015</a>
+                    <span class="archive-list-count">6</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2014/">2014</a>
+                    <span class="archive-list-count">10</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2013/">2013</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2010/">2010</a>
+                    <span class="archive-list-count">3</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2007/">2007</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2006/">2006</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2003/">2003</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+                <li class="archive-list-item">
+                    <a class="archive-list-link" href="/zh-TW/archives/2001/">2001</a>
+                    <span class="archive-list-count">1</span>
+                </li>
+            
+            </ul>
+        </div>
+    </div>
+
+
+                    
+                
+            
+        
+
+    </div>
+</aside>
+
+
+                </div>
+            </div>
+        </div>
+        
+<footer id="footer">
+    <div class="container">
+        <div class="container-inner">
+            <a id="back-to-top" href="javascript:;"><i class="icon fa fa-angle-up"></i></a>
+
+            <div class="qrcode-share-wrapper">
+                <div class="qrcode-text">https://neo01.com/l#f076e8da</div>
+                <img src="/qr/qr-3e2842b1c3490b76cd2337677b48b285.svg" width="200" height="200" alt="QR Code for https://neo01.com/l#f076e8da">
+            </div>
+            <div class="credit">
+                <h1 class="logo-wrap">
+                    <a href="/" title="Homepage" class="logo"></a>
+                </h1>
+                
+                <p>© 2026 Neo Alienson. 版權所有.
+                  <a href="/zh-TW/terms-and-conditions">使用條款</a></p>
+                
+            </div>
+            <div class="footer-plugins">
+              
+
+
+            </div>
+        </div>
+    </div>
+</footer>
+
+        
+        
+    
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+        
+
+
+    
+
+
+
+<!-- Custom Scripts -->
+
+
+
+
+        
+    </div>
+<!-- hexo injector body_end start --><script type="text/javascript" src="/js/bundle_last.js"></script><!-- hexo injector body_end end -->
+
+<script>CookieConsent.run({"palette":{"popup":{"background":"#000"},"button":{"background":"#f1d600"}},"guiOptions":{"consentModal":{"layout":"box","position":"bottom right","equalWeightButtons":true,"flipButtons":false},"preferencesModal":{"layout":"box","position":"right","equalWeightButtons":false,"flipButtons":false}},"categories":{"necessary":{"readOnly":true},"functionality":{},"analytics":{}},"language":{"default":"en","autoDetect":"browser","translations":{"en":{"consentModal":{"title":"Hello traveler, it's cookie time!","description":"🍪 This site uses cookies to serve you the best experience—no crumbs left behind! Want to know what cookies really are? Check out this easy-to-understand cookie explanation. And for the legal nitty-gritty, here’s our website cookie policy to keep you in the loop! 🚀\n","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","showPreferencesBtn":"Manage preferences","footer":"<a href=\"#link\">Privacy Policy</a>\n<a href=\"/terms-and-conditions/\">Terms and conditions</a>\n"},"preferencesModal":{"title":"Consent Preferences Center","acceptAllBtn":"Accept all","acceptNecessaryBtn":"Reject all","savePreferencesBtn":"Save preferences","closeIconLabel":"Close modal","serviceCounterLabel":"Service|Services","sections":[{"title":"Cookie Usage","description":"We use cookies to make your visit smoother, faster, and tailored just for you. Cookies help us remember your preferences, improve site performance, and deliver personalized content while keeping things secure and user-friendly.\n"},{"title":"Strictly Necessary Cookies <span class=\"pm__badge\">Always Enabled</span>","description":"These cookies are essential for the website to function properly. They enable core features like security, page navigation, and access to secure areas. Without these, the site cannot operate correctly.\n","linkedCategory":"necessary"},{"title":"Functionality Cookies","description":"Functionality cookies remember your choices to provide a more personalized experience. For example, they save your language preference or login details so you don’t have to keep entering them each time.\n","linkedCategory":"functionality"},{"title":"Analytics Cookies","description":"Analytics cookies help us understand how visitors interact with our site by collecting information anonymously. This insight allows us to improve functionality, fix issues, and make the website better for you.\n","linkedCategory":"analytics"},{"title":"More information","description":"Please refer to our <a href='/pages/cookie-policy'>cookie policy</a> for full details on how we use cookies and your options to manage them.\n"}]}}}}})</script></body></html>
