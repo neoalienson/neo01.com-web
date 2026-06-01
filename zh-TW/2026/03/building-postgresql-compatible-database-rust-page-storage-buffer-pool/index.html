@@ -1,0 +1,1152 @@
+<!DOCTYPE html><html lang="zh-TW"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="Astro v6.2.1"><title>使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池 - Decoding Digital Anomalies</title><meta name="description" content="為何我要用 Rust 建構 Vaultgres——一個 PostgreSQL 相容資料庫——來探索資料庫內部機制。深入探討頁面式儲存、緩衝池管理，以及在 AI 輔助開發下實作 WAL 相容儲存的挑戰。"><meta property="og:title" content="使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池 - Decoding Digital Anomalies"><meta property="og:description" content="為何我要用 Rust 建構 Vaultgres——一個 PostgreSQL 相容資料庫——來探索資料庫內部機制。深入探討頁面式儲存、緩衝池管理，以及在 AI 輔助開發下實作 WAL 相容儲存的挑戰。"><meta property="og:type" content="website"><meta property="og:url" content="https://neo01.com"><link rel="icon" href="/assets/neo01.png" type="image/png"><link rel="manifest" href="/manifest.json"><link rel="canonical" href="https://neo01.com"><link rel="alternate" type="application/rss+xml" title="Decoding Digital Anomalies" href="/rss.xml"><link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css"><link rel="stylesheet" href="/libs/titillium-web/styles.css"><link rel="stylesheet" href="/pagefind/pagefind-component-ui.css"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池 - Decoding Digital Anomalies"><meta name="twitter:description" content="為何我要用 Rust 建構 Vaultgres——一個 PostgreSQL 相容資料庫——來探索資料庫內部機制。深入探討頁面式儲存、緩衝池管理，以及在 AI 輔助開發下實作 WAL 相容儲存的挑戰。"><script src="/pagefind/pagefind-component-ui.js" defer></script><!-- Google tag (gtag.js) --><script async src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script><script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3DZR3TQYCY');
+    </script><script>
+      try {
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'page_view', { page_location: window.location.href });
+        }
+      } catch (e) {
+        console.warn('Analytics unavailable:', e);
+      }
+    </script><script>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script><style>._tabbedWrapper_r711i_1{display:none}._tabbedWrapper_r711i_1._hasToc_r711i_5,._tabbedWrapper_r711i_1._hasSeries_r711i_6{display:block}._tabbed_r711i_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md);margin:1rem 0;overflow:hidden}._tabHeader_r711i_17{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:0 1rem}._tabBar_r711i_25{display:flex;flex:1;border-bottom:1px solid var(--color-border);margin-bottom:0}._tab_r711i_1{flex:1;padding:.75rem .5rem;text-align:center;cursor:pointer;background:none;border:none;font-size:.875rem;font-weight:500;color:var(--color-sidebar-text);transition:color var(--transition-fast);border-bottom:2px solid transparent;margin-bottom:-1px}._tab_r711i_1:hover{color:var(--color-theme)}._tab_r711i_1._active_r711i_51{color:var(--color-theme);font-weight:600;border-bottom-color:var(--color-theme)}._tab_r711i_1._singleTab_r711i_57{flex:none;width:100%}._tabbedToggle_r711i_62{margin-left:auto;display:flex;align-items:center;justify-content:center;width:24px;height:24px;transition:transform var(--transition-fast);color:var(--color-sidebar-text-dark)}._tabbedToggle_r711i_62 svg{width:16px;height:16px}._tabbedToggle_r711i_62._open_r711i_78{transform:rotate(180deg)}._panels_r711i_82{display:none;padding:1rem 1.25rem .5rem}._panels_r711i_82._isOpen_r711i_87{display:block}._panel_r711i_82{display:none}._panel_r711i_82._active_r711i_51{display:block}[data-theme=dark] ._tabbed_r711i_1{background:var(--color-surface)}[data-theme=dark] ._tabBar_r711i_25{border-bottom-color:var(--color-border)}[data-theme=dark] ._tab_r711i_1{color:var(--color-sidebar-text)}[data-theme=dark] ._tab_r711i_1:hover{color:var(--color-theme-light)}[data-theme=dark] ._tab_r711i_1._active_r711i_51{color:var(--color-theme-light);border-bottom-color:var(--color-theme-light)}[data-theme=dark] ._tabbedToggle_r711i_62{color:var(--color-default)}@media(min-width:1024px){._tabbedWrapper_r711i_1{display:block;position:sticky;top:calc(var(--header-height) + 2rem);max-height:calc(100vh - var(--header-height) - 4rem);overflow-y:auto;align-self:start}._tabbedWrapper_r711i_1._hasToc_r711i_5,._tabbedWrapper_r711i_1._hasSeries_r711i_6{display:block}._tabbed_r711i_1{background:transparent;border-radius:0;padding:0;margin:0}._tabHeader_r711i_17{padding:0}._tabBar_r711i_25{border-bottom-color:var(--color-border);margin-bottom:.75rem}._panels_r711i_82{display:block;padding:0}._panels_r711i_82._isOpen_r711i_87{display:block}}@media(max-width:1023px){._tabbedWrapper_r711i_1{display:block!important;position:fixed;bottom:0;left:0;right:0;width:100%;z-index:1000;max-height:60vh;overflow-y:auto}._tabbed_r711i_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md) var(--radius-md) 0 0;padding:0}._tabbed_r711i_1._isOpen_r711i_87{max-height:60vh;overflow-y:auto}._tabHeader_r711i_17{padding:.75rem 1rem}[data-theme=dark] ._tabbed_r711i_1{background:var(--color-surface)}[data-theme=dark] ._tabbedToggle_r711i_62 svg{color:var(--color-default)}}
+</style>
+<link rel="stylesheet" href="/_astro/BaseLayout.C61PQYmh.css">
+<link rel="stylesheet" href="/_astro/_..BYacDPpd.css"><script>(function() {
+  function init() {
+    var header = document.querySelector('#header');
+    if (!header) {
+      console.log('[scroll-shrink-header] ERROR: header not found');
+      return;
+    }
+    header.setAttribute('data-header-scroll-shrink', '');
+    var lastScrollY = window.scrollY;
+    var ticking = false;
+    var threshold = 50;
+    var buffer = 5;
+
+    function updateHeader() {
+      var currentScrollY = window.scrollY;
+      if (currentScrollY > threshold) {
+        if (currentScrollY > lastScrollY + buffer) {
+          header.classList.add('header-shrunk');
+          console.log('[scroll-shrink-header] Shrink: scrollY=' + currentScrollY + ' (down)');
+        }
+      } else {
+        header.classList.remove('header-shrunk');
+        console.log('[scroll-shrink-header] Expand: scrollY=' + currentScrollY + ' (at top)');
+      }
+      lastScrollY = currentScrollY;
+      ticking = false;
+    }
+
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    console.log('[scroll-shrink-header] Initialized, threshold=' + threshold);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();</script></head> <body> <div id="wrap"> <header id="header" class="header-glass" data-astro-cid-qmpwvs2w> <div class="header-main" data-astro-cid-qmpwvs2w> <button class="header-nav-mobile-toggle md:hidden" aria-label="Open navigation menu" aria-expanded="false" id="main-nav-toggle" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M4 5h16" data-astro-cid-qmpwvs2w></path><path d="M4 12h16" data-astro-cid-qmpwvs2w></path><path d="M4 19h16" data-astro-cid-qmpwvs2w></path></svg> </button> <div class="header-brand" data-astro-cid-qmpwvs2w> <a href="/" class="logo-link" data-astro-cid-qmpwvs2w> <div class="logo" data-astro-cid-qmpwvs2w></div> </a> <div class="header-title-group" data-astro-cid-qmpwvs2w> <span class="header-title-text" data-astro-cid-qmpwvs2w>neo01.com</span> <span class="header-subtitle-text" data-astro-cid-qmpwvs2w>解碼數位異象</span> </div> </div> <nav class="header-nav" aria-label="Main navigation" data-astro-cid-qmpwvs2w> <ul class="header-nav-list" role="menubar" data-astro-cid-qmpwvs2w> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/" class="header-nav-link active" role="menuitem" data-astro-cid-qmpwvs2w>Blog</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/tools/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>Tools</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/about-me/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>About</a> </li> </ul> </nav> <div class="header-actions" data-astro-cid-qmpwvs2w> <div class="header-search-wrapper" data-astro-cid-qmpwvs2w> <pagefind-searchbox placeholder="搜索" show-sub-results="true" show-keyboard-hints="false" hide-shortcut="true" max-results="5" class="header-search-box" data-astro-cid-qmpwvs2w="true"></pagefind-searchbox> </div> <button class="theme-toggle" aria-label="Toggle theme" title="Toggle theme" data-astro-cid-qmpwvs2w> <span class="sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal" data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2026/03/building-postgresql-compatible-database-rust-page-storage-buffer-pool/" class="lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-CN/2026/03/building-postgresql-compatible-database-rust-page-storage-buffer-pool/" class="lang-link" data-lang="zh-CN" data-astro-cid-crzgpmpb>简</a> </div> </div> </div> <div class="header-categories" data-astro-cid-qmpwvs2w> <nav class="header-categories-nav" data-astro-cid-qmpwvs2w> <a href="/zh-TW/categories/ai/" class="header-category-link" data-astro-cid-qmpwvs2w>AI</a> <a href="/zh-TW/categories/architecture/" class="header-category-link" data-astro-cid-qmpwvs2w>Architecture</a> <a href="/zh-TW/categories/cybersecurity/" class="header-category-link" data-astro-cid-qmpwvs2w>Cybersecurity</a> <a href="/zh-TW/categories/development/" class="header-category-link" data-astro-cid-qmpwvs2w>Development</a> <a href="/zh-TW/categories/misc/" class="header-category-link" data-astro-cid-qmpwvs2w>Misc</a> </nav> </div> </header> <div class="drawer-overlay" id="drawerOverlay" data-astro-cid-qmpwvs2w></div> <aside class="drawer" id="mobileDrawer" aria-label="Mobile navigation" data-astro-cid-qmpwvs2w> <div class="drawer-header" data-astro-cid-qmpwvs2w> <button class="close-btn" aria-label="Close menu" id="closeBtn" data-astro-cid-qmpwvs2w> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-qmpwvs2w> <line x1="18" y1="6" x2="6" y2="18" data-astro-cid-qmpwvs2w></line> <line x1="6" y1="6" x2="18" y2="18" data-astro-cid-qmpwvs2w></line> </svg> </button> </div> <nav class="drawer-nav" data-astro-cid-qmpwvs2w> <a href="/zh-TW/" class="drawer-nav-link active" data-astro-cid-qmpwvs2w>Blog</a> <a href="/zh-TW/tools/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Tools</a> <a href="/zh-TW/about-me/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>About</a> <div class="drawer-nav-divider" data-astro-cid-qmpwvs2w>Categories</div> <a href="/zh-TW/categories/ai/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>AI</a> <a href="/zh-TW/categories/architecture/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Architecture</a> <a href="/zh-TW/categories/cybersecurity/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Cybersecurity</a> <a href="/zh-TW/categories/development/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Development</a> <a href="/zh-TW/categories/misc/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Misc</a> </nav> <div class="drawer-actions" data-astro-cid-qmpwvs2w> <button class="drawer-theme-toggle" aria-label="Toggle theme" data-astro-cid-qmpwvs2w> <span class="drawer-sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="drawer-moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal drawer-lang-switcher" data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2026/03/building-postgresql-compatible-database-rust-page-storage-buffer-pool/" class="drawer-lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="drawer-lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-CN/2026/03/building-postgresql-compatible-database-rust-page-storage-buffer-pool/" class="drawer-lang-link" data-lang="zh-CN" data-astro-cid-crzgpmpb>简</a> </div> </div> </aside> <script type="module">const d=document.getElementById("main-nav-toggle"),l=document.getElementById("closeBtn"),n=document.getElementById("drawerOverlay"),o=document.getElementById("mobileDrawer");function m(){o?.classList.add("open"),n?.classList.add("open"),document.body.style.overflow="hidden"}function r(){o?.classList.remove("open"),n?.classList.remove("open"),document.body.style.overflow=""}d?.addEventListener("click",m);l?.addEventListener("click",r);n?.addEventListener("click",r);function c(e){document.documentElement.setAttribute("data-theme",e),localStorage.setItem("theme",e),a();const t=document.querySelector("pagefind-searchbox");t&&(e==="dark"?t.setAttribute("data-pf-theme","dark"):t.removeAttribute("data-pf-theme"))}function a(){const e=document.documentElement.getAttribute("data-theme"),t=document.querySelector(".drawer-theme-value");t&&(t.textContent=e==="dark"?"Dark":"Light")}function s(){const t=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";c(t)}document.querySelectorAll(".theme-toggle, .drawer-theme-toggle").forEach(e=>{e.addEventListener("click",s)});window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",e=>{localStorage.getItem("theme")||c(e.matches?"dark":"light")});a();</script> <main class="home"> <div class="container"> <div class="main-body"> <div class="main-body-header"> <h1 class="header">使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池</h1> </div>     <div class="_postMeta_yeftz_1"> <div class="_metaItem_yeftz_10"> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"> <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect> <line x1="16" y1="2" x2="16" y2="6"></line> <line x1="8" y1="2" x2="8" y2="6"></line> <line x1="3" y1="10" x2="21" y2="10"></line> </svg> <time datetime="2026-03-01T00:00:00.000Z">3/1/2026</time> </div> <div class="_categories_yeftz_31"> <a href="/categories/development" class="_categoryTag_yeftz_37"> Development </a> </div> <div class="_tags_yeftz_51"> <a href="/zh-TW/tags/postgresql/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#PostgreSQL </a><a href="/zh-TW/tags/rust/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Rust </a><a href="/zh-TW/tags/database-internals/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Database Internals </a> </div> </div> <div class="post-layout" data-astro-cid-fzx4jmue> <aside class="post-toc-sidebar" data-astro-cid-fzx4jmue> <div class="_tabbedWrapper_r711i_1" data-tabbed-wrapper><div class="_tabbed_r711i_1"><div class="_tabHeader_r711i_17" data-tabbed-toggle><div class="_tabBar_r711i_25" data-tab-bar><button class="_tab_r711i_1  _active_r711i_51" data-tab="toc" aria-pressed="true">目錄</button><button class="_tab_r711i_1 " data-tab="series" aria-pressed="false">本系列文章</button></div><span class="_tabbedToggle_r711i_62"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></div><div class="_panels_r711i_82" data-tabbed-panels><div class="_panel_r711i_82 _active_r711i_51" data-panel="toc"><div class="_tocWrapper_ms9sd_1"><div class="_toc_ms9sd_1"><ul class="_tocContent_ms9sd_9"><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#1-為什麼需要頁面式儲存" data-toc-link="1-為什麼需要頁面式儲存">1 為什麼需要頁面式儲存？</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#問題原始位元組很混亂" data-toc-link="問題原始位元組很混亂">問題：原始位元組很混亂</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#解決方案固定大小頁面" data-toc-link="解決方案固定大小頁面">解決方案：固定大小頁面</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#2-頁面佈局8kb-頁面內部" data-toc-link="2-頁面佈局8kb-頁面內部">2 頁面佈局：8KB 頁面內部</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#postgresql-pageheader" data-toc-link="postgresql-pageheader">PostgreSQL PageHeader</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#itemid指向列資料的指標" data-toc-link="itemid指向列資料的指標">ItemId：指向列資料的指標</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#rust-實作page-結構體" data-toc-link="rust-實作page-結構體">Rust 實作：Page 結構體</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#3-緩衝池在記憶體中快取頁面" data-toc-link="3-緩衝池在記憶體中快取頁面">3 緩衝池：在記憶體中快取頁面</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#問題磁碟很慢" data-toc-link="問題磁碟很慢">問題：磁碟很慢</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#解決方案緩衝池" data-toc-link="解決方案緩衝池">解決方案：緩衝池</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#緩衝池架構" data-toc-link="緩衝池架構">緩衝池架構</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#rust-實作緩衝池" data-toc-link="rust-實作緩衝池">Rust 實作：緩衝池</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#4-磁碟管理員抽象化檔案-io" data-toc-link="4-磁碟管理員抽象化檔案-io">4 磁碟管理員：抽象化檔案 I/O</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#單一檔案-vs-多個檔案" data-toc-link="單一檔案-vs-多個檔案">單一檔案 vs. 多個檔案</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#頁面-id-編碼" data-toc-link="頁面-id-編碼">頁面 ID 編碼</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#5-預寫日誌-wal確保持久性" data-toc-link="5-預寫日誌-wal確保持久性">5 預寫日誌 (WAL)：確保持久性</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#問題崩潰會破壞資料" data-toc-link="問題崩潰會破壞資料">問題：崩潰會破壞資料</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#解決方案預寫日誌" data-toc-link="解決方案預寫日誌">解決方案：預寫日誌</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#wal-記錄格式" data-toc-link="wal-記錄格式">WAL 記錄格式</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#6-用-rust-建構的挑戰" data-toc-link="6-用-rust-建構的挑戰">6 用 Rust 建構的挑戰</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#挑戰-1所有權-vs-共享存取" data-toc-link="挑戰-1所有權-vs-共享存取">挑戰 1：所有權 vs. 共享存取</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#挑戰-2零拷貝-vs-安全" data-toc-link="挑戰-2零拷貝-vs-安全">挑戰 2：零拷貝 vs. 安全</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#挑戰-3錯誤處理" data-toc-link="挑戰-3錯誤處理">挑戰 3：錯誤處理</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#7-ai-如何加速學習" data-toc-link="7-ai-如何加速學習">7 AI 如何加速學習</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#ai-擅長什麼" data-toc-link="ai-擅長什麼">AI 擅長什麼</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#ai-無法替代什麼" data-toc-link="ai-無法替代什麼">AI 無法替代什麼</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#範例學習緩衝池淘汰" data-toc-link="範例學習緩衝池淘汰">範例：學習緩衝池淘汰</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#總結頁面式儲存一張圖" data-toc-link="總結頁面式儲存一張圖">總結：頁面式儲存一張圖</a></li></ul></div></div><script type="module">function l(){const n=document.querySelectorAll("article h2[id], article h3[id]"),o=document.querySelectorAll("[data-toc-link]");if(n.length===0||o.length===0)return;const i=new IntersectionObserver(e=>{let c=null;e.forEach(t=>{t.isIntersecting&&(c=t.target.id)}),o.forEach(t=>{const r=t.getAttribute("data-toc-link");t.classList.toggle("active",r===c)})},{rootMargin:"-80px 0px -70% 0px",threshold:0});n.forEach(e=>i.observe(e))}document.addEventListener("DOMContentLoaded",l);</script></div><div class="_panel_r711i_82" data-panel="series"><div class="_seriesWrapper_iy72p_1"><div class="_series_iy72p_1"><div class="_seriesTitle_iy72p_9">使用 Rust 建構資料庫</div><ul class="_seriesContent_iy72p_18"><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/building-postgresql-compatible-database-rust-page-storage-buffer-pool/" class="_seriesLink_iy72p_28 _current_iy72p_40">頁面式儲存與緩衝池</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-b-plus-tree-index-concurrent-access/" class="_seriesLink_iy72p_28">B+Tree 索引與併發存取</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-mvcc-transaction-manager/" class="_seriesLink_iy72p_28">MVCC 與交易管理</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-wal-crash-recovery-aries/" class="_seriesLink_iy72p_28">WAL 與 ARIES 崩潰恢復</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-wire-protocol-result-set/" class="_seriesLink_iy72p_28">通訊協定與結果集序列化</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-sql-parser/" class="_seriesLink_iy72p_28">綜合 SQL 解析器</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-query-optimizer/" class="_seriesLink_iy72p_28">基於成本的查詢最佳化器</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2026/03/database-rust-histogram-statistics/" class="_seriesLink_iy72p_28">直方圖統計</a></li></ul></div></div></div></div></div></div><script type="module">const v="_active_r711i_51",f="_open_r711i_78",O="_isOpen_r711i_87",e={active:v,open:f,isOpen:O};function h(){const s=document.querySelector("[data-tabbed-wrapper]");if(!s)return;const i=s.querySelector("[data-tabbed-toggle]"),a=s.querySelector("[data-tabbed-panels]"),r=s.querySelectorAll("[data-tab]"),d=s.querySelector('[data-panel="toc"]'),l=s.querySelector('[data-panel="series"]');if(!i||!a)return;function L(){const t=document.getElementById("header");return t?t.getBoundingClientRect().height:72}function n(){const t=L();s.style.top=`${t}px`}function b(t){const c=s.querySelector("[data-tab]."+e.active)?.getAttribute("data-tab")===t,g=window.innerWidth>=1024;if(c){if(g)return;a.classList.contains(e.isOpen)?(a.classList.remove(e.isOpen),i.classList.remove(e.open)):(a.classList.add(e.isOpen),i.classList.add(e.open))}else r.forEach(o=>{const u=o.getAttribute("data-tab")===t;o.classList.toggle(e.active,u),o.setAttribute("aria-pressed",u?"true":"false")}),d&&d.classList.toggle(e.active,t==="toc"),l&&l.classList.toggle(e.active,t==="series"),a.classList.add(e.isOpen),i.classList.add(e.open)}r.forEach(t=>{t.addEventListener("click",p=>{p.stopPropagation();const c=t.getAttribute("data-tab");b(c)})}),i.addEventListener("click",()=>{a.classList.contains(e.isOpen)?(a.classList.remove(e.isOpen),i.classList.remove(e.open)):(a.classList.add(e.isOpen),i.classList.add(e.open))}),n(),window.addEventListener("resize",n),window.addEventListener("load",n)}document.addEventListener("DOMContentLoaded",h);</script> </aside> <article class="article-content" data-astro-cid-fzx4jmue> <p>簡單的網站已無法滿足我對知識的渴望。
+多年來，我一直在建構 Web 應用程式——REST API、GraphQL 服務、帶有 AI 和 Agentic AI 的微服務——但我遇到了瓶頸。我能流利地<em>使用</em>資料庫，卻無法<em>建構</em>一個。內部機制對我來說仍是個黑盒子：PostgreSQL 究竟如何將資料儲存在磁碟上？緩衝池如何管理記憶體？WAL 如何確保持久性？
+因此，我開始建構 <strong><a href="https://github.com/neoalienson/Vaultgres">Vaultgres</a></strong>——一個用 Rust 實作的 PostgreSQL 相容資料庫。
+這不是另一個玩具級的鍵值儲存。我們的目標是 PostgreSQL 相容性：通訊協定、查詢語言，最終還包括儲存格式。為什麼？因為 PostgreSQL 的架構經過實戰驗證，相容性意味著真正的應用程式可以（理論上）無需修改就能連接。
+這個系列記錄了這段旅程：設計決策、錯誤、那些「啊哈！」的頓悟時刻，以及我如何利用 AI 加速學習，同時仍然親自完成艱苦的工作。
+今天的主題：<strong>頁面式儲存和緩衝池</strong>——每個資料庫建立的基礎。</p>
+<hr>
+<h2 id="1-為什麼需要頁面式儲存">1 為什麼需要頁面式儲存？</h2>
+<h3 id="問題原始位元組很混亂">問題：原始位元組很混亂</h3>
+<p>想像一下將資料作為連續串流直接儲存到磁碟：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Table: users</span></span>
+<span class="line"><span>┌────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│ id=1,name=Alice,id=2,name=Bob,id=3,name=Charlie...         │</span></span>
+<span class="line"><span>└────────────────────────────────────────────────────────────┘</span></span>
+<span class="line"><span>Table: orders</span></span>
+<span class="line"><span>┌────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│ id=101,user_id=1,amount=99.99,id=102,user_id=2,amount=...  │</span></span>
+<span class="line"><span>└────────────────────────────────────────────────────────────┘</span></span></code></pre>
+<p><strong>問題：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>問題</th><th>為什麼重要</th></tr></thead><tbody><tr><td><strong>沒有結構</strong></td><td>無法找到第 N 列，必須從頭開始掃描</td></tr><tr><td><strong>沒有併發性</strong></td><td>一個寫入者鎖定整個檔案</td></tr><tr><td><strong>沒有崩潰恢復</strong></td><td>部分寫入會破壞所有內容</td></tr><tr><td><strong>沒有快取</strong></td><td>必須讀取整個檔案才能存取一列</td></tr></tbody></table>
+<hr>
+<h3 id="解決方案固定大小頁面">解決方案：固定大小頁面</h3>
+<p>PostgreSQL 將資料劃分為<strong>固定大小的頁面</strong>（通常為 8KB）：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│  Page 0 (8KB)  │  Page 1 (8KB)  │  Page 2 (8KB)  │  ...    │</span></span>
+<span class="line"><span>└─────────────────────────────────────────────────────────────┘</span></span></code></pre>
+<p><strong>每個頁面包含：</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│ PageHeader (24 bytes)                                       │</span></span>
+<span class="line"><span>├─────────────────────────────────────────────────────────────┤</span></span>
+<span class="line"><span>│ ItemId array (4 bytes each)                                 │</span></span>
+<span class="line"><span>├─────────────────────────────────────────────────────────────┤</span></span>
+<span class="line"><span>│ Free space                                                  │</span></span>
+<span class="line"><span>├─────────────────────────────────────────────────────────────┤</span></span>
+<span class="line"><span>│ Items (actual row data, grows upward)                       │</span></span>
+<span class="line"><span>└─────────────────────────────────────────────────────────────┘</span></span></code></pre>
+<p><strong>優勢：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>優勢</th><th>為什麼重要</th></tr></thead><tbody><tr><td><strong>隨機存取</strong></td><td>直接讀取第 N 頁：<code>seek(N * 8KB)</code></td></tr><tr><td><strong>細粒度鎖定</strong></td><td>鎖定單個頁面，而非整個表</td></tr><tr><td><strong>高效快取</strong></td><td>將熱門頁面快取在記憶體中（緩衝池）</td></tr><tr><td><strong>崩潰恢復</strong></td><td>WAL 記錄參考特定頁面</td></tr><tr><td><strong>標準化</strong></td><td>所有頁面大小相同——簡化記憶體管理</td></tr></tbody></table>
+<div class="admonition info" data-admonition-type="info" data-icon="💡" data-title="為什麼是 8KB？"><div class="admonition-title"><span class="admonition-icon">💡</span>為什麼是 8KB？</div><p>PostgreSQL 預設使用 8KB 頁面（編譯時可用 <code>BLCKSZ</code> 配置）。
+<strong>權衡：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>頁面大小</th><th>優點</th><th>缺點</th></tr></thead><tbody><tr><td>小 (4KB)</td><td>較少內部碎片，更細的鎖定</td><td>更多頁面需管理，更大的標頭</td></tr><tr><td>中 (8KB)</td><td>平衡</td><td>預設值是有原因的</td></tr><tr><td>大 (32KB+)</td><td>更少頁面，更好的順序掃描</td><td>每個頁面浪費更多空間</td></tr><tr><td>Vaultgres 使用 8KB 以匹配 PostgreSQL——相容性優先於最佳化。</td><td></td><td></td></tr></tbody></table></div>
+<hr>
+<h2 id="2-頁面佈局8kb-頁面內部">2 頁面佈局：8KB 頁面內部</h2>
+<h3 id="postgresql-pageheader">PostgreSQL PageHeader</h3>
+<p>每個頁面都以標頭開始：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#6A737D">/* Simplified from PostgreSQL src/include/storage/bufpage.h */</span></span>
+<span class="line"><span style="color:#F97583">typedef</span><span style="color:#F97583"> struct</span><span style="color:#E1E4E8"> PageHeaderData {</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint16      pd_lower;</span><span style="color:#6A737D">     /* Offset to start of free space */</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint16      pd_upper;</span><span style="color:#6A737D">     /* Offset to end of free space */</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint16      pd_special;</span><span style="color:#6A737D">   /* Offset to start of special space */</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint16      pd_pagesize_version;</span><span style="color:#6A737D">  /* Page size and version */</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint32      pd_checksum;</span><span style="color:#6A737D">  /* Page checksum (optional) */</span></span>
+<span class="line"><span style="color:#6A737D">    /* ... more fields ... */</span></span>
+<span class="line"><span style="color:#E1E4E8">} PageHeaderData;</span></span></code></pre>
+<p><strong>視覺佈局：</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│ 0                   PageHeader (24 bytes)                   │</span></span>
+<span class="line"><span>│ ├── pd_lower ──┐                                            │</span></span>
+<span class="line"><span>│ │              ▼                                            │</span></span>
+<span class="line"><span>│ ├── ItemId[0]  │                                            │</span></span>
+<span class="line"><span>│ ├── ItemId[1]  │  ItemId array (4 bytes each)               │</span></span>
+<span class="line"><span>│ ├── ItemId[2]  │  (points to actual items below)            │</span></span>
+<span class="line"><span>│ │              │                                            │</span></span>
+<span class="line"><span>│ │         pd_upper ──┐                                      │</span></span>
+<span class="line"><span>│ │                    ▼                                      │</span></span>
+<span class="line"><span>│ │              ┌─────────────┐                              │</span></span>
+<span class="line"><span>│ │              │  Free Space │  (grows/shrinks)             │</span></span>
+<span class="line"><span>│ │              └─────────────┘                              │</span></span>
+<span class="line"><span>│ │                    ▲                                      │</span></span>
+<span class="line"><span>│ │              pd_special ──┘                               │</span></span>
+<span class="line"><span>│ │                                                           │</span></span>
+<span class="line"><span>│ │    ┌─────────────────────────────────┐                    │</span></span>
+<span class="line"><span>│ └─►  │  Item 2 (row data)              │  Items grow UP     │</span></span>
+<span class="line"><span>│      ├─────────────────────────────────┤                    │</span></span>
+<span class="line"><span>│      │  Item 1 (row data)              │                    │</span></span>
+<span class="line"><span>│      ├─────────────────────────────────┤                    │</span></span>
+<span class="line"><span>│      │  Item 0 (row data)              │                    │</span></span>
+<span class="line"><span>│      └─────────────────────────────────┘                    │</span></span>
+<span class="line"><span>└─────────────────────────────────────────────────────────────┘</span></span></code></pre>
+<p><strong>關鍵洞察：</strong> 項目從底部<strong>向上</strong>增長，ItemId 陣列從頂部<strong>向下</strong>增長。空閒空間在中間。這最大化了空間利用率。</p>
+<hr>
+<h3 id="itemid指向列資料的指標">ItemId：指向列資料的指標</h3>
+<p>每個 <code>ItemId</code> 是一個 4 位元組的指標：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#F97583">typedef</span><span style="color:#F97583"> struct</span><span style="color:#E1E4E8"> ItemIdData {</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint16      lp_off;</span><span style="color:#6A737D">     /* Offset to item (from page start) */</span></span>
+<span class="line"><span style="color:#E1E4E8">    uint16      lp_len;</span><span style="color:#6A737D">     /* Length of item (including header) */</span></span>
+<span class="line"><span style="color:#6A737D">    /* ... flags ... */</span></span>
+<span class="line"><span style="color:#E1E4E8">} ItemIdData;</span></span></code></pre>
+<p><strong>為什麼需要間接？</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>原因</th><th>解釋</th></tr></thead><tbody><tr><td><strong>移動項目而不改變參考</strong></td><td>當項目移動時更新 <code>lp_off</code></td></tr><tr><td><strong>標記項目為已刪除</strong></td><td>設定 <code>lp_len = 0</code> 而不覆蓋資料</td></tr><tr><td><strong>支援 HOT (Heap Only Tuple)</strong></td><td>對 PostgreSQL 效能至關重要</td></tr></tbody></table>
+<hr>
+<h3 id="rust-實作page-結構體">Rust 實作：Page 結構體</h3>
+<p>以下是 Vaultgres 表示頁面的方式：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// src/storage/page.rs</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">mem;</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> const</span><span style="color:#79B8FF"> PAGE_SIZE</span><span style="color:#F97583">:</span><span style="color:#B392F0"> usize</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 8192</span><span style="color:#E1E4E8">;  </span><span style="color:#6A737D">// 8KB</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> const</span><span style="color:#79B8FF"> PAGE_HEADER_SIZE</span><span style="color:#F97583">:</span><span style="color:#B392F0"> usize</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 24</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> const</span><span style="color:#79B8FF"> ITEM_ID_SIZE</span><span style="color:#F97583">:</span><span style="color:#B392F0"> usize</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 4</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">#[derive(</span><span style="color:#B392F0">Debug</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Clone</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Copy</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#E1E4E8">#[repr(</span><span style="color:#B392F0">C</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> ItemId</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> offset</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,  </span><span style="color:#6A737D">// Offset to item data</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> length</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,  </span><span style="color:#6A737D">// Length of item</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">impl</span><span style="color:#B392F0"> ItemId</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> const</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> new</span><span style="color:#E1E4E8">(offset</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">, length</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#79B8FF"> Self</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#79B8FF">        Self</span><span style="color:#E1E4E8"> { offset, length }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> const</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> is_unused</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> bool</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">length </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> 0</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#E1E4E8">#[repr(</span><span style="color:#B392F0">C</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> PageHeader</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> pd_lower</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,      </span><span style="color:#6A737D">// Start of free space (after ItemIds)</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> pd_upper</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,      </span><span style="color:#6A737D">// End of free space (before items)</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> pd_special</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,    </span><span style="color:#6A737D">// Start of special space (usually PAGE_SIZE)</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> version</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> checksum</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#6A737D">    // Padding to reach 24 bytes</span></span>
+<span class="line"><span style="color:#E1E4E8">    _padding</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> [</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">12</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> Page</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    data</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> [</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">PAGE_SIZE</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">impl</span><span style="color:#B392F0"> Page</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> new</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">-></span><span style="color:#79B8FF"> Self</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> data </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">0</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">PAGE_SIZE</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#6A737D">        // Initialize header</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> header </span><span style="color:#F97583">=</span><span style="color:#B392F0"> PageHeader</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">            pd_lower</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">PAGE_HEADER_SIZE</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            pd_upper</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> PAGE_SIZE</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            pd_special</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> PAGE_SIZE</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            version</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            checksum</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            _padding</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">12</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">        };</span></span>
+<span class="line"><span style="color:#6A737D">        // Write header to data</span></span>
+<span class="line"><span style="color:#F97583">        unsafe</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">            std</span><span style="color:#F97583">::</span><span style="color:#B392F0">ptr</span><span style="color:#F97583">::</span><span style="color:#B392F0">write_unaligned</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#E1E4E8">                data</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_mut_ptr</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#F97583"> *mut</span><span style="color:#B392F0"> PageHeader</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">                header,</span></span>
+<span class="line"><span style="color:#E1E4E8">            );</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#79B8FF">        Self</span><span style="color:#E1E4E8"> { data }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> header</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#F97583"> &#x26;</span><span style="color:#B392F0">PageHeader</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">        unsafe</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">&#x26;*</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_ptr</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#F97583"> *const</span><span style="color:#79B8FF"> PageHeader</span><span style="color:#E1E4E8">) }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> header_mut</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#F97583"> &#x26;mut</span><span style="color:#B392F0"> PageHeader</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">        unsafe</span><span style="color:#E1E4E8"> { </span><span style="color:#F97583">&#x26;mut</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_mut_ptr</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#F97583"> *mut</span><span style="color:#B392F0"> PageHeader</span><span style="color:#E1E4E8">) }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> free_space</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> usize</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> header </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">header</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">        header</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pd_upper </span><span style="color:#F97583">as</span><span style="color:#B392F0"> usize</span><span style="color:#F97583"> -</span><span style="color:#E1E4E8"> header</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pd_lower </span><span style="color:#F97583">as</span><span style="color:#B392F0"> usize</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> insert</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">, item_data</span><span style="color:#F97583">:</span><span style="color:#F97583"> &#x26;</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">]) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u16</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#6A737D">        // Check if we have enough space</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> required </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> item_data</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> ITEM_ID_SIZE</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">free_space</span><span style="color:#E1E4E8">() &#x3C; required {</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#B392F0"> None</span><span style="color:#E1E4E8">;  </span><span style="color:#6A737D">// Page full</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> header </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">header_mut</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">        // Calculate where to place the item (from bottom, growing up)</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> item_offset </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> header</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pd_upper </span><span style="color:#F97583">-</span><span style="color:#E1E4E8"> item_data</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">        // Write item data</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data[item_offset </span><span style="color:#F97583">as</span><span style="color:#B392F0"> usize</span><span style="color:#F97583">..</span><span style="color:#E1E4E8">item_offset </span><span style="color:#F97583">as</span><span style="color:#B392F0"> usize</span><span style="color:#F97583"> +</span><span style="color:#E1E4E8"> item_data</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">()]</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">copy_from_slice</span><span style="color:#E1E4E8">(item_data);</span></span>
+<span class="line"><span style="color:#6A737D">        // Create ItemId</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> item_id_offset </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> header</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pd_lower </span><span style="color:#F97583">as</span><span style="color:#B392F0"> usize</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> item_id </span><span style="color:#F97583">=</span><span style="color:#B392F0"> ItemId</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">(item_offset, item_data</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">        unsafe</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">            std</span><span style="color:#F97583">::</span><span style="color:#B392F0">ptr</span><span style="color:#F97583">::</span><span style="color:#B392F0">write_unaligned</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#79B8FF">                self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data[item_id_offset</span><span style="color:#F97583">..</span><span style="color:#E1E4E8">]</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_mut_ptr</span><span style="color:#E1E4E8">() </span><span style="color:#F97583">as</span><span style="color:#F97583"> *mut</span><span style="color:#B392F0"> ItemId</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">                item_id,</span></span>
+<span class="line"><span style="color:#E1E4E8">            );</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#6A737D">        // Update header</span></span>
+<span class="line"><span style="color:#E1E4E8">        header</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pd_lower </span><span style="color:#F97583">+=</span><span style="color:#79B8FF"> ITEM_ID_SIZE</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        header</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pd_upper </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> item_offset;</span></span>
+<span class="line"><span style="color:#6A737D">        // Return ItemId index (0-based)</span></span>
+<span class="line"><span style="color:#B392F0">        Some</span><span style="color:#E1E4E8">((item_id_offset </span><span style="color:#F97583">-</span><span style="color:#79B8FF"> PAGE_HEADER_SIZE</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">/</span><span style="color:#79B8FF"> ITEM_ID_SIZE</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> usize</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<div class="admonition warning" data-admonition-type="warning" data-icon="⚠️" data-title="為了效能使用 Unsafe Rust"><div class="admonition-title"><span class="admonition-icon">⚠️</span>為了效能使用 Unsafe Rust</div><p>是的，這裡使用了 <code>unsafe</code>。為什麼？</p><ul>
+<li><strong>零拷貝存取</strong> 頁面資料</li>
+<li><strong>精確的記憶體佈局</strong> 匹配 PostgreSQL 的磁碟上格式</li>
+<li><strong>效能</strong> 至關重要——頁面被存取數百萬次
+<strong>安全保證：</strong></li>
+<li><code>#[repr(C)]</code> 確保可預測的佈局</li>
+<li>所有存取都在範圍內（由 <code>free_space()</code> 檢查）</li>
+<li>頁面在使用前總是已初始化
+這就是 AI 輔助無價的地方：我可以問「這個 <code>unsafe</code> 區塊是否可靠？」並得到詳細分析。</li>
+</ul></div>
+<hr>
+<h2 id="3-緩衝池在記憶體中快取頁面">3 緩衝池：在記憶體中快取頁面</h2>
+<h3 id="問題磁碟很慢">問題：磁碟很慢</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>儲存</th><th>延遲</th><th>相對速度</th></tr></thead><tbody><tr><td>CPU 快取 (L1)</td><td>~1ns</td><td>1x</td></tr><tr><td>RAM</td><td>~100ns</td><td>100x 更慢</td></tr><tr><td>NVMe SSD</td><td>~100μs</td><td>100,000x 更慢</td></tr><tr><td>HDD</td><td>~10ms</td><td>10,000,000x 更慢</td></tr><tr><td><strong>沒有緩衝池：</strong></td><td></td><td></td></tr></tbody></table>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Query: SELECT * FROM users WHERE id = 42</span></span>
+<span class="line"><span>1. Read page containing id=42 from disk (100μs on NVMe)</span></span>
+<span class="line"><span>2. Parse page, find row</span></span>
+<span class="line"><span>3. Return result</span></span>
+<span class="line"><span>Next query: SELECT * FROM users WHERE id = 42</span></span>
+<span class="line"><span>1. Read page from disk AGAIN (100μs)  ← Wasteful!</span></span>
+<span class="line"><span>2. Parse page, find row</span></span>
+<span class="line"><span>3. Return result</span></span></code></pre>
+<hr>
+<h3 id="解決方案緩衝池">解決方案：緩衝池</h3>
+<p><strong>緩衝池</strong> 將經常存取的頁面快取在 RAM 中：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│                    Buffer Pool (RAM)                        │</span></span>
+<span class="line"><span>│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐            │</span></span>
+<span class="line"><span>│  │ Page 0  │ │ Page 5  │ │ Page 3  │ │ Page 7  │  ...       │</span></span>
+<span class="line"><span>│  │ (dirty) │ │ (clean) │ │ (dirty) │ │ (clean) │            │</span></span>
+<span class="line"><span>│  └─────────┘ └─────────┘ └─────────┘ └─────────┘            │</span></span>
+<span class="line"><span>└─────────────────────────────────────────────────────────────┘</span></span>
+<span class="line"><span>         │              │              │</span></span>
+<span class="line"><span>         ▼              ▼              ▼</span></span>
+<span class="line"><span>    ┌─────────┐    ┌─────────┐    ┌─────────┐</span></span>
+<span class="line"><span>    │ Disk    │    │ Disk    │    │ Disk    │</span></span>
+<span class="line"><span>    │ Page 0  │    │ Page 5  │    │ Page 3  │</span></span>
+<span class="line"><span>    └─────────┘    └─────────┘    └─────────┘</span></span></code></pre>
+<p><strong>使用緩衝池：</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Query: SELECT * FROM users WHERE id = 42</span></span>
+<span class="line"><span>1. Check buffer pool for page containing id=42</span></span>
+<span class="line"><span>2. If hit: Return from RAM (~100ns)  ← 1000x faster!</span></span>
+<span class="line"><span>3. If miss: Read from disk, cache in pool, return</span></span>
+<span class="line"><span>Next query: SELECT * FROM users WHERE id = 42</span></span>
+<span class="line"><span>1. Check buffer pool (HIT!)</span></span>
+<span class="line"><span>2. Return from RAM (~100ns)  ← Cached!</span></span></code></pre>
+<hr>
+<h3 id="緩衝池架構">緩衝池架構</h3>
+<div class="mermaid">flowchart BT
+    subgraph "Buffer Pool Manager"
+        A[Page Request] --> B{In Pool?}
+        B -->|Hit| C[Return Cached Page]
+        B -->|Miss| D[Find Victim Page]
+        D --> E{Dirty?}
+        E -->|Yes| F[Write to Disk]
+        E -->|No| G[Skip Write]
+        F --> H[Read New Page]
+        G --> H
+        H --> I[Update LRU List]
+        I --> J[Return New Page]
+    end
+    subgraph "Memory"
+        C --> K[Buffer Frame]
+        J --> K
+    end
+    subgraph "Disk"
+        F --> L[Write Page]
+        H --> M[Read Page]
+    end
+    style B fill:#fff3e0,stroke:#f57c00
+    style E fill:#fff3e0,stroke:#f57c00
+    style K fill:#e3f2fd,stroke:#1976d2
+</div>
+<p><strong>元件：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>元件</th><th>目的</th></tr></thead><tbody><tr><td><strong>緩衝幀 (Buffer Frames)</strong></td><td>固定大小的槽位持有頁面（例如 1024 幀 × 8KB = 8MB）</td></tr><tr><td><strong>頁面表 (Page Table)</strong></td><td>映射頁面 ID → 緩衝幀（雜湊表）</td></tr><tr><td><strong>LRU 串列</strong></td><td>追蹤存取順序以進行淘汰</td></tr><tr><td><strong>髒位元 (Dirty Bit)</strong></td><td>標記需要寫回的頁面</td></tr><tr><td><strong>釘選計數 (Pin Count)</strong></td><td>防止使用中頁面被淘汰</td></tr></tbody></table>
+<hr>
+<h3 id="rust-實作緩衝池">Rust 實作：緩衝池</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// src/storage/buffer_pool.rs</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">collections</span><span style="color:#F97583">::</span><span style="color:#B392F0">HashMap</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">sync</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">{</span><span style="color:#B392F0">Arc</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Mutex</span><span style="color:#E1E4E8">};</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#F97583"> crate::</span><span style="color:#B392F0">storage</span><span style="color:#F97583">::</span><span style="color:#B392F0">page</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">{</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">PAGE_SIZE</span><span style="color:#E1E4E8">};</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> BufferFrame</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    page</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">>,</span></span>
+<span class="line"><span style="color:#E1E4E8">    page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">>,</span></span>
+<span class="line"><span style="color:#E1E4E8">    pin_count</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    is_dirty</span><span style="color:#F97583">:</span><span style="color:#B392F0"> bool</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    last_accessed</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">,  </span><span style="color:#6A737D">// For LRU</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> BufferPool</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    frames</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Vec</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">BufferFrame</span><span style="color:#E1E4E8">>>,</span></span>
+<span class="line"><span style="color:#E1E4E8">    page_table</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">HashMap</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">usize</span><span style="color:#E1E4E8">>>,  </span><span style="color:#6A737D">// page_id → frame_index</span></span>
+<span class="line"><span style="color:#E1E4E8">    lru_list</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Vec</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">usize</span><span style="color:#E1E4E8">>>,  </span><span style="color:#6A737D">// frame indices, front = MRU</span></span>
+<span class="line"><span style="color:#E1E4E8">    disk</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Arc</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">DiskManager</span><span style="color:#E1E4E8">>,</span></span>
+<span class="line"><span style="color:#E1E4E8">    access_counter</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">>,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">impl</span><span style="color:#B392F0"> BufferPool</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> new</span><span style="color:#E1E4E8">(num_frames</span><span style="color:#F97583">:</span><span style="color:#B392F0"> usize</span><span style="color:#E1E4E8">, disk</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Arc</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">DiskManager</span><span style="color:#E1E4E8">>) </span><span style="color:#F97583">-></span><span style="color:#79B8FF"> Self</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> frames </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">0</span><span style="color:#F97583">..</span><span style="color:#E1E4E8">num_frames)</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">|</span><span style="color:#E1E4E8">_</span><span style="color:#F97583">|</span><span style="color:#B392F0"> Mutex</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">BufferFrame</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">                page</span><span style="color:#F97583">:</span><span style="color:#B392F0"> None</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">                page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> None</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">                pin_count</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">                is_dirty</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">                last_accessed</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">            }))</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">collect</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#79B8FF">        Self</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">            frames,</span></span>
+<span class="line"><span style="color:#E1E4E8">            page_table</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">HashMap</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">()),</span></span>
+<span class="line"><span style="color:#E1E4E8">            lru_list</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Vec</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">()),</span></span>
+<span class="line"><span style="color:#E1E4E8">            disk,</span></span>
+<span class="line"><span style="color:#E1E4E8">            access_counter</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> get_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Arc</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">>>> {</span></span>
+<span class="line"><span style="color:#6A737D">        // Check if page is in pool</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> page_table </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">frame_idx) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">page_id) {</span></span>
+<span class="line"><span style="color:#6A737D">            // Cache hit</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames[frame_idx]</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">            frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pin_count </span><span style="color:#F97583">+=</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">            frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">last_accessed </span><span style="color:#F97583">=</span><span style="color:#F97583"> *</span><span style="color:#79B8FF">self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">access_counter</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">            // Move to front of LRU</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> lru </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lru_list</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(pos) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> lru</span><span style="color:#F97583">.</span><span style="color:#B392F0">iter</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">position</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">|&#x26;</span><span style="color:#E1E4E8">x</span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> x </span><span style="color:#F97583">==</span><span style="color:#E1E4E8"> frame_idx) {</span></span>
+<span class="line"><span style="color:#E1E4E8">                lru</span><span style="color:#F97583">.</span><span style="color:#B392F0">remove</span><span style="color:#E1E4E8">(pos);</span></span>
+<span class="line"><span style="color:#E1E4E8">                lru</span><span style="color:#F97583">.</span><span style="color:#B392F0">push_front</span><span style="color:#E1E4E8">(frame_idx);</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#F97583">            return</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Arc</span><span style="color:#F97583">::</span><span style="color:#B392F0">clone</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_ref</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">()));</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#B392F0">        drop</span><span style="color:#E1E4E8">(page_table);</span></span>
+<span class="line"><span style="color:#6A737D">        // Cache miss - need to load from disk</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#B392F0">load_page</span><span style="color:#E1E4E8">(page_id)</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    fn</span><span style="color:#B392F0"> load_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Arc</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">>>> {</span></span>
+<span class="line"><span style="color:#6A737D">        // Find victim frame using LRU</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> victim_idx </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">find_victim</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames[victim_idx]</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">        // Write back if dirty</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">is_dirty {</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(old_page_id) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_id {</span></span>
+<span class="line"><span style="color:#79B8FF">                self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">disk</span><span style="color:#F97583">.</span><span style="color:#B392F0">write_page</span><span style="color:#E1E4E8">(old_page_id, frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_ref</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">())</span></span>
+<span class="line"><span style="color:#F97583">                    .</span><span style="color:#B392F0">ok</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#E1E4E8">            frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">is_dirty </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#6A737D">        // Read new page from disk</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> new_page </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">disk</span><span style="color:#F97583">.</span><span style="color:#B392F0">read_page</span><span style="color:#E1E4E8">(page_id)</span><span style="color:#F97583">.</span><span style="color:#B392F0">ok</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">        // Update frame</span></span>
+<span class="line"><span style="color:#E1E4E8">        frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page </span><span style="color:#F97583">=</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(new_page);</span></span>
+<span class="line"><span style="color:#E1E4E8">        frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_id </span><span style="color:#F97583">=</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(page_id);</span></span>
+<span class="line"><span style="color:#E1E4E8">        frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pin_count </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">last_accessed </span><span style="color:#F97583">=</span><span style="color:#F97583"> *</span><span style="color:#79B8FF">self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">access_counter</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">        // Update page table</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> page_table </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">        page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">insert</span><span style="color:#E1E4E8">(page_id, victim_idx);</span></span>
+<span class="line"><span style="color:#6A737D">        // Update LRU</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> lru </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lru_list</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">        lru</span><span style="color:#F97583">.</span><span style="color:#B392F0">push_front</span><span style="color:#E1E4E8">(victim_idx);</span></span>
+<span class="line"><span style="color:#B392F0">        Some</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Arc</span><span style="color:#F97583">::</span><span style="color:#B392F0">clone</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_ref</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">()))</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    fn</span><span style="color:#B392F0"> find_victim</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">usize</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> lru </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lru_list</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">        // Find unpinned page from back (LRU)</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> i </span><span style="color:#F97583">in</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">0</span><span style="color:#F97583">..</span><span style="color:#E1E4E8">lru</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">())</span><span style="color:#F97583">.</span><span style="color:#B392F0">rev</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#E1E4E8"> frame_idx </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> lru[i];</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames[frame_idx]</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pin_count </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">                lru</span><span style="color:#F97583">.</span><span style="color:#B392F0">remove</span><span style="color:#E1E4E8">(i);</span></span>
+<span class="line"><span style="color:#F97583">                return</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(frame_idx);</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#6A737D">        // All pages pinned - need to wait or allocate more frames</span></span>
+<span class="line"><span style="color:#B392F0">        None</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> mark_dirty</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> page_table </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">frame_idx) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">page_id) {</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames[frame_idx]</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">            frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">is_dirty </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> unpin_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> page_table </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">frame_idx) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_table</span><span style="color:#F97583">.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">page_id) {</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames[frame_idx]</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">            frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pin_count </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pin_count</span><span style="color:#F97583">.</span><span style="color:#B392F0">saturating_sub</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">1</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> flush_all</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;()> {</span></span>
+<span class="line"><span style="color:#F97583">        for</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">in</span><span style="color:#F97583"> &#x26;</span><span style="color:#79B8FF">self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames {</span></span>
+<span class="line"><span style="color:#F97583">            let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> f </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#E1E4E8"> f</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">is_dirty {</span></span>
+<span class="line"><span style="color:#F97583">                if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(page_id) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> f</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page_id {</span></span>
+<span class="line"><span style="color:#79B8FF">                    self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">disk</span><span style="color:#F97583">.</span><span style="color:#B392F0">write_page</span><span style="color:#E1E4E8">(page_id, f</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">page</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_ref</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">())</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">                }</span></span>
+<span class="line"><span style="color:#E1E4E8">                f</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">is_dirty </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(())</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<div class="admonition tip" data-admonition-type="tip" data-icon="💡" data-title="關鍵設計決策"><div class="admonition-title"><span class="admonition-icon">💡</span>關鍵設計決策</div><p><strong>1. 細粒度鎖定：</strong> 每個 <code>BufferFrame</code> 都有自己的 <code>Mutex</code>，而不是整個池只有一把鎖。
+<strong>2. ARC 用於共享存取：</strong> <code>Arc&#x3C;Mutex&#x3C;Page>></code> 允許多個執行緒持有同一頁面。
+<strong>3. 釘選計數：</strong> 防止執行緒使用頁面時被淘汰。
+<strong>4. LRU 淘汰：</strong> 最近最少使用的頁面優先被淘汰。
+這些決策來自於詢問 AI：「如何在 Rust 中設計執行緒安全的緩衝池？」然後根據 PostgreSQL 的實際實作迭代答案。</p></div>
+<hr>
+<h2 id="4-磁碟管理員抽象化檔案-io">4 磁碟管理員：抽象化檔案 I/O</h2>
+<h3 id="單一檔案-vs-多個檔案">單一檔案 vs. 多個檔案</h3>
+<p>PostgreSQL 將每個表/索引儲存在單獨的檔案中：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>$PGDATA/base/16384/      # Database OID</span></span>
+<span class="line"><span>├── 16385                # Table: users</span></span>
+<span class="line"><span>├── 16386                # Table: orders</span></span>
+<span class="line"><span>├── 16387_idx            # Index: users_email_idx</span></span>
+<span class="line"><span>└── ...</span></span></code></pre>
+<p>Vaultgres 遵循相同的模式：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// src/storage/disk.rs</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">collections</span><span style="color:#F97583">::</span><span style="color:#B392F0">HashMap</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">fs</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">{</span><span style="color:#B392F0">File</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">OpenOptions</span><span style="color:#E1E4E8">};</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">{</span><span style="color:#B392F0">Read</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Seek</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">SeekFrom</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Write</span><span style="color:#E1E4E8">};</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">path</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">{</span><span style="color:#B392F0">Path</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">PathBuf</span><span style="color:#E1E4E8">};</span></span>
+<span class="line"><span style="color:#F97583">use</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">sync</span><span style="color:#F97583">::</span><span style="color:#B392F0">Mutex</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> DiskManager</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    data_dir</span><span style="color:#F97583">:</span><span style="color:#B392F0"> PathBuf</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    files</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">HashMap</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">File</span><span style="color:#E1E4E8">>>,  # table_id → </span><span style="color:#B392F0">File</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">impl</span><span style="color:#B392F0"> DiskManager</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> new</span><span style="color:#E1E4E8">(data_dir</span><span style="color:#F97583">:</span><span style="color:#F97583"> &#x26;</span><span style="color:#B392F0">str</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">Self</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#B392F0">        std</span><span style="color:#F97583">::</span><span style="color:#B392F0">fs</span><span style="color:#F97583">::</span><span style="color:#B392F0">create_dir_all</span><span style="color:#E1E4E8">(data_dir)</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">Self</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">            data_dir</span><span style="color:#F97583">:</span><span style="color:#B392F0"> PathBuf</span><span style="color:#F97583">::</span><span style="color:#B392F0">from</span><span style="color:#E1E4E8">(data_dir),</span></span>
+<span class="line"><span style="color:#E1E4E8">            files</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Mutex</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">HashMap</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">()),</span></span>
+<span class="line"><span style="color:#E1E4E8">        })</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    fn</span><span style="color:#B392F0"> get_file</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, table_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;std</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">fs</span><span style="color:#F97583">::</span><span style="color:#B392F0">File</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> files </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">files</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#F97583"> let</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(file) </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> files</span><span style="color:#F97583">.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">table_id) {</span></span>
+<span class="line"><span style="color:#6A737D">            // File already open - need to handle this differently</span></span>
+<span class="line"><span style="color:#6A737D">            // (simplified for example)</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> path </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data_dir</span><span style="color:#F97583">.</span><span style="color:#B392F0">join</span><span style="color:#E1E4E8">(table_id</span><span style="color:#F97583">.</span><span style="color:#B392F0">to_string</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> file </span><span style="color:#F97583">=</span><span style="color:#B392F0"> OpenOptions</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">read</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">write</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">create</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#F97583">            .</span><span style="color:#B392F0">open</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">path)</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        files</span><span style="color:#F97583">.</span><span style="color:#B392F0">insert</span><span style="color:#E1E4E8">(table_id, file</span><span style="color:#F97583">.</span><span style="color:#B392F0">try_clone</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(file)</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> read_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> table_id </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_id </span><span style="color:#F97583">>></span><span style="color:#79B8FF"> 32</span><span style="color:#E1E4E8">;  # </span><span style="color:#B392F0">High</span><span style="color:#79B8FF"> 32</span><span style="color:#E1E4E8"> bits</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> page_num </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_id </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">;  # </span><span style="color:#B392F0">Low</span><span style="color:#79B8FF"> 32</span><span style="color:#E1E4E8"> bits</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> file </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">get_file</span><span style="color:#E1E4E8">(table_id)</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> data </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span><span style="color:#79B8FF">0</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">; </span><span style="color:#79B8FF">PAGE_SIZE</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#E1E4E8">        file</span><span style="color:#F97583">.</span><span style="color:#B392F0">seek</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">SeekFrom</span><span style="color:#F97583">::</span><span style="color:#B392F0">Start</span><span style="color:#E1E4E8">(page_num </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u64</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> PAGE_SIZE</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">))</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        file</span><span style="color:#F97583">.</span><span style="color:#B392F0">read_exact</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#E1E4E8"> data)</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">Page</span><span style="color:#F97583">::</span><span style="color:#B392F0">from_data</span><span style="color:#E1E4E8">(data))</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> write_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">, page</span><span style="color:#F97583">:</span><span style="color:#F97583"> &#x26;</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;()> {</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> table_id </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_id </span><span style="color:#F97583">>></span><span style="color:#79B8FF"> 32</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> page_num </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> page_id </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> file </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">get_file</span><span style="color:#E1E4E8">(table_id)</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        file</span><span style="color:#F97583">.</span><span style="color:#B392F0">seek</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">SeekFrom</span><span style="color:#F97583">::</span><span style="color:#B392F0">Start</span><span style="color:#E1E4E8">(page_num </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u64</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> PAGE_SIZE</span><span style="color:#F97583"> as</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">))</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        file</span><span style="color:#F97583">.</span><span style="color:#B392F0">write_all</span><span style="color:#E1E4E8">(page</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_bytes</span><span style="color:#E1E4E8">())</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">        file</span><span style="color:#F97583">.</span><span style="color:#B392F0">sync_all</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;  # </span><span style="color:#B392F0">Force</span><span style="color:#E1E4E8"> to disk</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(())</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<hr>
+<h3 id="頁面-id-編碼">頁面 ID 編碼</h3>
+<p>Vaultgres 將表 ID 和頁面編號編碼為單個 <code>u64</code>：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>┌─────────────────────────────────────────────────────────────┐</span></span>
+<span class="line"><span>│  Page ID (u64)                                              │</span></span>
+<span class="line"><span>│  ┌─────────────────┬─────────────────┐                      │</span></span>
+<span class="line"><span>│  │  Table ID (32)  │  Page Num (32)  │                      │</span></span>
+<span class="line"><span>│  └─────────────────┴─────────────────┘                      │</span></span>
+<span class="line"><span>└─────────────────────────────────────────────────────────────┘</span></span>
+<span class="line"><span>Example: page_id = 0x0000000100000005</span></span>
+<span class="line"><span>  Table ID: 1</span></span>
+<span class="line"><span>  Page Number: 5</span></span></code></pre>
+<p><strong>為什麼？</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>原因</th><th>解釋</th></tr></thead><tbody><tr><td><strong>單一識別符</strong></td><td>簡化緩衝池和頁面表</td></tr><tr><td><strong>高效雜湊</strong></td><td><code>u64</code> 比 <code>(u32, u32)</code> 元組更快</td></tr><tr><td><strong>PostgreSQL 相容</strong></td><td>類似於 PostgreSQL 的 <code>BlockId</code></td></tr></tbody></table>
+<hr>
+<h2 id="5-預寫日誌-wal確保持久性">5 預寫日誌 (WAL)：確保持久性</h2>
+<h3 id="問題崩潰會破壞資料">問題：崩潰會破壞資料</h3>
+<p>沒有 WAL：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>1. Buffer pool modifies page in memory</span></span>
+<span class="line"><span>2. Before page is written to disk... CRASH!</span></span>
+<span class="line"><span>3. Data lost forever</span></span></code></pre>
+<p><strong>更糟的是：</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>1. Write page to disk (50% complete)... CRASH!</span></span>
+<span class="line"><span>2. Page is now corrupted (torn page)</span></span></code></pre>
+<hr>
+<h3 id="解決方案預寫日誌">解決方案：預寫日誌</h3>
+<p><strong>WAL 原則：</strong> 在修改頁面之前，先將變更寫入日誌：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Transaction: UPDATE users SET balance = 100 WHERE id = 42</span></span>
+<span class="line"><span>1. Write WAL record: "Page X, Offset Y, Old Value Z, New Value W"</span></span>
+<span class="line"><span>2. Flush WAL to disk (fsync)</span></span>
+<span class="line"><span>3. Modify page in buffer pool (mark dirty)</span></span>
+<span class="line"><span>4. ACK to client</span></span>
+<span class="line"><span>5. Later: Checkpoint writes dirty pages to disk</span></span></code></pre>
+<p><strong>崩潰後：</strong></p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>1. Read last checkpoint position</span></span>
+<span class="line"><span>2. Replay WAL records from checkpoint to end</span></span>
+<span class="line"><span>3. Database is consistent</span></span></code></pre>
+<hr>
+<h3 id="wal-記錄格式">WAL 記錄格式</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// src/storage/wal.rs</span></span>
+<span class="line"><span style="color:#E1E4E8">#[derive(</span><span style="color:#B392F0">Debug</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Clone</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> WalRecord</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> lsn</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">,              </span><span style="color:#6A737D">// Log Sequence Number</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> table_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> page_num</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> offset</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u16</span><span style="color:#E1E4E8">,           </span><span style="color:#6A737D">// Offset within page</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> old_data</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Vec</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">>,     </span><span style="color:#6A737D">// Before image (for undo)</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> new_data</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Vec</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">>,     </span><span style="color:#6A737D">// After image (for redo)</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> transaction_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#E1E4E8"> record_type</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WalRecordType</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#E1E4E8">#[derive(</span><span style="color:#B392F0">Debug</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">Clone</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> enum</span><span style="color:#B392F0"> WalRecordType</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    Insert</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    Update</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    Delete</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    Checkpoint</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    Commit</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    Abort</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> struct</span><span style="color:#B392F0"> WalManager</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    wal_dir</span><span style="color:#F97583">:</span><span style="color:#B392F0"> PathBuf</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    current_lsn</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    current_file</span><span style="color:#F97583">:</span><span style="color:#B392F0"> File</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    flush_lsn</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">,  </span><span style="color:#6A737D">// Last flushed LSN</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">impl</span><span style="color:#B392F0"> WalManager</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> log_change</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">, record</span><span style="color:#F97583">:</span><span style="color:#B392F0"> WalRecord</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#6A737D">        // Serialize record</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> data </span><span style="color:#F97583">=</span><span style="color:#B392F0"> Vec</span><span style="color:#F97583">::</span><span style="color:#B392F0">new</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">        data</span><span style="color:#F97583">.</span><span style="color:#B392F0">extend_from_slice</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">record</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lsn</span><span style="color:#F97583">.</span><span style="color:#B392F0">to_le_bytes</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#E1E4E8">        data</span><span style="color:#F97583">.</span><span style="color:#B392F0">extend_from_slice</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">(record</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">table_id</span><span style="color:#F97583">.</span><span style="color:#B392F0">to_le_bytes</span><span style="color:#E1E4E8">()));</span></span>
+<span class="line"><span style="color:#6A737D">        // ... more fields</span></span>
+<span class="line"><span style="color:#6A737D">        // Write to WAL file</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">current_file</span><span style="color:#F97583">.</span><span style="color:#B392F0">write_all</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#E1E4E8">data)</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">        // Update LSN</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">current_lsn </span><span style="color:#F97583">+=</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(record</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">lsn)</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> flush</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;()> {</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">current_file</span><span style="color:#F97583">.</span><span style="color:#B392F0">sync_all</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">?</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#79B8FF">        self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">flush_lsn </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">current_lsn;</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(())</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> replay_from</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">, lsn</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">, buffer_pool</span><span style="color:#F97583">:</span><span style="color:#F97583"> &#x26;</span><span style="color:#B392F0">BufferPool</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Result</span><span style="color:#E1E4E8">&#x3C;()> {</span></span>
+<span class="line"><span style="color:#6A737D">        // Seek to LSN</span></span>
+<span class="line"><span style="color:#6A737D">        // Read records</span></span>
+<span class="line"><span style="color:#6A737D">        // For each record:</span></span>
+<span class="line"><span style="color:#6A737D">        //   - Get page from buffer pool</span></span>
+<span class="line"><span style="color:#6A737D">        //   - Apply new_data to page</span></span>
+<span class="line"><span style="color:#6A737D">        //   - Mark page dirty</span></span>
+<span class="line"><span style="color:#B392F0">        Ok</span><span style="color:#E1E4E8">(())</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<div class="admonition warning" data-admonition-type="warning" data-icon="⚠️" data-title="WAL 很難"><div class="admonition-title"><span class="admonition-icon">⚠️</span>WAL 很難</div><p>正確實作 WAL 是建構資料庫最困難的部分之一：</p><ul>
+<li><strong>邏輯 vs. 實體 WAL：</strong> 記錄操作（INSERT 列）還是頁面變更（位元組 X→Y）？</li>
+<li>**AR… [截斷]</li>
+<li><strong>檢查點：</strong> 多久一次？模糊還是清晰？</li>
+<li><strong>日誌截斷：</strong> 何時可以刪除舊的 WAL 檔案？
+Vaultgres 將從簡單的實體 WAL（頁面映像）開始，然後逐步演進。AI 對於理解這裡的權衡取捨非常有幫助。</li>
+</ul></div>
+<hr>
+<h2 id="6-用-rust-建構的挑戰">6 用 Rust 建構的挑戰</h2>
+<h3 id="挑戰-1所有權-vs-共享存取">挑戰 1：所有權 vs. 共享存取</h3>
+<p><strong>問題：</strong> 緩衝池需要在執行緒間共享頁面，但 Rust 的所有權系統與此相抗。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// ❌ Doesn't work</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> get_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Page</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#6A737D">    // Can't return owned Page - buffer pool needs to keep it</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#6A737D">// ✅ Solution: Arc&#x3C;Mutex&#x3C;T>></span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> get_page</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">, page_id</span><span style="color:#F97583">:</span><span style="color:#B392F0"> u64</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Arc</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Mutex</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Page</span><span style="color:#E1E4E8">>> {</span></span>
+<span class="line"><span style="color:#6A737D">    // Shared ownership, interior mutability</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>權衡：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>方法</th><th>優點</th><th>缺點</th></tr></thead><tbody><tr><td><code>Arc&#x3C;Mutex&#x3C;T>></code></td><td>安全、熟悉</td><td>鎖定競爭</td></tr><tr><td><code>RwLock&#x3C;T></code></td><td>更適合讀取負載</td><td>寫入飢餓</td></tr><tr><td>Lock-free (unsafe)</td><td>最大效能</td><td>複雜、易出錯</td></tr></tbody></table>
+<hr>
+<h3 id="挑戰-2零拷貝-vs-安全">挑戰 2：零拷貝 vs. 安全</h3>
+<p><strong>問題：</strong> PostgreSQL 使用原始指標進行頁面存取。Rust 想要邊界檢查。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// PostgreSQL (C)</span></span>
+<span class="line"><span style="color:#B392F0">Page</span><span style="color:#E1E4E8"> page </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> buffer_pool</span><span style="color:#F97583">-></span><span style="color:#E1E4E8">pages[frame_id];</span></span>
+<span class="line"><span style="color:#B392F0">Item</span><span style="color:#E1E4E8"> item </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#B392F0">Item</span><span style="color:#E1E4E8">)(page </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> item_offset);  </span><span style="color:#6A737D">// No bounds check!</span></span>
+<span class="line"><span style="color:#6A737D">// Rust (safe)</span></span>
+<span class="line"><span style="color:#F97583">let</span><span style="color:#E1E4E8"> item </span><span style="color:#F97583">=</span><span style="color:#F97583"> &#x26;</span><span style="color:#E1E4E8">page</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data[item_offset</span><span style="color:#F97583">..</span><span style="color:#E1E4E8">item_offset </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> item_len];  </span><span style="color:#6A737D">// Bounds checked</span></span>
+<span class="line"><span style="color:#6A737D">// Rust (unsafe, zero-copy)</span></span>
+<span class="line"><span style="color:#F97583">let</span><span style="color:#E1E4E8"> item </span><span style="color:#F97583">=</span><span style="color:#F97583"> unsafe</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    &#x26;*</span><span style="color:#E1E4E8">(page</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">data</span><span style="color:#F97583">.</span><span style="color:#B392F0">as_ptr</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">add</span><span style="color:#E1E4E8">(item_offset) </span><span style="color:#F97583">as</span><span style="color:#F97583"> *const</span><span style="color:#79B8FF"> Item</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">};  </span><span style="color:#6A737D">// Fast but requires safety analysis</span></span></code></pre>
+<p><strong>Vaultgres 方法：</strong> 從安全開始，在效能分析後用 <code>unsafe</code> 最佳化熱點路徑。</p>
+<hr>
+<h3 id="挑戰-3錯誤處理">挑戰 3：錯誤處理</h3>
+<p><strong>問題：</strong> PostgreSQL 使用 <code>elog(ERROR, ...)</code>。Rust 使用 <code>Result&#x3C;T, E></code>。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#6A737D">// PostgreSQL</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (page_full) {</span></span>
+<span class="line"><span style="color:#B392F0">    elog</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">ERROR</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">"page is full"</span><span style="color:#E1E4E8">);  </span><span style="color:#6A737D">// Longjmp out</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#6A737D">// Rust</span></span>
+<span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8"> (page_full) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#B392F0"> Err</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">PageError</span><span style="color:#F97583">::</span><span style="color:#B392F0">Full</span><span style="color:#E1E4E8">);  </span><span style="color:#6A737D">// Propagate up</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>影響：</strong> 每個函數簽名都改變了。呼叫鏈變成 <code>Result</code> 金字塔。
+<strong>解決方案：</strong> 大量使用 <code>?</code> 運算符，定義明確的錯誤類型：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#E1E4E8">#[derive(</span><span style="color:#B392F0">Debug</span><span style="color:#E1E4E8">)]</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> enum</span><span style="color:#B392F0"> StorageError</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">    PageFull</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    PageNotFound</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#B392F0">    IoError</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Error</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#B392F0">    CorruptedPage</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">u64</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">impl</span><span style="color:#B392F0"> From</span><span style="color:#E1E4E8">&#x3C;std</span><span style="color:#F97583">::</span><span style="color:#E1E4E8">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Error</span><span style="color:#E1E4E8">> </span><span style="color:#F97583">for</span><span style="color:#B392F0"> StorageError</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    fn</span><span style="color:#B392F0"> from</span><span style="color:#E1E4E8">(err</span><span style="color:#F97583">:</span><span style="color:#B392F0"> std</span><span style="color:#F97583">::</span><span style="color:#B392F0">io</span><span style="color:#F97583">::</span><span style="color:#B392F0">Error</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#79B8FF"> Self</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#B392F0">        StorageError</span><span style="color:#F97583">::</span><span style="color:#B392F0">IoError</span><span style="color:#E1E4E8">(err)</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> insert</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;mut</span><span style="color:#79B8FF"> self</span><span style="color:#E1E4E8">, data</span><span style="color:#F97583">:</span><span style="color:#F97583"> &#x26;</span><span style="color:#E1E4E8">[</span><span style="color:#B392F0">u8</span><span style="color:#E1E4E8">]) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Result</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">u16</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">StorageError</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#B392F0">free_space</span><span style="color:#E1E4E8">() &#x3C; data</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#B392F0"> Err</span><span style="color:#E1E4E8">(</span><span style="color:#B392F0">StorageError</span><span style="color:#F97583">::</span><span style="color:#B392F0">PageFull</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#6A737D">    // ...</span></span>
+<span class="line"><span style="color:#B392F0">    Ok</span><span style="color:#E1E4E8">(item_id)</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<hr>
+<h2 id="7-ai-如何加速學習">7 AI 如何加速學習</h2>
+<h3 id="ai-擅長什麼">AI 擅長什麼</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>任務</th><th>我如何使用 AI</th></tr></thead><tbody><tr><td><strong>解釋概念</strong></td><td>「解釋 PostgreSQL 的緩衝池替換策略」</td></tr><tr><td><strong>程式碼審查</strong></td><td>「這個 unsafe 區塊是否可靠？什麼可能出錯？」</td></tr><tr><td><strong>產生樣板</strong></td><td>「為 PostgreSQL PageHeader 產生 Rust 結構體」</td></tr><tr><td><strong>除錯協助</strong></td><td>「為什麼會死結？這是我的鎖定順序…」</td></tr><tr><td><strong>比較方法</strong></td><td>「LRU vs. Clock vs. FIFO 用於緩衝池淘汰」</td></tr></tbody></table>
+<hr>
+<h3 id="ai-無法替代什麼">AI 無法替代什麼</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>技能</th><th>為什麼仍取決於我</th></tr></thead><tbody><tr><td><strong>系統設計</strong></td><td>AI 無法決定整體架構</td></tr><tr><td><strong>權衡分析</strong></td><td>「我應該優先考慮相容性還是效能？」</td></tr><tr><td><strong>測試</strong></td><td>AI 無法執行基準測試或尋找競爭條件</td></tr><tr><td><strong>除錯</strong></td><td>AI 無法附加 gdb 或讀取核心轉儲</td></tr><tr><td><strong>學習</strong></td><td>我仍然必須理解 AI 產生的每一行程式碼</td></tr></tbody></table>
+<hr>
+<h3 id="範例學習緩衝池淘汰">範例：學習緩衝池淘汰</h3>
+<p><strong>我問 AI 的問題：</strong></p>
+<blockquote>
+<p>“PostgreSQL 使用 clock-sweep 演算法進行緩衝池淘汰，而不是純 LRU。為什麼？有什麼權衡取捨？”
+<strong>我學到的：</strong></p>
+</blockquote>
+<ol>
+<li><strong>LRU 問題：</strong> 順序掃描會淘汰所有內容（掃描抵抗）</li>
+<li><strong>Clock-sweep：</strong> 近似 LRU 但更便宜（不需要鏈結串列更新）</li>
+<li><strong>使用計數：</strong> 頁面在淘汰前獲得多次機會</li>
+<li><strong>PostgreSQL 的變體：</strong> 還考慮釘選計數和髒頁狀態
+<strong>結果：</strong> 我在 Vaultgres 中實作了 clock-sweep 而不是 LRU：</li>
+</ol>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#F97583">pub</span><span style="color:#F97583"> fn</span><span style="color:#B392F0"> find_victim</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">&#x26;</span><span style="color:#79B8FF">self</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">-></span><span style="color:#B392F0"> Option</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">usize</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> clock_hand </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">clock_hand</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#E1E4E8"> frames </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames</span><span style="color:#F97583">.</span><span style="color:#B392F0">len</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> _ </span><span style="color:#F97583">in</span><span style="color:#79B8FF"> 0</span><span style="color:#F97583">..</span><span style="color:#E1E4E8">frames </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8"> {  </span><span style="color:#6A737D">// Sweep at most twice</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#E1E4E8"> idx </span><span style="color:#F97583">=</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8">clock_hand </span><span style="color:#F97583">as</span><span style="color:#B392F0"> usize</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        let</span><span style="color:#F97583"> mut</span><span style="color:#E1E4E8"> frame </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> self</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">frames[idx]</span><span style="color:#F97583">.</span><span style="color:#B392F0">lock</span><span style="color:#E1E4E8">()</span><span style="color:#F97583">.</span><span style="color:#B392F0">unwrap</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">        if</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">pin_count </span><span style="color:#F97583">==</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">            if</span><span style="color:#E1E4E8"> frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">usage_count </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">                frame</span><span style="color:#F97583">.</span><span style="color:#E1E4E8">usage_count </span><span style="color:#F97583">-=</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">;  </span><span style="color:#6A737D">// Second chance</span></span>
+<span class="line"><span style="color:#E1E4E8">            } </span><span style="color:#F97583">else</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">                *</span><span style="color:#E1E4E8">clock_hand </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">clock_hand </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">%</span><span style="color:#E1E4E8"> frames </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">                return</span><span style="color:#B392F0"> Some</span><span style="color:#E1E4E8">(idx);  </span><span style="color:#6A737D">// Evict this one</span></span>
+<span class="line"><span style="color:#E1E4E8">            }</span></span>
+<span class="line"><span style="color:#E1E4E8">        }</span></span>
+<span class="line"><span style="color:#B392F0">        drop</span><span style="color:#E1E4E8">(frame);</span></span>
+<span class="line"><span style="color:#F97583">        *</span><span style="color:#E1E4E8">clock_hand </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">clock_hand </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">%</span><span style="color:#E1E4E8"> frames </span><span style="color:#F97583">as</span><span style="color:#B392F0"> u32</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#B392F0">    None</span><span style="color:#6A737D">  // All pages pinned</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>這就是模式：AI 解釋，我實作，我測試，我學習。</p>
+<h2 id="總結頁面式儲存一張圖">總結：頁面式儲存一張圖</h2>
+<div class="mermaid">flowchart BT
+    subgraph "Buffer Pool RAM"
+        A[Frame 0: Page 5] --> B[Frame 1: Page 3]
+        B --> C[Frame 2: Page 7]
+        C --> D[...]
+    end
+    subgraph "Page Structure"
+        E[PageHeader 24B] --> F[ItemId array]
+        F --> G[Free space]
+        G --> H[Items grow up]
+    end
+    subgraph "Disk"
+        I[Table 1 / Page 0] --> J[Table 1 / Page 1]
+        J --> K[Table 2 / Page 0]
+    end
+    subgraph "WAL"
+        L[WAL Record 1] --> M[WAL Record 2]
+        M --> N[WAL Record 3]
+    end
+    B --> E
+    E --> I
+    N --> B
+    style E fill:#e3f2fd,stroke:#1976d2
+    style L fill:#fff3e0,stroke:#f57c00
+    style A fill:#e8f5e9,stroke:#388e3c
+</div>
+<p><strong>關鍵要點：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>概念</th><th>為什麼重要</th></tr></thead><tbody><tr><td><strong>頁面式儲存</strong></td><td>隨機存取、細粒度鎖定、高效快取</td></tr><tr><td><strong>緩衝池</strong></td><td>熱門頁面比磁碟存取快 1000 倍</td></tr><tr><td><strong>LRU/Clock 淘汰</strong></td><td>保留常用頁面，淘汰冷頁面</td></tr><tr><td><strong>WAL</strong></td><td>不犧牲效能的持久性</td></tr><tr><td><strong>Rust 挑戰</strong></td><td>所有權、安全、零拷貝——到處都是權衡取捨</td></tr></tbody></table>
+<hr>
+<p><strong>進一步閱讀：</strong></p>
+<ul>
+<li>PostgreSQL Source: <a href="https://github.com/postgres/postgres/blob/master/src/include/storage/bufpage.h"><code>src/include/storage/bufpage.h</code></a></li>
+<li>PostgreSQL Source: <a href="https://github.com/postgres/postgres/tree/master/src/backend/storage/buffer"><code>src/backend/storage/buffer/</code></a></li>
+<li>“Database Management Systems” by Ramakrishnan &#x26; Gehrke (Ch. 9: Storage and Indexing)</li>
+<li>“Readings in Database Systems” (Red Book) - Buffer Pool chapter</li>
+<li>Vaultgres Repository: <a href="https://github.com/neoalienson/Vaultgres">github.com/neoalienson/Vaultgres</a></li>
+</ul> </article> </div>  </div> </div> </main> <footer id="footer" data-astro-cid-l3trhy4j> <div class="footer-inner" data-astro-cid-l3trhy4j> <div class="footer-top-row" data-astro-cid-l3trhy4j> <div class="footer-col footer-quick-links" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>快速連結</span> <div class="footer-quick-links-list" data-astro-cid-l3trhy4j> <a href="/zh-TW/about-me/" data-astro-cid-l3trhy4j>關於</a><a href="/zh-TW/tools/" data-astro-cid-l3trhy4j>工具</a> </div> </div> <div class="footer-col footer-qr-col" data-astro-cid-l3trhy4j> <div class="short-url-qr" data-url="https://neo01.com/zh-TW/2026/03/building-postgresql-compatible-database-rust-page-storage-buffer-pool/" data-size="80" data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-btn" aria-label="View QR code full size" data-astro-cid-av7zekv5> <img src="" alt="QR code" width="80" height="80" data-astro-cid-av7zekv5> </button> </div> <div class="short-url-qr-lightbox" id="short-url-qr-lightbox" hidden data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-lightbox-close" aria-label="Close" data-astro-cid-av7zekv5>×</button> <img src="" alt="QR code full size" class="short-url-qr-lightbox-img" data-astro-cid-av7zekv5> <a href="#" class="short-url-qr-lightbox-link" target="_blank" data-astro-cid-av7zekv5>Open short URL</a> </div> <script type="module" src="/_astro/QrInFooter.astro_astro_type_script_index_0_lang.DCVJWpeH.js"></script> </div> <div class="footer-col footer-connect" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>關注</span> <div class="footer-connect-icons" data-astro-cid-l3trhy4j> <a href="https://github.com/neoalienson" target="_blank" rel="noopener" aria-label="GitHub" data-astro-cid-l3trhy4j><i class="fab fa-github" data-astro-cid-l3trhy4j></i></a> <a href="https://linkedin.com/in/neoalienson" target="_blank" rel="noopener" aria-label="LinkedIn" data-astro-cid-l3trhy4j><i class="fab fa-linkedin" data-astro-cid-l3trhy4j></i></a> <a href="/rss.xml" aria-label="RSS" data-astro-cid-l3trhy4j><i class="fas fa-rss" data-astro-cid-l3trhy4j></i></a> </div> </div> </div> <div class="footer-bottom-row" data-astro-cid-l3trhy4j> <span class="footer-legal-links" data-astro-cid-l3trhy4j>  <a href="/zh-TW/terms-and-conditions/" data-astro-cid-l3trhy4j>條款</a> <span class="link-sep" data-astro-cid-l3trhy4j>|</span> <a href="/zh-TW/cookie-policy/" data-astro-cid-l3trhy4j>Cookie 政策</a>  </span> <span class="footer-copyright" data-astro-cid-l3trhy4j>&copy; 2026 Neo Alienson. 保留所有權利。</span> </div> </div> </footer> <button id="back-to-top" class="back-to-top" style="--btt-size: 48px; --btt-bottom: 60px; --btt-right: 30px; --btt-circumference: 131.94689145077132;" aria-label="Back to top" data-astro-cid-c4zgazz7> <svg class="back-to-top-ring" viewBox="0 0 48 48" aria-hidden="true" data-astro-cid-c4zgazz7> <circle class="back-to-top-track" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-c4zgazz7></circle> <circle id="back-to-top-progress" class="back-to-top-progress" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="131.94689145077132" stroke-dashoffset="131.94689145077132" data-astro-cid-c4zgazz7></circle> </svg> <span class="back-to-top-face" aria-hidden="true" data-astro-cid-c4zgazz7> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-c4zgazz7> <path d="m18 15-6-6-6 6" data-astro-cid-c4zgazz7></path> </svg> </span> </button> <script>(function(){const threshold = 400;
+const circumference = 131.94689145077132;
+
+  (function () {
+    const THRESHOLD = threshold;
+    const CIRCUMFERENCE = circumference;
+
+    let docMaxScrollY = 0;
+    function updateDocMaxScrollY() {
+      docMaxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+    }
+    window.addEventListener('resize', updateDocMaxScrollY, { passive: true });
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(updateDocMaxScrollY).observe(document.documentElement);
+    }
+
+    function initBackToTop() {
+      const btn = document.getElementById('back-to-top');
+      if (!btn || btn.dataset.bttInit) return;
+      btn.dataset.bttInit = 'true';
+
+      const ring = document.getElementById('back-to-top-progress');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let ticking = false;
+      let visible = false;
+
+      btn.style.opacity = '0';
+      btn.style.translate = '0 2rem';
+      btn.style.pointerEvents = 'none';
+
+      function show() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 250ms cubic-bezier(0,0,0.2,1), translate 250ms cubic-bezier(0,0,0.2,1)';
+        btn.style.opacity = '1';
+        btn.style.translate = '0 0';
+        btn.style.pointerEvents = 'auto';
+        visible = true;
+      }
+
+      function hide() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 300ms cubic-bezier(0.4,0,1,1), translate 300ms cubic-bezier(0.4,0,1,1)';
+        btn.style.opacity = '0';
+        btn.style.translate = '0 2rem';
+        btn.style.pointerEvents = 'none';
+        visible = false;
+      }
+
+      function updateFrame() {
+        const pct = docMaxScrollY > 0 ? Math.min(1, Math.max(0, window.scrollY / docMaxScrollY)) : 0;
+        if (ring) {
+          ring.style.strokeDashoffset = String(CIRCUMFERENCE * (1 - pct));
+        }
+        if (window.scrollY > THRESHOLD) {
+          if (!visible) show();
+        } else {
+          if (visible) hide();
+        }
+        ticking = false;
+      }
+
+      function onScroll() {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(updateFrame);
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+
+      btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+      });
+
+      document.addEventListener('astro:before-swap', function () {
+        window.removeEventListener('scroll', onScroll);
+      }, { once: true });
+
+      requestAnimationFrame(function () {
+        updateDocMaxScrollY();
+        updateFrame();
+      });
+    }
+
+    document.addEventListener('astro:page-load', initBackToTop);
+    initBackToTop();
+  })();
+})();</script> </div>  <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_0_lang.ByB3VsLC.js"></script> <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_1_lang.DT7tPFqy.js"></script> </body> </html>

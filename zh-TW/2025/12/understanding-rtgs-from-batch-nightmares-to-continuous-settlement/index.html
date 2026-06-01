@@ -1,0 +1,446 @@
+<!DOCTYPE html><html lang="zh-TW"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="Astro v6.2.1"><title>理解 RTGS：從批次作業噩夢到連續結算 - Decoding Digital Anomalies</title><meta name="description" content="在 RTGS 普及之前，我們基本上是靠著希望和夜間批次作業的勇氣來運行支付系統。想像一下：你是一名中型銀端的 on-call DevOps / 中介軟體工程師。"><meta property="og:title" content="理解 RTGS：從批次作業噩夢到連續結算 - Decoding Digital Anomalies"><meta property="og:description" content="在 RTGS 普及之前，我們基本上是靠著希望和夜間批次作業的勇氣來運行支付系統。想像一下：你是一名中型銀端的 on-call DevOps / 中介軟體工程師。"><meta property="og:type" content="website"><meta property="og:url" content="https://neo01.com"><link rel="icon" href="/assets/neo01.png" type="image/png"><link rel="manifest" href="/manifest.json"><link rel="canonical" href="https://neo01.com"><link rel="alternate" type="application/rss+xml" title="Decoding Digital Anomalies" href="/rss.xml"><link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css"><link rel="stylesheet" href="/libs/titillium-web/styles.css"><link rel="stylesheet" href="/pagefind/pagefind-component-ui.css"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="理解 RTGS：從批次作業噩夢到連續結算 - Decoding Digital Anomalies"><meta name="twitter:description" content="在 RTGS 普及之前，我們基本上是靠著希望和夜間批次作業的勇氣來運行支付系統。想像一下：你是一名中型銀端的 on-call DevOps / 中介軟體工程師。"><script src="/pagefind/pagefind-component-ui.js" defer></script><!-- Google tag (gtag.js) --><script async src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script><script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3DZR3TQYCY');
+    </script><script>
+      try {
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'page_view', { page_location: window.location.href });
+        }
+      } catch (e) {
+        console.warn('Analytics unavailable:', e);
+      }
+    </script><script>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script><style>._tabbedWrapper_r711i_1{display:none}._tabbedWrapper_r711i_1._hasToc_r711i_5,._tabbedWrapper_r711i_1._hasSeries_r711i_6{display:block}._tabbed_r711i_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md);margin:1rem 0;overflow:hidden}._tabHeader_r711i_17{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:0 1rem}._tabBar_r711i_25{display:flex;flex:1;border-bottom:1px solid var(--color-border);margin-bottom:0}._tab_r711i_1{flex:1;padding:.75rem .5rem;text-align:center;cursor:pointer;background:none;border:none;font-size:.875rem;font-weight:500;color:var(--color-sidebar-text);transition:color var(--transition-fast);border-bottom:2px solid transparent;margin-bottom:-1px}._tab_r711i_1:hover{color:var(--color-theme)}._tab_r711i_1._active_r711i_51{color:var(--color-theme);font-weight:600;border-bottom-color:var(--color-theme)}._tab_r711i_1._singleTab_r711i_57{flex:none;width:100%}._tabbedToggle_r711i_62{margin-left:auto;display:flex;align-items:center;justify-content:center;width:24px;height:24px;transition:transform var(--transition-fast);color:var(--color-sidebar-text-dark)}._tabbedToggle_r711i_62 svg{width:16px;height:16px}._tabbedToggle_r711i_62._open_r711i_78{transform:rotate(180deg)}._panels_r711i_82{display:none;padding:1rem 1.25rem .5rem}._panels_r711i_82._isOpen_r711i_87{display:block}._panel_r711i_82{display:none}._panel_r711i_82._active_r711i_51{display:block}[data-theme=dark] ._tabbed_r711i_1{background:var(--color-surface)}[data-theme=dark] ._tabBar_r711i_25{border-bottom-color:var(--color-border)}[data-theme=dark] ._tab_r711i_1{color:var(--color-sidebar-text)}[data-theme=dark] ._tab_r711i_1:hover{color:var(--color-theme-light)}[data-theme=dark] ._tab_r711i_1._active_r711i_51{color:var(--color-theme-light);border-bottom-color:var(--color-theme-light)}[data-theme=dark] ._tabbedToggle_r711i_62{color:var(--color-default)}@media(min-width:1024px){._tabbedWrapper_r711i_1{display:block;position:sticky;top:calc(var(--header-height) + 2rem);max-height:calc(100vh - var(--header-height) - 4rem);overflow-y:auto;align-self:start}._tabbedWrapper_r711i_1._hasToc_r711i_5,._tabbedWrapper_r711i_1._hasSeries_r711i_6{display:block}._tabbed_r711i_1{background:transparent;border-radius:0;padding:0;margin:0}._tabHeader_r711i_17{padding:0}._tabBar_r711i_25{border-bottom-color:var(--color-border);margin-bottom:.75rem}._panels_r711i_82{display:block;padding:0}._panels_r711i_82._isOpen_r711i_87{display:block}}@media(max-width:1023px){._tabbedWrapper_r711i_1{display:block!important;position:fixed;bottom:0;left:0;right:0;width:100%;z-index:1000;max-height:60vh;overflow-y:auto}._tabbed_r711i_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md) var(--radius-md) 0 0;padding:0}._tabbed_r711i_1._isOpen_r711i_87{max-height:60vh;overflow-y:auto}._tabHeader_r711i_17{padding:.75rem 1rem}[data-theme=dark] ._tabbed_r711i_1{background:var(--color-surface)}[data-theme=dark] ._tabbedToggle_r711i_62 svg{color:var(--color-default)}}
+</style>
+<link rel="stylesheet" href="/_astro/BaseLayout.C61PQYmh.css">
+<link rel="stylesheet" href="/_astro/_..BYacDPpd.css"><script>(function() {
+  function init() {
+    var header = document.querySelector('#header');
+    if (!header) {
+      console.log('[scroll-shrink-header] ERROR: header not found');
+      return;
+    }
+    header.setAttribute('data-header-scroll-shrink', '');
+    var lastScrollY = window.scrollY;
+    var ticking = false;
+    var threshold = 50;
+    var buffer = 5;
+
+    function updateHeader() {
+      var currentScrollY = window.scrollY;
+      if (currentScrollY > threshold) {
+        if (currentScrollY > lastScrollY + buffer) {
+          header.classList.add('header-shrunk');
+          console.log('[scroll-shrink-header] Shrink: scrollY=' + currentScrollY + ' (down)');
+        }
+      } else {
+        header.classList.remove('header-shrunk');
+        console.log('[scroll-shrink-header] Expand: scrollY=' + currentScrollY + ' (at top)');
+      }
+      lastScrollY = currentScrollY;
+      ticking = false;
+    }
+
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    console.log('[scroll-shrink-header] Initialized, threshold=' + threshold);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();</script></head> <body> <div id="wrap"> <header id="header" class="header-glass" data-astro-cid-qmpwvs2w> <div class="header-main" data-astro-cid-qmpwvs2w> <button class="header-nav-mobile-toggle md:hidden" aria-label="Open navigation menu" aria-expanded="false" id="main-nav-toggle" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M4 5h16" data-astro-cid-qmpwvs2w></path><path d="M4 12h16" data-astro-cid-qmpwvs2w></path><path d="M4 19h16" data-astro-cid-qmpwvs2w></path></svg> </button> <div class="header-brand" data-astro-cid-qmpwvs2w> <a href="/" class="logo-link" data-astro-cid-qmpwvs2w> <div class="logo" data-astro-cid-qmpwvs2w></div> </a> <div class="header-title-group" data-astro-cid-qmpwvs2w> <span class="header-title-text" data-astro-cid-qmpwvs2w>neo01.com</span> <span class="header-subtitle-text" data-astro-cid-qmpwvs2w>解碼數位異象</span> </div> </div> <nav class="header-nav" aria-label="Main navigation" data-astro-cid-qmpwvs2w> <ul class="header-nav-list" role="menubar" data-astro-cid-qmpwvs2w> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/" class="header-nav-link active" role="menuitem" data-astro-cid-qmpwvs2w>Blog</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/tools/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>Tools</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/about-me/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>About</a> </li> </ul> </nav> <div class="header-actions" data-astro-cid-qmpwvs2w> <div class="header-search-wrapper" data-astro-cid-qmpwvs2w> <pagefind-searchbox placeholder="搜索" show-sub-results="true" show-keyboard-hints="false" hide-shortcut="true" max-results="5" class="header-search-box" data-astro-cid-qmpwvs2w="true"></pagefind-searchbox> </div> <button class="theme-toggle" aria-label="Toggle theme" title="Toggle theme" data-astro-cid-qmpwvs2w> <span class="sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal" data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2025/12/understanding-rtgs-from-batch-nightmares-to-continuous-settlement/" class="lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-CN/2025/12/understanding-rtgs-from-batch-nightmares-to-continuous-settlement/" class="lang-link" data-lang="zh-CN" data-astro-cid-crzgpmpb>简</a> </div> </div> </div> <div class="header-categories" data-astro-cid-qmpwvs2w> <nav class="header-categories-nav" data-astro-cid-qmpwvs2w> <a href="/zh-TW/categories/ai/" class="header-category-link" data-astro-cid-qmpwvs2w>AI</a> <a href="/zh-TW/categories/architecture/" class="header-category-link" data-astro-cid-qmpwvs2w>Architecture</a> <a href="/zh-TW/categories/cybersecurity/" class="header-category-link" data-astro-cid-qmpwvs2w>Cybersecurity</a> <a href="/zh-TW/categories/development/" class="header-category-link" data-astro-cid-qmpwvs2w>Development</a> <a href="/zh-TW/categories/misc/" class="header-category-link" data-astro-cid-qmpwvs2w>Misc</a> </nav> </div> </header> <div class="drawer-overlay" id="drawerOverlay" data-astro-cid-qmpwvs2w></div> <aside class="drawer" id="mobileDrawer" aria-label="Mobile navigation" data-astro-cid-qmpwvs2w> <div class="drawer-header" data-astro-cid-qmpwvs2w> <button class="close-btn" aria-label="Close menu" id="closeBtn" data-astro-cid-qmpwvs2w> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-qmpwvs2w> <line x1="18" y1="6" x2="6" y2="18" data-astro-cid-qmpwvs2w></line> <line x1="6" y1="6" x2="18" y2="18" data-astro-cid-qmpwvs2w></line> </svg> </button> </div> <nav class="drawer-nav" data-astro-cid-qmpwvs2w> <a href="/zh-TW/" class="drawer-nav-link active" data-astro-cid-qmpwvs2w>Blog</a> <a href="/zh-TW/tools/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Tools</a> <a href="/zh-TW/about-me/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>About</a> <div class="drawer-nav-divider" data-astro-cid-qmpwvs2w>Categories</div> <a href="/zh-TW/categories/ai/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>AI</a> <a href="/zh-TW/categories/architecture/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Architecture</a> <a href="/zh-TW/categories/cybersecurity/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Cybersecurity</a> <a href="/zh-TW/categories/development/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Development</a> <a href="/zh-TW/categories/misc/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Misc</a> </nav> <div class="drawer-actions" data-astro-cid-qmpwvs2w> <button class="drawer-theme-toggle" aria-label="Toggle theme" data-astro-cid-qmpwvs2w> <span class="drawer-sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="drawer-moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal drawer-lang-switcher" data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2025/12/understanding-rtgs-from-batch-nightmares-to-continuous-settlement/" class="drawer-lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="drawer-lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-CN/2025/12/understanding-rtgs-from-batch-nightmares-to-continuous-settlement/" class="drawer-lang-link" data-lang="zh-CN" data-astro-cid-crzgpmpb>简</a> </div> </div> </aside> <script type="module">const d=document.getElementById("main-nav-toggle"),l=document.getElementById("closeBtn"),n=document.getElementById("drawerOverlay"),o=document.getElementById("mobileDrawer");function m(){o?.classList.add("open"),n?.classList.add("open"),document.body.style.overflow="hidden"}function r(){o?.classList.remove("open"),n?.classList.remove("open"),document.body.style.overflow=""}d?.addEventListener("click",m);l?.addEventListener("click",r);n?.addEventListener("click",r);function c(e){document.documentElement.setAttribute("data-theme",e),localStorage.setItem("theme",e),a();const t=document.querySelector("pagefind-searchbox");t&&(e==="dark"?t.setAttribute("data-pf-theme","dark"):t.removeAttribute("data-pf-theme"))}function a(){const e=document.documentElement.getAttribute("data-theme"),t=document.querySelector(".drawer-theme-value");t&&(t.textContent=e==="dark"?"Dark":"Light")}function s(){const t=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";c(t)}document.querySelectorAll(".theme-toggle, .drawer-theme-toggle").forEach(e=>{e.addEventListener("click",s)});window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",e=>{localStorage.getItem("theme")||c(e.matches?"dark":"light")});a();</script> <main class="home"> <div class="container"> <div class="main-body"> <div class="main-body-header"> <h1 class="header">理解 RTGS：從批次作業噩夢到連續結算</h1> </div>     <div class="_postMeta_yeftz_1"> <div class="_metaItem_yeftz_10"> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"> <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect> <line x1="16" y1="2" x2="16" y2="6"></line> <line x1="8" y1="2" x2="8" y2="6"></line> <line x1="3" y1="10" x2="21" y2="10"></line> </svg> <time datetime="2025-12-01T00:00:00.000Z">12/1/2025</time> </div> <div class="_categories_yeftz_31"> <a href="/categories/misc" class="_categoryTag_yeftz_37"> Misc </a> </div> <div class="_tags_yeftz_51"> <a href="/zh-TW/tags/rtgs/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#RTGS </a><a href="/zh-TW/tags/payment-systems/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Payment Systems </a><a href="/zh-TW/tags/financial-infrastructure/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Financial Infrastructure </a> </div> </div> <div class="post-layout" data-astro-cid-fzx4jmue> <aside class="post-toc-sidebar" data-astro-cid-fzx4jmue> <div class="_tabbedWrapper_r711i_1" data-tabbed-wrapper><div class="_tabbed_r711i_1"><div class="_tabHeader_r711i_17" data-tabbed-toggle><div class="_tabBar_r711i_25" data-tab-bar><button class="_tab_r711i_1  _active_r711i_51" data-tab="toc" aria-pressed="true">目錄</button><button class="_tab_r711i_1 " data-tab="series" aria-pressed="false">本系列文章</button></div><span class="_tabbedToggle_r711i_62"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></div><div class="_panels_r711i_82" data-tabbed-panels><div class="_panel_r711i_82 _active_r711i_51" data-panel="toc"><div class="_tocWrapper_ms9sd_1"><div class="_toc_ms9sd_1"><ul class="_tocContent_ms9sd_9"><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#1-rtgs-之前" data-toc-link="1-rtgs-之前">1 RTGS 之前</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#2-什麼是-rtgs" data-toc-link="2-什麼是-rtgs">2 什麼是 RTGS？</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#21-定義和核心概念" data-toc-link="21-定義和核心概念">2.1 定義和核心概念</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#22-rtgs-與淨額結算系統" data-toc-link="22-rtgs-與淨額結算系統">2.2 RTGS 與淨額結算系統</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#23-rtgs-系統的關鍵特性" data-toc-link="23-rtgs-系統的關鍵特性">2.3 RTGS 系統的關鍵特性</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#footnote-label" data-toc-link="footnote-label">Footnotes</a></li></ul></div></div><script type="module">function l(){const n=document.querySelectorAll("article h2[id], article h3[id]"),o=document.querySelectorAll("[data-toc-link]");if(n.length===0||o.length===0)return;const i=new IntersectionObserver(e=>{let c=null;e.forEach(t=>{t.isIntersecting&&(c=t.target.id)}),o.forEach(t=>{const r=t.getAttribute("data-toc-link");t.classList.toggle("active",r===c)})},{rootMargin:"-80px 0px -70% 0px",threshold:0});n.forEach(e=>i.observe(e))}document.addEventListener("DOMContentLoaded",l);</script></div><div class="_panel_r711i_82" data-panel="series"><div class="_seriesWrapper_iy72p_1"><div class="_series_iy72p_1"><div class="_seriesTitle_iy72p_9">理解 RTGS</div><ul class="_seriesContent_iy72p_18"><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2025/12/understanding-rtgs-from-batch-nightmares-to-continuous-settlement/" class="_seriesLink_iy72p_28 _current_iy72p_40">從批次作業噩夢到連續結算</a></li><li class="_seriesItem_iy72p_24"><a href="/zh-TW/2025/12/understanding-rtgs-finance-concepts/" class="_seriesLink_iy72p_28">IT 專業人員必知的核心金融概念</a></li></ul></div></div></div></div></div></div><script type="module">const v="_active_r711i_51",f="_open_r711i_78",O="_isOpen_r711i_87",e={active:v,open:f,isOpen:O};function h(){const s=document.querySelector("[data-tabbed-wrapper]");if(!s)return;const i=s.querySelector("[data-tabbed-toggle]"),a=s.querySelector("[data-tabbed-panels]"),r=s.querySelectorAll("[data-tab]"),d=s.querySelector('[data-panel="toc"]'),l=s.querySelector('[data-panel="series"]');if(!i||!a)return;function L(){const t=document.getElementById("header");return t?t.getBoundingClientRect().height:72}function n(){const t=L();s.style.top=`${t}px`}function b(t){const c=s.querySelector("[data-tab]."+e.active)?.getAttribute("data-tab")===t,g=window.innerWidth>=1024;if(c){if(g)return;a.classList.contains(e.isOpen)?(a.classList.remove(e.isOpen),i.classList.remove(e.open)):(a.classList.add(e.isOpen),i.classList.add(e.open))}else r.forEach(o=>{const u=o.getAttribute("data-tab")===t;o.classList.toggle(e.active,u),o.setAttribute("aria-pressed",u?"true":"false")}),d&&d.classList.toggle(e.active,t==="toc"),l&&l.classList.toggle(e.active,t==="series"),a.classList.add(e.isOpen),i.classList.add(e.open)}r.forEach(t=>{t.addEventListener("click",p=>{p.stopPropagation();const c=t.getAttribute("data-tab");b(c)})}),i.addEventListener("click",()=>{a.classList.contains(e.isOpen)?(a.classList.remove(e.isOpen),i.classList.remove(e.open)):(a.classList.add(e.isOpen),i.classList.add(e.open))}),n(),window.addEventListener("resize",n),window.addEventListener("load",n)}document.addEventListener("DOMContentLoaded",h);</script> </aside> <article class="article-content" data-astro-cid-fzx4jmue> <p>即時總額結算（RTGS）系統構成了現代金融基礎設施的骨幹，每天處理數兆美元的交易。對於 IT 專業人員來說，在處理金融系統、支付平台或企業架構時，理解 RTGS 至關重要。</p>
+<h2 id="1-rtgs-之前">1 RTGS 之前</h2>
+<p>在 RTGS 普及之前，我們基本上是靠著希望和夜間批次作業的勇氣來運行支付系統。想像一下：你是一名中型銀行的 on-call DevOps / 中介軟體工程師。時間大約是 1998 到 2005 年左右，你負責維護高額支付閘道，這個閘道會與你所在國家的大額支付系統通訊（CHAPS、RTGS 全面實施前的 Fedwire、Euro1、舊版 TARGET 等，任選一個）。
+白天一切都感覺出奇地平靜。SWIFT 訊息飛進飛出，你的應用程式記錄它們，將它們放入 Oracle 佇列或純文字檔案中，更新每個交易對手的影子分類帳，記錄總借記和貸記。沒有真正的資金移動。你只是在記分：「我們欠他們 8.47 億，他們欠我們 9.12 億 → 目前淨額我們領先 6500 萬。」流動性團隊喜歡這樣，因為實際的央行借記會保持很小，直到日終。
+然後截止時間到了，真正的樂趣開始了。
+批次作業啟動了——某些陳舊的 COBOL 或早期 Java 怪物，負責對所有參與者進行多邊淨額計算。根據交易量，它會運算 20 到 90 分鐘。你追蹤日誌，看著臨時表膨脹，祈禱沒有人在使用者餘額列上產生死結。當它完成時，轟的一聲：淨借記/貸記部位入帳。只有這些淨額會透過央行帳戶結算，通常是在第二天早上，或者如果你所在的方案不錯的話，當天晚上。
+從我們鍵盤這側來看，可怕的不是技術崩潰（雖然確實會發生）。而是凌晨 2</p><div></div> 的呼叫通知：<p></p>
+<blockquote>
+<p>參與者 ABC 淨借記 21 億美元 – 無法覆蓋
+臨時貸記已下發至企業活期存款帳戶
+你知道如果央行不救助他們接下來會發生什麼：撤銷。進入追索城市。每個收到淨貸記的銀行都必須退回一些。已經花費「他們的」匯入匯款的客戶會被反向扣款。交易台保證金催繳電話爆炸。而你——這個擁有生產環境權限的可憐傢伙——是那個在凌晨 3 點風險委員會決定後重新排隊、取消或強制釋放任何內容的人，而流動性主管在電話會議中尖叫。
+跨境外匯結算簡直是直截了當的賭博，只是多了額外的步驟。你會在東京 nostro 帳戶關閉時貸記日元，然後經歷八個小時的无线电靜默，祈禱美元第二天早上到達紐約。如果交易對手隔夜倒閉？自認倒楣。那是教科書式的赫斯塔特風險（Herstatt risk），我們在每個價值日都經歷著。</p>
+</blockquote>
+<h2 id="2-什麼是-rtgs">2 什麼是 RTGS？</h2>
+<h3 id="21-定義和核心概念">2.1 定義和核心概念</h3>
+<div class="admonition tip" data-admonition-type="tip" data-icon="💡" data-title="RTGS 定義"><div class="admonition-title"><span class="admonition-icon">💡</span>RTGS 定義</div><p><strong>即時總額結算（RTGS）</strong> 是一個資金轉帳系統，其中交易以<strong>即時</strong>、<strong>個別</strong>方式在<strong>總額</strong>基礎上結算。
+讓我們分解這個定義的每個組成部分：</p></div>
+<div class="mermaid">graph LR
+    A["RTGS&#x3C;br/>即時總額結算"]
+    A --> B["即時"]
+    A --> C["總額"]
+    A --> D["結算"]
+    B --> B1["立即處理"]
+    B --> B2["無等待期"]
+    B --> B3["連續運作"]
+    C --> C1["個別交易"]
+    C --> C2["無淨額計算"]
+    C --> C3["全額結算"]
+    D --> D1["最終轉帳"]
+    D --> D2["不可撤銷"]
+    D --> D3["無條件"]
+    style A fill:#1976d2,stroke:#0d47a1,color:#fff
+    style B fill:#e3f2fd,stroke:#1976d2
+    style C fill:#fff3e0,stroke:#f57c00
+    style D fill:#e8f5e9,stroke:#388e3c
+</div>
+<div class="admonition anote" data-admonition-type="anote" data-icon="📝" data-title="「即時」究竟是什麼意思？"><div class="admonition-title"><span class="admonition-icon">📝</span>「即時」究竟是什麼意思？</div><p>對於 IT 專業人員來說，重要的是要理解 RTGS 上下文中的「即時」從技術角度來看意味著<strong>接近即時</strong>：
+<strong>✅ RTGS 上下文中的即時：</strong></p><ul>
+<li><strong>無故意延遲</strong>：交易不會被批次處理或排隊等待稍後處理</li>
+<li><strong>連續處理</strong>：系統在運作時間內收到交易時立即處理，全天候運作</li>
+<li><strong>秒級結算最終性</strong>：一旦處理完成，結算即為最終且不可撤銷</li>
+<li><strong>與批次系統對比</strong>：不像 ACH<sup><a href="#user-content-fn-1" id="user-content-fnref-1" data-footnote-ref="" aria-describedby="footnote-label">1</a></sup> 或淨額結算需要等待數小時或數天
+<strong>⏱️ 實際處理時間：</strong></li>
+</ul></div>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>階段                       典型持續時間        備註</span></span>
+<span class="line"><span>─────────────────────────────────────────────────────────</span></span>
+<span class="line"><span>訊息驗證                   10-50 毫秒         XML 架構、簽章檢查</span></span>
+<span class="line"><span>流動性檢查                  5-20 毫秒         資料庫查詢</span></span>
+<span class="line"><span>結算執行                    10-100 毫秒        帳戶更新、分類帳寫入</span></span>
+<span class="line"><span>確認發送                    5-50 毫秒         取決於網路延遲</span></span>
+<span class="line"><span>─────────────────────────────────────────────────────────</span></span>
+<span class="line"><span>端到端總計                  100-500 毫秒       P99 延遲通常 &#x3C; 1 秒</span></span></code></pre>
+<p><strong>🔬 技術現實：</strong></p>
+<ul>
+<li>不像嵌入式系統的「硬即時」（微秒級截止時間）</li>
+<li>按 IT 標準屬於「軟即時」/「接近即時」</li>
+<li>但與傳統銀行（數天）或批次系統（數小時）相比是「即時」</li>
+<li>行業基準：>95% 的支付在 60 秒內結算
+<strong>💡 關鍵要點：</strong> 「即時」意味著<strong>無批次處理、無延遲結算</strong>——每筆交易在收到時個別處理，正常情況下結算在不到一秒內完成。
+<strong>📝 注意：</strong> 整篇文章中使用縮寫以求簡潔。完整名稱和描述請參閱 <a href="#8-acronyms-and-abbreviations">第 8 節：縮寫和簡稱</a>。
+有了 RTGS，每筆支付都是其自己的原子單位。發送者有覆蓋 → 借記、貸記、完成，亞秒級、不可撤銷、由央行本身蓋上最終性印章。無批次處理。無黎明時的淨額抽獎。如果發送者沒有資金（或日間信貸額度），支付會停留在佇列中或直接拒絕。沒有稍後要追索的臨時貸記。沒有凌晨 3 點的撤銷。
+我們的日常工作徹底改變了：</li>
+</ul>
+<ul>
+<li>告別夜間批次恐懼，迎來日間佇列管理（優先級通道、死結檢測、自動重新提交邏輯）</li>
+<li>流動性預測成為真正的工作，而不是電子表格祈禱</li>
+<li>監控從「批次完成？」轉向即時吞吐量、參與者上限、佇列深度警報、延遲 SLA</li>
+<li>on-call 變得更頻繁，因為系統不能再休眠了——全天候意味著如果節點掉線就要全天候呼叫</li>
+<li>但恐懼程度？降到地板以下。一家銀行的崩潰不會以同樣方式連鎖反應。你不會醒來擔心整個淨額系統即將被撕裂。
+我們用廉價流動性換來了防彈最終性，我們大多數人都會毫不猶豫地再次達成那筆交易。
+如今，當我看到團隊抱怨 RTGS 流動性緊縮或 ISO 20022 遷移痛苦時，我只是 smirk 並想：至少你不是那個在凌晨 4 點喝著昨天的咖啡，祈禱多邊淨額平衡的傢伙。
+你還在某個地方與舊批次垃圾搏鬥，還是已經深入現代 RTGS 戰壕？你在 RTGS 之前時代有過最糟糕的生產恐怖故事是什麼？</li>
+</ul>
+<h3 id="22-rtgs-與淨額結算系統">2.2 RTGS 與淨額結算系統</h3>
+<p>理解 RTGS 和淨額結算之間的差異是基礎。但首先，什麼是淨額結算系統，它為什麼存在？</p>
+<div class="admonition anote" data-admonition-type="anote" data-icon="📝" data-title="🏦 什麼是淨額結算？"><div class="admonition-title"><span class="admonition-icon">📝</span>🏦 什麼是淨額結算？</div><p><strong>淨額結算</strong>（也稱為延遲淨額結算或 DNS）是一個支付系統，其中交易在<strong>預定間隔</strong>內作為<strong>淨部位</strong>結算，交易會<strong>累積一段時間</strong>。
+<strong>運作方式：</strong></p><ol>
+<li>全天，銀行向系統發送支付指令</li>
+<li>系統記錄所有交易但<strong>不立即結算</strong></li>
+<li>在結算時間（例如日終），系統計算<strong>淨部位</strong></li>
+<li>每個參與者支付或收取僅<strong>淨差額</strong>
+<strong>淨額結算存在的原因：</strong>
+✅ <strong>流動性效率</strong></li>
+</ol><ul>
+<li>銀行需要持有的現金較少</li>
+<li>多項義務相互抵銷</li>
+<li>適合高交易量、較低價值的支付
+✅ <strong>成本降低</strong></li>
+<li>實際資金轉帳較少</li>
+<li>營運成本較低</li>
+<li>對小額交易經濟實惠
+✅ <strong>歷史原因</strong></li>
+<li>早於現代計算</li>
+<li>與批次處理配合良好</li>
+<li>仍適合某些支付類型
+⚠️ <strong>權衡：信用風險</strong></li>
+<li>結算被延遲，產生曝險</li>
+<li>如果一家銀行在結算前倒閉，其他銀行會受到影響</li>
+<li>稱為「赫斯塔特風險」或結算風險
+<strong>視覺比較：資金如何流動</strong>
+<strong>RTGS：每筆交易立即結算</strong></li>
+</ul></div>
+<div class="mermaid">graph TD
+    A1[銀行 A] -->|支付 100 美元 | A2((RTGS))
+    A2 -->|支付 100 美元 | A3[銀行 B]
+    A1 -->|支付 50 美元 | A2
+    A2 -->|支付 50 美元 | A4[銀行 C]
+    A5[銀行 B] -->|支付 80 美元 | A2
+    A2 -->|支付 80 美元 | A4
+</div>
+<p><strong>淨額結算：累積然後淨額</strong></p>
+<div class="mermaid">graph TD
+    B1[銀行 A] -->|欠 150 美元 | B2((清算))
+    B3[銀行 B] -->|欠 80 美元 | B2
+    B4[銀行 C] -->|收取 70 美元 | B2
+    B2 -->|淨額：-150 美元 | B1
+    B2 -->|淨額：+20 美元 | B3
+    B2 -->|淨額：+130 美元 | B4
+</div>
+<p><strong>詳細比較：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>特性</th><th>RTGS</th><th>淨額結算 (DNS)</th></tr></thead><tbody><tr><td><strong>結算時機</strong></td><td>即時、連續</td><td>期末（批次）</td></tr><tr><td><strong>結算基礎</strong></td><td>總額（個別）</td><td>淨額（彙總）</td></tr><tr><td><strong>交易最終性</strong></td><td>立即</td><td>延遲</td></tr><tr><td><strong>流動性需求</strong></td><td>高</td><td>較低</td></tr><tr><td><strong>信用風險</strong></td><td>最小</td><td>較高（交易對手風險）</td></tr><tr><td><strong>處理成本</strong></td><td>每筆交易較高</td><td>每筆交易較低</td></tr><tr><td><strong>最適合</strong></td><td>高價值、時間關鍵</td><td>低價值、高交易量</td></tr><tr><td><strong>淨額結算範例：</strong></td><td></td><td></td></tr></tbody></table>
+<div class="mermaid">sequenceDiagram
+    participant A as 銀行 A
+    participant B as 銀行 B
+    participant C as 銀行 C
+    participant NS as 淨額系統
+    A->>B: 支付 100 美元
+    B->>C: 支付 80 美元
+    C->>A: 支付 50 美元
+    A->>B: 支付 30 美元
+    Note over NS: 日終淨額計算
+    NS->>A: 淨部位：-20 美元
+    NS->>B: 淨部位：+50 美元
+    NS->>C: 淨部位：-30 美元
+    Note over NS: 所有交易單一次結算
+</div>
+<p><strong>RTGS 範例：</strong></p>
+<div class="mermaid">sequenceDiagram
+    participant A as 銀行 A
+    participant RTGS as RTGS 系統
+    participant B as 銀行 B
+    A->>RTGS: 支付 100 美元
+    RTGS->>RTGS: 檢查流動性
+    RTGS->>A: 借記 100 美元 (立即)
+    RTGS->>B: 貸記 100 美元 (立即)
+    RTGS-->>A: 結算確認
+    A->>RTGS: 支付 30 美元
+    RTGS->>RTGS: 檢查流動性
+    RTGS->>A: 借記 30 美元 (立即)
+    RTGS->>B: 貸記 30 美元 (立即)
+    RTGS-->>A: 結算確認
+</div>
+<p><strong>實際使用情況：</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>系統類型</th><th>典型結算方法</th><th>範例</th></tr></thead><tbody><tr><td><strong>高額支付</strong></td><td>RTGS</td><td>Fedwire、TARGET2、CHAPS</td></tr><tr><td><strong>零售支付</strong></td><td>淨額結算</td><td>ACH<sup><a href="#user-content-fn-1" id="user-content-fnref-1-2" data-footnote-ref="" aria-describedby="footnote-label">1</a></sup>、直接扣款、卡片網路</td></tr><tr><td><strong>證券交易</strong></td><td>RTGS 或混合</td><td>DTC<sup><a href="#user-content-fn-3" id="user-content-fnref-3" data-footnote-ref="" aria-describedby="footnote-label">2</a></sup>、Euroclear</td></tr><tr><td><strong>外匯 (FX)</strong><sup><a href="#user-content-fn-4" id="user-content-fnref-4" data-footnote-ref="" aria-describedby="footnote-label">3</a></sup></td><td>RTGS</td><td>CLS<sup><a href="#user-content-fn-5" id="user-content-fnref-5" data-footnote-ref="" aria-describedby="footnote-label">4</a></sup> 銀行</td></tr></tbody></table>
+<h3 id="23-rtgs-系統的關鍵特性">2.3 RTGS 系統的關鍵特性</h3>
+<div class="admonition anote" data-admonition-type="anote" data-icon="📝" data-title="RTGS 基本特性"><div class="admonition-title"><span class="admonition-icon">📝</span>RTGS 基本特性</div><p>RTGS 系統具有這些 IT 專業人員必須了解的關鍵特性：
+✅ <strong>即時處理</strong></p><ul>
+<li>交易在收到時立即處理</li>
+<li>無批次處理或排隊等待結算</li>
+<li>營業時間內連續運作
+✅ <strong>總額結算</strong></li>
+<li>每筆交易個別結算</li>
+<li>不與其他交易淨額抵銷</li>
+<li>全額轉帳
+✅ <strong>最終性</strong></li>
+<li>結算不可撤銷</li>
+<li>無條件資金轉帳</li>
+<li>處理後具有法律確定性
+✅ <strong>央行貨幣</strong></li>
+<li>以央行準備金結算</li>
+<li>最高形式的資金安全</li>
+<li>無商業銀行信用風險</li>
+</ul></div>
+<div class="admonition tip" data-admonition-type="tip" data-icon="💡" data-title="敏捷、DevOps 和持續交付實踐 vs RTGS"><div class="admonition-title"><span class="admonition-icon">💡</span>敏捷、DevOps 和持續交付實踐 vs RTGS</div><p>RTGS 與核心 DevOps 原則強烈共鳴，尤其是我們所信奉的「更小的發布、更少的風險」口號。
+想想我們剛才談到的舊延遲淨額結算世界：那基本上就是支付領域的大爆炸發布等價物。你整天堆積數百/數千筆支付指令（就像在大型分支或單體 sprint 中累積功能/程式碼變更）。然後在日終（或第二天早上），你執行一個巨大的批次/淨額作業——轟的一聲，所有內容在一個原子（但可怕）的提交中結算。如果任何問題出錯（參與者無法覆蓋其淨借記、佇列中有壞數據、死結等），爆炸半徑巨大：潛在撤銷、追索、系統性凍結、凌晨 3 點的作戰室。高風險，因為故障會一次性影響所有內容，恢復痛苦且會連鎖反應。
+RTGS 將其翻轉為更接近持續部署/小型、頻繁發布並具有強大安全網的模式：</p><ul>
+<li>每筆支付 = 其自己的小型、獨立發布。無捆綁/淨額計算。一個指令進入 → 驗證 → 檢查流動性/覆蓋 → 即時總額結算（亞秒級/在央行帳簿上原子化）→ 完成，不可撤銷。快速失敗且隔離——如果發送者沒有資金，它會佇列或直接拒絕。沒有稍後要追索的臨時貸記。</li>
+<li>風險按交易控制。就像金絲雀/藍綠/金絲雀部署或基於主幹的開發 + 功能旗標：你經常發布小型變更，問題只影響該單一變更（或一小部分流量），而不是整個系統。一個交易對手失敗？它不會 unravel 整個天的淨額——只有他們未結算的支付被阻止/佇列。系統性風險大幅下降，因為沒有累積的曝險等待單一批次視窗。</li>
+<li>快速失敗，快速恢復。在 DevOps 中我們討厭長反饋迴路——這裡也一樣。批次淨額給你在黎明時的反饋（太遲了）。RTGS 提供即時反饋：支付成功 → 資金立即可用；失敗 → 發送者立即知道並可以行動（補充流動性、重試等）。 mirrors 具有自動化閘道、測試和每次提交回滾的 CI/CD 管道。</li>
+<li>權衡感覺也很熟悉。RTGS 需要更多日間流動性（就像需要更多測試環境、更好的可觀察性工具或 CD 的基礎設施餘量）。它「昂貴」在於持續就緒（全天候 HA、佇列管理、死結演算法），但回報是更低的爆炸半徑，不再有「希望夜間作業不會炸毀生產環境」的恐懼。
+簡言之：延遲淨額計算 = 瀑布式/大爆炸/單體發布 → 資源效率高但高賭注、高風險當故障時。
+RTGS = DevOps/CD/小型批次/原子部署 → 更高的營運成本（流動性始終熱、全天候監控）但更少的生存風險、更快的迭代（支付全天流動無需等待）、真正的最終性/信心。
+我們基本上已經將資金移動的骨幹 DevOps 化了。央行做了風險等價的決定：「去他的，不再有季度單體下降——讓我們在每次發生時發布每個變更，並帶有防護措施。」
+你在你正在處理的支付軌道上看到同樣的類比，還是你的設置中有一些打破類比的轉折？
+這就是基礎：我們如何從延遲淨額計算時代的夜間批次輪盤賭中爬出來，降落在即時、不可撤銷最終性的 RTGS 世界。如果你曾經在凌晨 2 點盯著佇列深度警報，想知道淨額是否會守住——或者你剛剛開始建構或整合現代支付軌道——這個系列就是為你準備的。接下來，我們將直接深入引擎室：今天的 RTGS 系統實際上如何在底層運作、讓數兆資金流動而無死結的佇列邏輯、工程師每天對抗的流動性謎題，以及仍然讓央行 SRE 保持高度警報的故障模式。堅持下去——事情會變得技術性、有點粗糲，而且（希望）更清晰。下回見。</li>
+</ul></div>
+<hr>
+<p><strong>本文腳註：</strong></p>
+<blockquote>
+<p><strong>注意：</strong> 有關 RTGS 系列中使用的所有縮寫的完整列表，請參閱 <a href="/2025/12/rtgs-acronyms-and-abbreviations/">RTGS 縮寫和簡稱參考</a>。</p>
+</blockquote>
+<section data-footnotes="" class="footnotes"><h2 class="sr-only" id="footnote-label">Footnotes</h2>
+<ol>
+<li id="user-content-fn-1">
+<p><strong>ACH</strong> - 自動清算所：美國電子金融交易處理網路，通常用於國內低價值支付 <a href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 1" class="data-footnote-backref">↩</a> <a href="#user-content-fnref-1-2" data-footnote-backref="" aria-label="Back to reference 1-2" class="data-footnote-backref">↩<sup>2</sup></a></p>
+</li>
+<li id="user-content-fn-3">
+<p><strong>DTC</strong> - 存託信託公司：美國證券存管和清算所，結算證券交易 <a href="#user-content-fnref-3" data-footnote-backref="" aria-label="Back to reference 2" class="data-footnote-backref">↩</a></p>
+</li>
+<li id="user-content-fn-4">
+<p><strong>FX</strong> - 外匯：不同國家貨幣之間的交易 <a href="#user-content-fnref-4" data-footnote-backref="" aria-label="Back to reference 3" class="data-footnote-backref">↩</a></p>
+</li>
+<li id="user-content-fn-5">
+<p><strong>CLS</strong> - 連續連結結算：外匯交易的多幣種現金結算系統，消除結算風險 <a href="#user-content-fnref-5" data-footnote-backref="" aria-label="Back to reference 4" class="data-footnote-backref">↩</a></p>
+</li>
+</ol>
+</section> </article> </div>  </div> </div> </main> <footer id="footer" data-astro-cid-l3trhy4j> <div class="footer-inner" data-astro-cid-l3trhy4j> <div class="footer-top-row" data-astro-cid-l3trhy4j> <div class="footer-col footer-quick-links" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>快速連結</span> <div class="footer-quick-links-list" data-astro-cid-l3trhy4j> <a href="/zh-TW/about-me/" data-astro-cid-l3trhy4j>關於</a><a href="/zh-TW/tools/" data-astro-cid-l3trhy4j>工具</a> </div> </div> <div class="footer-col footer-qr-col" data-astro-cid-l3trhy4j> <div class="short-url-qr" data-url="https://neo01.com/zh-TW/2025/12/understanding-rtgs-from-batch-nightmares-to-continuous-settlement/" data-size="80" data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-btn" aria-label="View QR code full size" data-astro-cid-av7zekv5> <img src="" alt="QR code" width="80" height="80" data-astro-cid-av7zekv5> </button> </div> <div class="short-url-qr-lightbox" id="short-url-qr-lightbox" hidden data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-lightbox-close" aria-label="Close" data-astro-cid-av7zekv5>×</button> <img src="" alt="QR code full size" class="short-url-qr-lightbox-img" data-astro-cid-av7zekv5> <a href="#" class="short-url-qr-lightbox-link" target="_blank" data-astro-cid-av7zekv5>Open short URL</a> </div> <script type="module" src="/_astro/QrInFooter.astro_astro_type_script_index_0_lang.DCVJWpeH.js"></script> </div> <div class="footer-col footer-connect" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>關注</span> <div class="footer-connect-icons" data-astro-cid-l3trhy4j> <a href="https://github.com/neoalienson" target="_blank" rel="noopener" aria-label="GitHub" data-astro-cid-l3trhy4j><i class="fab fa-github" data-astro-cid-l3trhy4j></i></a> <a href="https://linkedin.com/in/neoalienson" target="_blank" rel="noopener" aria-label="LinkedIn" data-astro-cid-l3trhy4j><i class="fab fa-linkedin" data-astro-cid-l3trhy4j></i></a> <a href="/rss.xml" aria-label="RSS" data-astro-cid-l3trhy4j><i class="fas fa-rss" data-astro-cid-l3trhy4j></i></a> </div> </div> </div> <div class="footer-bottom-row" data-astro-cid-l3trhy4j> <span class="footer-legal-links" data-astro-cid-l3trhy4j>  <a href="/zh-TW/terms-and-conditions/" data-astro-cid-l3trhy4j>條款</a> <span class="link-sep" data-astro-cid-l3trhy4j>|</span> <a href="/zh-TW/cookie-policy/" data-astro-cid-l3trhy4j>Cookie 政策</a>  </span> <span class="footer-copyright" data-astro-cid-l3trhy4j>&copy; 2026 Neo Alienson. 保留所有權利。</span> </div> </div> </footer> <button id="back-to-top" class="back-to-top" style="--btt-size: 48px; --btt-bottom: 60px; --btt-right: 30px; --btt-circumference: 131.94689145077132;" aria-label="Back to top" data-astro-cid-c4zgazz7> <svg class="back-to-top-ring" viewBox="0 0 48 48" aria-hidden="true" data-astro-cid-c4zgazz7> <circle class="back-to-top-track" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-c4zgazz7></circle> <circle id="back-to-top-progress" class="back-to-top-progress" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="131.94689145077132" stroke-dashoffset="131.94689145077132" data-astro-cid-c4zgazz7></circle> </svg> <span class="back-to-top-face" aria-hidden="true" data-astro-cid-c4zgazz7> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-c4zgazz7> <path d="m18 15-6-6-6 6" data-astro-cid-c4zgazz7></path> </svg> </span> </button> <script>(function(){const threshold = 400;
+const circumference = 131.94689145077132;
+
+  (function () {
+    const THRESHOLD = threshold;
+    const CIRCUMFERENCE = circumference;
+
+    let docMaxScrollY = 0;
+    function updateDocMaxScrollY() {
+      docMaxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+    }
+    window.addEventListener('resize', updateDocMaxScrollY, { passive: true });
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(updateDocMaxScrollY).observe(document.documentElement);
+    }
+
+    function initBackToTop() {
+      const btn = document.getElementById('back-to-top');
+      if (!btn || btn.dataset.bttInit) return;
+      btn.dataset.bttInit = 'true';
+
+      const ring = document.getElementById('back-to-top-progress');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let ticking = false;
+      let visible = false;
+
+      btn.style.opacity = '0';
+      btn.style.translate = '0 2rem';
+      btn.style.pointerEvents = 'none';
+
+      function show() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 250ms cubic-bezier(0,0,0.2,1), translate 250ms cubic-bezier(0,0,0.2,1)';
+        btn.style.opacity = '1';
+        btn.style.translate = '0 0';
+        btn.style.pointerEvents = 'auto';
+        visible = true;
+      }
+
+      function hide() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 300ms cubic-bezier(0.4,0,1,1), translate 300ms cubic-bezier(0.4,0,1,1)';
+        btn.style.opacity = '0';
+        btn.style.translate = '0 2rem';
+        btn.style.pointerEvents = 'none';
+        visible = false;
+      }
+
+      function updateFrame() {
+        const pct = docMaxScrollY > 0 ? Math.min(1, Math.max(0, window.scrollY / docMaxScrollY)) : 0;
+        if (ring) {
+          ring.style.strokeDashoffset = String(CIRCUMFERENCE * (1 - pct));
+        }
+        if (window.scrollY > THRESHOLD) {
+          if (!visible) show();
+        } else {
+          if (visible) hide();
+        }
+        ticking = false;
+      }
+
+      function onScroll() {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(updateFrame);
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+
+      btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+      });
+
+      document.addEventListener('astro:before-swap', function () {
+        window.removeEventListener('scroll', onScroll);
+      }, { once: true });
+
+      requestAnimationFrame(function () {
+        updateDocMaxScrollY();
+        updateFrame();
+      });
+    }
+
+    document.addEventListener('astro:page-load', initBackToTop);
+    initBackToTop();
+  })();
+})();</script> </div>  <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_0_lang.ByB3VsLC.js"></script> <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_1_lang.DT7tPFqy.js"></script> </body> </html>

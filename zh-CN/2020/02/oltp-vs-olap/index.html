@@ -1,0 +1,903 @@
+<!DOCTYPE html><html lang="zh-CN"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="Astro v6.2.1"><title>OLTP vs OLAP：理解交易型与分析型数据库 - Decoding Digital Anomalies</title><meta name="description" content="探索 OLTP 与 OLAP 系统的根本差异。了解何时使用交易型数据库处理日常运营，以及何时使用分析型数据库进行商业智能分析。"><meta property="og:title" content="OLTP vs OLAP：理解交易型与分析型数据库 - Decoding Digital Anomalies"><meta property="og:description" content="探索 OLTP 与 OLAP 系统的根本差异。了解何时使用交易型数据库处理日常运营，以及何时使用分析型数据库进行商业智能分析。"><meta property="og:type" content="website"><meta property="og:url" content="https://neo01.com"><link rel="icon" href="/assets/neo01.png" type="image/png"><link rel="manifest" href="/manifest.json"><link rel="canonical" href="https://neo01.com"><link rel="alternate" type="application/rss+xml" title="Decoding Digital Anomalies" href="/rss.xml"><link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css"><link rel="stylesheet" href="/libs/titillium-web/styles.css"><link rel="stylesheet" href="/pagefind/pagefind-component-ui.css"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="OLTP vs OLAP：理解交易型与分析型数据库 - Decoding Digital Anomalies"><meta name="twitter:description" content="探索 OLTP 与 OLAP 系统的根本差异。了解何时使用交易型数据库处理日常运营，以及何时使用分析型数据库进行商业智能分析。"><script src="/pagefind/pagefind-component-ui.js" defer></script><!-- Google tag (gtag.js) --><script async src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script><script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3DZR3TQYCY');
+    </script><script>
+      try {
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'page_view', { page_location: window.location.href });
+        }
+      } catch (e) {
+        console.warn('Analytics unavailable:', e);
+      }
+    </script><script>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script><style>._tabbedWrapper_r711i_1{display:none}._tabbedWrapper_r711i_1._hasToc_r711i_5,._tabbedWrapper_r711i_1._hasSeries_r711i_6{display:block}._tabbed_r711i_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md);margin:1rem 0;overflow:hidden}._tabHeader_r711i_17{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:0 1rem}._tabBar_r711i_25{display:flex;flex:1;border-bottom:1px solid var(--color-border);margin-bottom:0}._tab_r711i_1{flex:1;padding:.75rem .5rem;text-align:center;cursor:pointer;background:none;border:none;font-size:.875rem;font-weight:500;color:var(--color-sidebar-text);transition:color var(--transition-fast);border-bottom:2px solid transparent;margin-bottom:-1px}._tab_r711i_1:hover{color:var(--color-theme)}._tab_r711i_1._active_r711i_51{color:var(--color-theme);font-weight:600;border-bottom-color:var(--color-theme)}._tab_r711i_1._singleTab_r711i_57{flex:none;width:100%}._tabbedToggle_r711i_62{margin-left:auto;display:flex;align-items:center;justify-content:center;width:24px;height:24px;transition:transform var(--transition-fast);color:var(--color-sidebar-text-dark)}._tabbedToggle_r711i_62 svg{width:16px;height:16px}._tabbedToggle_r711i_62._open_r711i_78{transform:rotate(180deg)}._panels_r711i_82{display:none;padding:1rem 1.25rem .5rem}._panels_r711i_82._isOpen_r711i_87{display:block}._panel_r711i_82{display:none}._panel_r711i_82._active_r711i_51{display:block}[data-theme=dark] ._tabbed_r711i_1{background:var(--color-surface)}[data-theme=dark] ._tabBar_r711i_25{border-bottom-color:var(--color-border)}[data-theme=dark] ._tab_r711i_1{color:var(--color-sidebar-text)}[data-theme=dark] ._tab_r711i_1:hover{color:var(--color-theme-light)}[data-theme=dark] ._tab_r711i_1._active_r711i_51{color:var(--color-theme-light);border-bottom-color:var(--color-theme-light)}[data-theme=dark] ._tabbedToggle_r711i_62{color:var(--color-default)}@media(min-width:1024px){._tabbedWrapper_r711i_1{display:block;position:sticky;top:calc(var(--header-height) + 2rem);max-height:calc(100vh - var(--header-height) - 4rem);overflow-y:auto;align-self:start}._tabbedWrapper_r711i_1._hasToc_r711i_5,._tabbedWrapper_r711i_1._hasSeries_r711i_6{display:block}._tabbed_r711i_1{background:transparent;border-radius:0;padding:0;margin:0}._tabHeader_r711i_17{padding:0}._tabBar_r711i_25{border-bottom-color:var(--color-border);margin-bottom:.75rem}._panels_r711i_82{display:block;padding:0}._panels_r711i_82._isOpen_r711i_87{display:block}}@media(max-width:1023px){._tabbedWrapper_r711i_1{display:block!important;position:fixed;bottom:0;left:0;right:0;width:100%;z-index:1000;max-height:60vh;overflow-y:auto}._tabbed_r711i_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md) var(--radius-md) 0 0;padding:0}._tabbed_r711i_1._isOpen_r711i_87{max-height:60vh;overflow-y:auto}._tabHeader_r711i_17{padding:.75rem 1rem}[data-theme=dark] ._tabbed_r711i_1{background:var(--color-surface)}[data-theme=dark] ._tabbedToggle_r711i_62 svg{color:var(--color-default)}}
+</style>
+<link rel="stylesheet" href="/_astro/BaseLayout.C61PQYmh.css">
+<link rel="stylesheet" href="/_astro/_..BYacDPpd.css"><script>(function() {
+  function init() {
+    var header = document.querySelector('#header');
+    if (!header) {
+      console.log('[scroll-shrink-header] ERROR: header not found');
+      return;
+    }
+    header.setAttribute('data-header-scroll-shrink', '');
+    var lastScrollY = window.scrollY;
+    var ticking = false;
+    var threshold = 50;
+    var buffer = 5;
+
+    function updateHeader() {
+      var currentScrollY = window.scrollY;
+      if (currentScrollY > threshold) {
+        if (currentScrollY > lastScrollY + buffer) {
+          header.classList.add('header-shrunk');
+          console.log('[scroll-shrink-header] Shrink: scrollY=' + currentScrollY + ' (down)');
+        }
+      } else {
+        header.classList.remove('header-shrunk');
+        console.log('[scroll-shrink-header] Expand: scrollY=' + currentScrollY + ' (at top)');
+      }
+      lastScrollY = currentScrollY;
+      ticking = false;
+    }
+
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    console.log('[scroll-shrink-header] Initialized, threshold=' + threshold);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();</script></head> <body> <div id="wrap"> <header id="header" class="header-glass" data-astro-cid-qmpwvs2w> <div class="header-main" data-astro-cid-qmpwvs2w> <button class="header-nav-mobile-toggle md:hidden" aria-label="Open navigation menu" aria-expanded="false" id="main-nav-toggle" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M4 5h16" data-astro-cid-qmpwvs2w></path><path d="M4 12h16" data-astro-cid-qmpwvs2w></path><path d="M4 19h16" data-astro-cid-qmpwvs2w></path></svg> </button> <div class="header-brand" data-astro-cid-qmpwvs2w> <a href="/" class="logo-link" data-astro-cid-qmpwvs2w> <div class="logo" data-astro-cid-qmpwvs2w></div> </a> <div class="header-title-group" data-astro-cid-qmpwvs2w> <span class="header-title-text" data-astro-cid-qmpwvs2w>neo01.com</span> <span class="header-subtitle-text" data-astro-cid-qmpwvs2w>解码数字异常</span> </div> </div> <nav class="header-nav" aria-label="Main navigation" data-astro-cid-qmpwvs2w> <ul class="header-nav-list" role="menubar" data-astro-cid-qmpwvs2w> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-CN/" class="header-nav-link active" role="menuitem" data-astro-cid-qmpwvs2w>Blog</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-CN/tools/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>Tools</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-CN/about-me/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>About</a> </li> </ul> </nav> <div class="header-actions" data-astro-cid-qmpwvs2w> <div class="header-search-wrapper" data-astro-cid-qmpwvs2w> <pagefind-searchbox placeholder="搜索" show-sub-results="true" show-keyboard-hints="false" hide-shortcut="true" max-results="5" class="header-search-box" data-astro-cid-qmpwvs2w="true"></pagefind-searchbox> </div> <button class="theme-toggle" aria-label="Toggle theme" title="Toggle theme" data-astro-cid-qmpwvs2w> <span class="sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal" data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2020/02/oltp-vs-olap/" class="lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-TW/2020/02/oltp-vs-olap/" class="lang-link" data-lang="zh-TW" data-astro-cid-crzgpmpb>繁</a> </div> </div> </div> <div class="header-categories" data-astro-cid-qmpwvs2w> <nav class="header-categories-nav" data-astro-cid-qmpwvs2w> <a href="/zh-CN/categories/ai/" class="header-category-link" data-astro-cid-qmpwvs2w>AI</a> <a href="/zh-CN/categories/architecture/" class="header-category-link" data-astro-cid-qmpwvs2w>Architecture</a> <a href="/zh-CN/categories/cybersecurity/" class="header-category-link" data-astro-cid-qmpwvs2w>Cybersecurity</a> <a href="/zh-CN/categories/development/" class="header-category-link" data-astro-cid-qmpwvs2w>Development</a> <a href="/zh-CN/categories/misc/" class="header-category-link" data-astro-cid-qmpwvs2w>Misc</a> </nav> </div> </header> <div class="drawer-overlay" id="drawerOverlay" data-astro-cid-qmpwvs2w></div> <aside class="drawer" id="mobileDrawer" aria-label="Mobile navigation" data-astro-cid-qmpwvs2w> <div class="drawer-header" data-astro-cid-qmpwvs2w> <button class="close-btn" aria-label="Close menu" id="closeBtn" data-astro-cid-qmpwvs2w> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-qmpwvs2w> <line x1="18" y1="6" x2="6" y2="18" data-astro-cid-qmpwvs2w></line> <line x1="6" y1="6" x2="18" y2="18" data-astro-cid-qmpwvs2w></line> </svg> </button> </div> <nav class="drawer-nav" data-astro-cid-qmpwvs2w> <a href="/zh-CN/" class="drawer-nav-link active" data-astro-cid-qmpwvs2w>Blog</a> <a href="/zh-CN/tools/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Tools</a> <a href="/zh-CN/about-me/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>About</a> <div class="drawer-nav-divider" data-astro-cid-qmpwvs2w>Categories</div> <a href="/zh-CN/categories/ai/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>AI</a> <a href="/zh-CN/categories/architecture/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Architecture</a> <a href="/zh-CN/categories/cybersecurity/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Cybersecurity</a> <a href="/zh-CN/categories/development/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Development</a> <a href="/zh-CN/categories/misc/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>Misc</a> </nav> <div class="drawer-actions" data-astro-cid-qmpwvs2w> <button class="drawer-theme-toggle" aria-label="Toggle theme" data-astro-cid-qmpwvs2w> <span class="drawer-sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="drawer-moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal drawer-lang-switcher" data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2020/02/oltp-vs-olap/" class="drawer-lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="drawer-lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-TW/2020/02/oltp-vs-olap/" class="drawer-lang-link" data-lang="zh-TW" data-astro-cid-crzgpmpb>繁</a> </div> </div> </aside> <script type="module">const d=document.getElementById("main-nav-toggle"),l=document.getElementById("closeBtn"),n=document.getElementById("drawerOverlay"),o=document.getElementById("mobileDrawer");function m(){o?.classList.add("open"),n?.classList.add("open"),document.body.style.overflow="hidden"}function r(){o?.classList.remove("open"),n?.classList.remove("open"),document.body.style.overflow=""}d?.addEventListener("click",m);l?.addEventListener("click",r);n?.addEventListener("click",r);function c(e){document.documentElement.setAttribute("data-theme",e),localStorage.setItem("theme",e),a();const t=document.querySelector("pagefind-searchbox");t&&(e==="dark"?t.setAttribute("data-pf-theme","dark"):t.removeAttribute("data-pf-theme"))}function a(){const e=document.documentElement.getAttribute("data-theme"),t=document.querySelector(".drawer-theme-value");t&&(t.textContent=e==="dark"?"Dark":"Light")}function s(){const t=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";c(t)}document.querySelectorAll(".theme-toggle, .drawer-theme-toggle").forEach(e=>{e.addEventListener("click",s)});window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",e=>{localStorage.getItem("theme")||c(e.matches?"dark":"light")});a();</script> <main class="home"> <div class="container"> <div class="main-body"> <div class="main-body-header"> <h1 class="header">OLTP vs OLAP：理解交易型与分析型数据库</h1> </div>     <div class="_postMeta_yeftz_1"> <div class="_metaItem_yeftz_10"> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"> <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect> <line x1="16" y1="2" x2="16" y2="6"></line> <line x1="8" y1="2" x2="8" y2="6"></line> <line x1="3" y1="10" x2="21" y2="10"></line> </svg> <time datetime="2020-02-14T00:00:00.000Z">2/14/2020</time> </div> <div class="_categories_yeftz_31"> <a href="/categories/architecture" class="_categoryTag_yeftz_37"> Architecture </a> </div>  </div> <div class="post-layout" data-astro-cid-fzx4jmue> <aside class="post-toc-sidebar" data-astro-cid-fzx4jmue> <div class="_tabbedWrapper_r711i_1" data-tabbed-wrapper><div class="_tabbed_r711i_1"><div class="_tabHeader_r711i_17" data-tabbed-toggle><div class="_tabBar_r711i_25" data-tab-bar><button class="_tab_r711i_1 _singleTab_r711i_57 _active_r711i_51" data-tab="toc" aria-pressed="true">目录</button></div><span class="_tabbedToggle_r711i_62"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></div><div class="_panels_r711i_82" data-tabbed-panels><div class="_panel_r711i_82 _active_r711i_51" data-panel="toc"><div class="_tocWrapper_ms9sd_1"><div class="_toc_ms9sd_1"><ul class="_tocContent_ms9sd_9"><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#数据处理的两个世界" data-toc-link="数据处理的两个世界">数据处理的两个世界</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#oltp运营主力" data-toc-link="oltp运营主力">OLTP：运营主力</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#特性" data-toc-link="特性">特性</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#oltp-数据库设计规范化架构" data-toc-link="oltp-数据库设计规范化架构">OLTP 数据库设计：规范化架构</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#oltp-查询模式" data-toc-link="oltp-查询模式">OLTP 查询模式</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#olap分析强力引擎" data-toc-link="olap分析强力引擎">OLAP：分析强力引擎</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#特性-1" data-toc-link="特性-1">特性</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#olap-数据库设计星型架构" data-toc-link="olap-数据库设计星型架构">OLAP 数据库设计：星型架构</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#olap-查询模式" data-toc-link="olap-查询模式">OLAP 查询模式</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#并排比较" data-toc-link="并排比较">并排比较</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#真实世界示例电子商务平台" data-toc-link="真实世界示例电子商务平台">真实世界示例：电子商务平台</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#oltp处理订单" data-toc-link="oltp处理订单">OLTP：处理订单</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#olap分析销售绩效" data-toc-link="olap分析销售绩效">OLAP：分析销售绩效</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#etl连接-oltp-和-olap" data-toc-link="etl连接-oltp-和-olap">ETL：连接 OLTP 和 OLAP</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#选择正确的系统" data-toc-link="选择正确的系统">选择正确的系统</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#使用-oltp-的时机" data-toc-link="使用-oltp-的时机">使用 OLTP 的时机：</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#使用-olap-的时机" data-toc-link="使用-olap-的时机">使用 OLAP 的时机：</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#混合方法htap" data-toc-link="混合方法htap">混合方法：HTAP</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#现代-olap-技术" data-toc-link="现代-olap-技术">现代 OLAP 技术</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#云端数据仓库" data-toc-link="云端数据仓库">云端数据仓库</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#性能优化" data-toc-link="性能优化">性能优化</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#oltp-优化" data-toc-link="oltp-优化">OLTP 优化</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#olap-优化" data-toc-link="olap-优化">OLAP 优化</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#总结" data-toc-link="总结">总结</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#参考资料" data-toc-link="参考资料">参考资料</a></li></ul></div></div><script type="module">function l(){const n=document.querySelectorAll("article h2[id], article h3[id]"),o=document.querySelectorAll("[data-toc-link]");if(n.length===0||o.length===0)return;const i=new IntersectionObserver(e=>{let c=null;e.forEach(t=>{t.isIntersecting&&(c=t.target.id)}),o.forEach(t=>{const r=t.getAttribute("data-toc-link");t.classList.toggle("active",r===c)})},{rootMargin:"-80px 0px -70% 0px",threshold:0});n.forEach(e=>i.observe(e))}document.addEventListener("DOMContentLoaded",l);</script></div></div></div></div><script type="module">const v="_active_r711i_51",f="_open_r711i_78",O="_isOpen_r711i_87",e={active:v,open:f,isOpen:O};function h(){const s=document.querySelector("[data-tabbed-wrapper]");if(!s)return;const i=s.querySelector("[data-tabbed-toggle]"),a=s.querySelector("[data-tabbed-panels]"),r=s.querySelectorAll("[data-tab]"),d=s.querySelector('[data-panel="toc"]'),l=s.querySelector('[data-panel="series"]');if(!i||!a)return;function L(){const t=document.getElementById("header");return t?t.getBoundingClientRect().height:72}function n(){const t=L();s.style.top=`${t}px`}function b(t){const c=s.querySelector("[data-tab]."+e.active)?.getAttribute("data-tab")===t,g=window.innerWidth>=1024;if(c){if(g)return;a.classList.contains(e.isOpen)?(a.classList.remove(e.isOpen),i.classList.remove(e.open)):(a.classList.add(e.isOpen),i.classList.add(e.open))}else r.forEach(o=>{const u=o.getAttribute("data-tab")===t;o.classList.toggle(e.active,u),o.setAttribute("aria-pressed",u?"true":"false")}),d&&d.classList.toggle(e.active,t==="toc"),l&&l.classList.toggle(e.active,t==="series"),a.classList.add(e.isOpen),i.classList.add(e.open)}r.forEach(t=>{t.addEventListener("click",p=>{p.stopPropagation();const c=t.getAttribute("data-tab");b(c)})}),i.addEventListener("click",()=>{a.classList.contains(e.isOpen)?(a.classList.remove(e.isOpen),i.classList.remove(e.open)):(a.classList.add(e.isOpen),i.classList.add(e.open))}),n(),window.addEventListener("resize",n),window.addEventListener("load",n)}document.addEventListener("DOMContentLoaded",h);</script> </aside> <article class="article-content" data-astro-cid-fzx4jmue> <p>想象两种不同类型的商店。第一种是繁忙的便利商店，顾客快速拿取商品、付款、离开——每小时数百笔小型快速交易。第二种是仓库，分析师研究购买模式、库存趋势和季节性需求——较少的操作，但每次都检查大量数据。这代表了数据库系统的两种基本方法：OLTP 和 OLAP。</p>
+<h2 id="数据处理的两个世界">数据处理的两个世界</h2>
+<p>现代企业需要数据库来满足两种不同的目的：
+<strong>OLTP (Online Transaction Processing，在线交易处理)</strong>：处理日常运营</p>
+<ul>
+<li>处理客户订单</li>
+<li>更新库存</li>
+<li>记录付款</li>
+<li>管理用户账户
+<strong>OLAP (Online Analytical Processing，在线分析处理)</strong>：支持商业智能</li>
+<li>分析销售趋势</li>
+<li>生成报表</li>
+<li>预测需求</li>
+<li>识别模式</li>
+</ul>
+<div class="mermaid">graph TB
+    subgraph OLTP["🏪 OLTP 系统"]
+        T1[客户订单]
+        T2[付款处理]
+        T3[库存更新]
+        T4[用户注册]
+        T1 --> DB1[(交易&#x3C;br/>数据库)]
+        T2 --> DB1
+        T3 --> DB1
+        T4 --> DB1
+    end
+    subgraph ETL["🔄 ETL 流程"]
+        E1[提取]
+        E2[转换]
+        E3[加载]
+        E1 --> E2
+        E2 --> E3
+    end
+    subgraph OLAP["📊 OLAP 系统"]
+        A1[销售分析]
+        A2[趋势报表]
+        A3[预测]
+        A4[商业智能]
+        DW[(数据&#x3C;br/>仓库)] --> A1
+        DW --> A2
+        DW --> A3
+        DW --> A4
+    end
+    DB1 -.->|定期同步| E1
+    E3 --> DW
+    style OLTP fill:#e3f2fd,stroke:#1976d2
+    style OLAP fill:#f3e5f5,stroke:#7b1fa2
+    style ETL fill:#fff3e0,stroke:#f57c00
+</div>
+<h2 id="oltp运营主力">OLTP：运营主力</h2>
+<p>OLTP 系统通过快速、可靠的交易为您的日常业务运营提供动力。</p>
+<h3 id="特性">特性</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// OLTP：快速、专注的操作</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> OrderService</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> createOrder</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">customerId</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">items</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 单一交易影响少数数据行</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> connection</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> db.</span><span style="color:#B392F0">getConnection</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">beginTransaction</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">      // 插入订单（1 行）</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> order</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">        'INSERT INTO orders (customer_id, total, status) VALUES (?, ?, ?)'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        [customerId, </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">calculateTotal</span><span style="color:#E1E4E8">(items), </span><span style="color:#9ECBFF">'PENDING'</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">      );</span></span>
+<span class="line"><span style="color:#6A737D">      // 插入订单项目（少数行）</span></span>
+<span class="line"><span style="color:#F97583">      for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> item</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> items) {</span></span>
+<span class="line"><span style="color:#F97583">        await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">          'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          [order.id, item.productId, item.quantity, item.price]</span></span>
+<span class="line"><span style="color:#E1E4E8">        );</span></span>
+<span class="line"><span style="color:#6A737D">        // 更新库存（每个项目 1 行）</span></span>
+<span class="line"><span style="color:#F97583">        await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">          'UPDATE products SET stock = stock - ? WHERE id = ?'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          [item.quantity, item.productId]</span></span>
+<span class="line"><span style="color:#E1E4E8">        );</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">commit</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">      return</span><span style="color:#E1E4E8"> order;</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (error) {</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">rollback</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">      throw</span><span style="color:#E1E4E8"> error;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="oltp-数据库设计规范化架构">OLTP 数据库设计：规范化架构</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- 规范化设计最小化冗余</span></span>
+<span class="line"><span style="color:#6A737D">-- 针对 INSERT、UPDATE、DELETE 优化</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> customers</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  id </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  name</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  email </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  created_at </span><span style="color:#F97583">TIMESTAMP</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> orders</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  id </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  customer_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  total </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  status</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">20</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  created_at </span><span style="color:#F97583">TIMESTAMP</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (customer_id) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> customers(id)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> order_items</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  id </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  order_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  product_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  quantity </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  price </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (order_id) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> orders(id),</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (product_id) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> products(id)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> products</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  id </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  name</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">200</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  category_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  stock </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  price </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span></code></pre>
+<h3 id="oltp-查询模式">OLTP 查询模式</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- 典型的 OLTP 查询：快速、特定、小结果集</span></span>
+<span class="line"><span style="color:#6A737D">-- 获取客户详细信息</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span><span style="color:#F97583"> *</span><span style="color:#F97583"> FROM</span><span style="color:#E1E4E8"> customers </span><span style="color:#F97583">WHERE</span><span style="color:#E1E4E8"> id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 12345</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">-- 创建新订单</span></span>
+<span class="line"><span style="color:#F97583">INSERT INTO</span><span style="color:#E1E4E8"> orders (customer_id, total, </span><span style="color:#F97583">status</span><span style="color:#E1E4E8">, created_at)</span></span>
+<span class="line"><span style="color:#F97583">VALUES</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">12345</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">299</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">99</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">'PENDING'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">NOW</span><span style="color:#E1E4E8">());</span></span>
+<span class="line"><span style="color:#6A737D">-- 更新库存</span></span>
+<span class="line"><span style="color:#F97583">UPDATE</span><span style="color:#E1E4E8"> products </span></span>
+<span class="line"><span style="color:#F97583">SET</span><span style="color:#E1E4E8"> stock </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> stock </span><span style="color:#F97583">-</span><span style="color:#79B8FF"> 2</span><span style="color:#E1E4E8"> </span></span>
+<span class="line"><span style="color:#F97583">WHERE</span><span style="color:#E1E4E8"> id </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 789</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">-- 检查订单状态</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span><span style="color:#79B8FF"> o</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">id</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">o</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">status</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">o</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">total</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">name</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> orders o</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> customers c </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> o</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">customer_id</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">id</span></span>
+<span class="line"><span style="color:#F97583">WHERE</span><span style="color:#79B8FF"> o</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">id</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 54321</span><span style="color:#E1E4E8">;</span></span></code></pre>
+<div class="admonition anote" data-admonition-type="anote" data-icon="📝" data-title="OLTP 关键特性"><div class="admonition-title"><span class="admonition-icon">📝</span>OLTP 关键特性</div><p><strong>快速响应时间</strong>：每笔交易毫秒级
+<strong>高并发性</strong>：数千个同时用户
+<strong>ACID 合规性</strong>：保证数据一致性
+<strong>规范化架构</strong>：最小数据冗余
+<strong>实时数据</strong>：实时、最新的信息</p></div>
+<h2 id="olap分析强力引擎">OLAP：分析强力引擎</h2>
+<p>OLAP 系统分析历史数据以支持业务决策。</p>
+<h3 id="特性-1">特性</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// OLAP：跨大型数据集的复杂分析</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> SalesAnalytics</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> getMonthlySalesTrend</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">year</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 查询扫描数百万行</span></span>
+<span class="line"><span style="color:#6A737D">    // 跨多个维度聚合数据</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        DATE_FORMAT(o.created_at, '%Y-%m') as month,</span></span>
+<span class="line"><span style="color:#9ECBFF">        c.region,</span></span>
+<span class="line"><span style="color:#9ECBFF">        p.category,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(DISTINCT o.id) as order_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(oi.quantity) as units_sold,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(oi.quantity * oi.price) as revenue,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(o.total) as avg_order_value</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM orders o</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN customers c ON o.customer_id = c.id</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN order_items oi ON o.id = oi.order_id</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN products p ON oi.product_id = p.id</span></span>
+<span class="line"><span style="color:#9ECBFF">      WHERE YEAR(o.created_at) = ?</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY </span></span>
+<span class="line"><span style="color:#9ECBFF">        DATE_FORMAT(o.created_at, '%Y-%m'),</span></span>
+<span class="line"><span style="color:#9ECBFF">        c.region,</span></span>
+<span class="line"><span style="color:#9ECBFF">        p.category</span></span>
+<span class="line"><span style="color:#9ECBFF">      ORDER BY month, region, category</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> dataWarehouse.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query, [year]);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> getCustomerSegmentation</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#6A737D">    // 复杂的分析查询</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        CASE </span></span>
+<span class="line"><span style="color:#9ECBFF">          WHEN total_spent > 10000 THEN 'VIP'</span></span>
+<span class="line"><span style="color:#9ECBFF">          WHEN total_spent > 5000 THEN 'Premium'</span></span>
+<span class="line"><span style="color:#9ECBFF">          WHEN total_spent > 1000 THEN 'Regular'</span></span>
+<span class="line"><span style="color:#9ECBFF">          ELSE 'Occasional'</span></span>
+<span class="line"><span style="color:#9ECBFF">        END as segment,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(*) as customer_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(total_spent) as avg_lifetime_value,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(order_count) as avg_orders,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(days_since_first_order) as avg_customer_age</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM (</span></span>
+<span class="line"><span style="color:#9ECBFF">        SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">          c.id,</span></span>
+<span class="line"><span style="color:#9ECBFF">          SUM(o.total) as total_spent,</span></span>
+<span class="line"><span style="color:#9ECBFF">          COUNT(o.id) as order_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">          DATEDIFF(NOW(), MIN(o.created_at)) as days_since_first_order</span></span>
+<span class="line"><span style="color:#9ECBFF">        FROM customers c</span></span>
+<span class="line"><span style="color:#9ECBFF">        LEFT JOIN orders o ON c.id = o.customer_id</span></span>
+<span class="line"><span style="color:#9ECBFF">        GROUP BY c.id</span></span>
+<span class="line"><span style="color:#9ECBFF">      ) customer_stats</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY segment</span></span>
+<span class="line"><span style="color:#9ECBFF">      ORDER BY avg_lifetime_value DESC</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> dataWarehouse.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="olap-数据库设计星型架构">OLAP 数据库设计：星型架构</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- 反规范化设计针对查询优化</span></span>
+<span class="line"><span style="color:#6A737D">-- 星型架构包含事实表和维度表</span></span>
+<span class="line"><span style="color:#6A737D">-- 事实表：包含度量值</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> fact_sales</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  sale_id </span><span style="color:#F97583">BIGINT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  date_key </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  customer_key </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  product_key </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  store_key </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  quantity </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  unit_price </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  discount </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  revenue </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  cost </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  profit </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (date_key) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> dim_date(date_key),</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (customer_key) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> dim_customer(customer_key),</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (product_key) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> dim_product(product_key),</span></span>
+<span class="line"><span style="color:#F97583">  FOREIGN KEY</span><span style="color:#E1E4E8"> (store_key) </span><span style="color:#F97583">REFERENCES</span><span style="color:#E1E4E8"> dim_store(store_key)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">-- 维度表：包含描述性属性</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> dim_date</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  date_key </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  full_date </span><span style="color:#F97583">DATE</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  year</span><span style="color:#F97583"> INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  quarter</span><span style="color:#F97583"> INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  month</span><span style="color:#F97583"> INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  month_name </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">20</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  week</span><span style="color:#F97583"> INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  day_of_week </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  day_name </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">20</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  is_weekend </span><span style="color:#F97583">BOOLEAN</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  is_holiday </span><span style="color:#F97583">BOOLEAN</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> dim_customer</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  customer_key </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  customer_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  name</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  email </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  segment </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  region </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  country </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  registration_date </span><span style="color:#F97583">DATE</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> dim_product</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  product_key </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  product_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  name</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">200</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  category </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  subcategory </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  brand </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  supplier </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> dim_store</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  store_key </span><span style="color:#F97583">INT</span><span style="color:#F97583"> PRIMARY KEY</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  store_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#F97583">  name</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  city </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  state</span><span style="color:#F97583"> VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  country </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">100</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  region </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">50</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  size_category </span><span style="color:#F97583">VARCHAR</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">20</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span></code></pre>
+<div class="mermaid">graph TB
+    F[事实表&#x3C;br/>fact_sales&#x3C;br/>sale_id, quantity, revenue, profit]
+    D1[维度&#x3C;br/>dim_date&#x3C;br/>year, quarter, month, week]
+    D2[维度&#x3C;br/>dim_customer&#x3C;br/>name, segment, region]
+    D3[维度&#x3C;br/>dim_product&#x3C;br/>category, brand, supplier]
+    D4[维度&#x3C;br/>dim_store&#x3C;br/>city, state, region]
+    F --> D1
+    F --> D2
+    F --> D3
+    F --> D4
+    style F fill:#ffeb3b,stroke:#f57f17
+    style D1 fill:#81c784,stroke:#388e3c
+    style D2 fill:#81c784,stroke:#388e3c
+    style D3 fill:#81c784,stroke:#388e3c
+    style D4 fill:#81c784,stroke:#388e3c
+</div>
+<h3 id="olap-查询模式">OLAP 查询模式</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- 典型的 OLAP 查询：复杂、分析性、大结果集</span></span>
+<span class="line"><span style="color:#6A737D">-- 销售趋势分析</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span><span style="color:#E1E4E8"> </span></span>
+<span class="line"><span style="color:#79B8FF">  d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">year</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">quarter</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">category</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">revenue</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_revenue,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">profit</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_profit,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">customer_key</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> unique_customers</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> fact_sales f</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> dim_date d </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">date_key</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">date_key</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> dim_product p </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">product_key</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">product_key</span></span>
+<span class="line"><span style="color:#F97583">WHERE</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">year</span><span style="color:#F97583"> BETWEEN</span><span style="color:#79B8FF"> 2018</span><span style="color:#F97583"> AND</span><span style="color:#79B8FF"> 2020</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">year</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">quarter</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">category</span></span>
+<span class="line"><span style="color:#F97583">ORDER BY</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">year</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">quarter</span><span style="color:#E1E4E8">, total_revenue </span><span style="color:#F97583">DESC</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">-- 按地区的客户分群</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span><span style="color:#E1E4E8"> </span></span>
+<span class="line"><span style="color:#79B8FF">  c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">region</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">segment</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">DISTINCT</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">customer_key</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> customer_count,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">revenue</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_revenue,</span></span>
+<span class="line"><span style="color:#79B8FF">  AVG</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">revenue</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> avg_transaction_value</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> fact_sales f</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> dim_customer c </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">customer_key</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">customer_key</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> dim_date d </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">date_key</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">date_key</span></span>
+<span class="line"><span style="color:#F97583">WHERE</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">year</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 2020</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#79B8FF"> c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">region</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">c</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">segment</span></span>
+<span class="line"><span style="color:#F97583">ORDER BY</span><span style="color:#E1E4E8"> total_revenue </span><span style="color:#F97583">DESC</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">-- 产品性能比较</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span><span style="color:#E1E4E8"> </span></span>
+<span class="line"><span style="color:#79B8FF">  p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">category</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">brand</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">quantity</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> units_sold,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">revenue</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> revenue,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">profit</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> profit,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">profit</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">/</span><span style="color:#79B8FF"> SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">revenue</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 100</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> profit_margin</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> fact_sales f</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> dim_product p </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">product_key</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">product_key</span></span>
+<span class="line"><span style="color:#F97583">JOIN</span><span style="color:#E1E4E8"> dim_date d </span><span style="color:#F97583">ON</span><span style="color:#79B8FF"> f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">date_key</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">date_key</span></span>
+<span class="line"><span style="color:#F97583">WHERE</span><span style="color:#79B8FF"> d</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">year</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 2020</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#79B8FF"> p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">category</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">p</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">brand</span></span>
+<span class="line"><span style="color:#F97583">HAVING</span><span style="color:#79B8FF"> SUM</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">f</span><span style="color:#E1E4E8">.</span><span style="color:#79B8FF">revenue</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 100000</span></span>
+<span class="line"><span style="color:#F97583">ORDER BY</span><span style="color:#E1E4E8"> profit_margin </span><span style="color:#F97583">DESC</span><span style="color:#E1E4E8">;</span></span></code></pre>
+<div class="admonition anote" data-admonition-type="anote" data-icon="📝" data-title="OLAP 关键特性"><div class="admonition-title"><span class="admonition-icon">📝</span>OLAP 关键特性</div><p><strong>复杂查询</strong>：多维度分析
+<strong>大数据量</strong>：数百万到数十亿行
+<strong>历史数据</strong>：时间序列分析
+<strong>反规范化架构</strong>：针对读取性能优化
+<strong>批量更新</strong>：定期数据加载（ETL）</p></div>
+<h2 id="并排比较">并排比较</h2>
+<div class="echarts">{
+  "title": {
+    "text": "OLTP vs OLAP：查询响应时间"
+  },
+  "tooltip": {
+    "trigger": "axis",
+    "axisPointer": {
+      "type": "shadow"
+    }
+  },
+  "legend": {
+    "data": ["OLTP", "OLAP"]
+  },
+  "xAxis": {
+    "type": "category",
+    "data": ["简单查询", "联结查询", "聚合", "复杂分析"]
+  },
+  "yAxis": {
+    "type": "value",
+    "name": "响应时间 (ms)",
+    "axisLabel": {
+      "formatter": "{value}"
+    }
+  },
+  "series": [
+    {
+      "name": "OLTP",
+      "type": "bar",
+      "data": [5, 20, 50, 200],
+      "itemStyle": {
+        "color": "#1976d2"
+      }
+    },
+    {
+      "name": "OLAP",
+      "type": "bar",
+      "data": [100, 500, 2000, 10000],
+      "itemStyle": {
+        "color": "#7b1fa2"
+      }
+    }
+  ]
+}
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>方面</th><th>OLTP</th><th>OLAP</th></tr></thead><tbody><tr><td><strong>目的</strong></td><td>日常运营</td><td>商业智能</td></tr><tr><td><strong>用户</strong></td><td>数千个并发用户</td><td>数十个分析师</td></tr><tr><td><strong>操作</strong></td><td>INSERT、UPDATE、DELETE、SELECT</td><td>SELECT 搭配复杂聚合</td></tr><tr><td><strong>查询复杂度</strong></td><td>简单、预定义</td><td>复杂、临时</td></tr><tr><td><strong>响应时间</strong></td><td>毫秒</td><td>秒到分钟</td></tr><tr><td><strong>每次查询的数据量</strong></td><td>少数行</td><td>数百万行</td></tr><tr><td><strong>数据库设计</strong></td><td>规范化（3NF）</td><td>反规范化（星型/雪花）</td></tr><tr><td><strong>数据新鲜度</strong></td><td>实时</td><td>定期更新</td></tr><tr><td><strong>事务支持</strong></td><td>需要 ACID</td><td>不重要</td></tr><tr><td><strong>索引</strong></td><td>多个字段上的多个索引</td><td>关键字段上的少数索引</td></tr><tr><td><strong>示例系统</strong></td><td>MySQL、PostgreSQL、Oracle</td><td>Redshift、BigQuery、Snowflake</td></tr></tbody></table>
+<h2 id="真实世界示例电子商务平台">真实世界示例：电子商务平台</h2>
+<h3 id="oltp处理订单">OLTP：处理订单</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> OrderProcessingService</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> processCheckout</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">cart</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">customerId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // OLTP：快速交易处理</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> connection</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.db.</span><span style="color:#B392F0">getConnection</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">beginTransaction</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">      // 创建订单（影响 1 行）</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> order</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">        'INSERT INTO orders (customer_id, total, status) VALUES (?, ?, ?)'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        [customerId, cart.total, </span><span style="color:#9ECBFF">'PROCESSING'</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">      );</span></span>
+<span class="line"><span style="color:#6A737D">      // 添加订单项目（影响少数行）</span></span>
+<span class="line"><span style="color:#F97583">      for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> item</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> cart.items) {</span></span>
+<span class="line"><span style="color:#F97583">        await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">          'INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          [order.id, item.id, item.quantity, item.price]</span></span>
+<span class="line"><span style="color:#E1E4E8">        );</span></span>
+<span class="line"><span style="color:#6A737D">        // 更新库存（影响 1 行）</span></span>
+<span class="line"><span style="color:#F97583">        await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">          'UPDATE products SET stock = stock - ? WHERE id = ?'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">          [item.quantity, item.id]</span></span>
+<span class="line"><span style="color:#E1E4E8">        );</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#6A737D">      // 记录付款（影响 1 行）</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">        'INSERT INTO payments (order_id, amount, method, status) VALUES (?, ?, ?, ?)'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">        [order.id, cart.total, cart.paymentMethod, </span><span style="color:#9ECBFF">'COMPLETED'</span><span style="color:#E1E4E8">]</span></span>
+<span class="line"><span style="color:#E1E4E8">      );</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">commit</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">      // 毫秒级响应</span></span>
+<span class="line"><span style="color:#F97583">      return</span><span style="color:#E1E4E8"> { orderId: order.id, status: </span><span style="color:#9ECBFF">'SUCCESS'</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (error) {</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#E1E4E8"> connection.</span><span style="color:#B392F0">rollback</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">      throw</span><span style="color:#E1E4E8"> error;</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h3 id="olap分析销售绩效">OLAP：分析销售绩效</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> SalesReportingService</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> generateQuarterlyReport</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">year</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">quarter</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // OLAP：复杂的分析查询</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        d.month_name,</span></span>
+<span class="line"><span style="color:#9ECBFF">        p.category,</span></span>
+<span class="line"><span style="color:#9ECBFF">        s.region,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(DISTINCT f.sale_id) as transaction_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(DISTINCT f.customer_key) as unique_customers,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(f.quantity) as units_sold,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(f.revenue) as total_revenue,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(f.profit) as total_profit,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(f.revenue) as avg_transaction_value,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(f.profit) / SUM(f.revenue) * 100 as profit_margin</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM fact_sales f</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN dim_date d ON f.date_key = d.date_key</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN dim_product p ON f.product_key = p.product_key</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN dim_store s ON f.store_key = s.store_key</span></span>
+<span class="line"><span style="color:#9ECBFF">      WHERE d.year = ? AND d.quarter = ?</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY d.month_name, p.category, s.region</span></span>
+<span class="line"><span style="color:#9ECBFF">      WITH ROLLUP</span></span>
+<span class="line"><span style="color:#9ECBFF">      ORDER BY d.month_name, total_revenue DESC</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">    // 查询扫描数百万行</span></span>
+<span class="line"><span style="color:#6A737D">    // 秒级响应</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> results</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.dataWarehouse.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query, [year, quarter]);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">formatReport</span><span style="color:#E1E4E8">(results);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> getCustomerLifetimeValue</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#6A737D">    // OLAP：客户分析</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        c.segment,</span></span>
+<span class="line"><span style="color:#9ECBFF">        c.region,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(DISTINCT c.customer_key) as customer_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(customer_metrics.total_revenue) as avg_lifetime_value,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(customer_metrics.order_count) as avg_orders,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(customer_metrics.avg_order_value) as avg_order_size,</span></span>
+<span class="line"><span style="color:#9ECBFF">        AVG(customer_metrics.customer_age_days) as avg_customer_age_days</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM dim_customer c</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN (</span></span>
+<span class="line"><span style="color:#9ECBFF">        SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">          f.customer_key,</span></span>
+<span class="line"><span style="color:#9ECBFF">          SUM(f.revenue) as total_revenue,</span></span>
+<span class="line"><span style="color:#9ECBFF">          COUNT(DISTINCT f.sale_id) as order_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">          AVG(f.revenue) as avg_order_value,</span></span>
+<span class="line"><span style="color:#9ECBFF">          DATEDIFF(CURRENT_DATE, MIN(d.full_date)) as customer_age_days</span></span>
+<span class="line"><span style="color:#9ECBFF">        FROM fact_sales f</span></span>
+<span class="line"><span style="color:#9ECBFF">        JOIN dim_date d ON f.date_key = d.date_key</span></span>
+<span class="line"><span style="color:#9ECBFF">        GROUP BY f.customer_key</span></span>
+<span class="line"><span style="color:#9ECBFF">      ) customer_metrics ON c.customer_key = customer_metrics.customer_key</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY c.segment, c.region</span></span>
+<span class="line"><span style="color:#9ECBFF">      ORDER BY avg_lifetime_value DESC</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.dataWarehouse.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="etl连接-oltp-和-olap">ETL：连接 OLTP 和 OLAP</h2>
+<p>提取、转换、加载（ETL）流程将数据从 OLTP 系统移动到 OLAP 系统：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> ETLPipeline</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> runDailySalesETL</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'开始 ETL 流程...'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">    // 提取：从 OLTP 数据库获取数据</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> salesData</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">extractSalesData</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#6A737D">    // 转换：清理和重塑数据</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> transformedData</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">transformSalesData</span><span style="color:#E1E4E8">(salesData);</span></span>
+<span class="line"><span style="color:#6A737D">    // 加载：插入到数据仓库</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">loadToDataWarehouse</span><span style="color:#E1E4E8">(transformedData);</span></span>
+<span class="line"><span style="color:#E1E4E8">    console.</span><span style="color:#B392F0">log</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'ETL 流程完成'</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> extractSalesData</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#6A737D">    // 从 OLTP 数据库提取</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        o.id as order_id,</span></span>
+<span class="line"><span style="color:#9ECBFF">        o.created_at,</span></span>
+<span class="line"><span style="color:#9ECBFF">        o.customer_id,</span></span>
+<span class="line"><span style="color:#9ECBFF">        c.name as customer_name,</span></span>
+<span class="line"><span style="color:#9ECBFF">        c.region,</span></span>
+<span class="line"><span style="color:#9ECBFF">        oi.product_id,</span></span>
+<span class="line"><span style="color:#9ECBFF">        p.name as product_name,</span></span>
+<span class="line"><span style="color:#9ECBFF">        p.category,</span></span>
+<span class="line"><span style="color:#9ECBFF">        oi.quantity,</span></span>
+<span class="line"><span style="color:#9ECBFF">        oi.price,</span></span>
+<span class="line"><span style="color:#9ECBFF">        oi.quantity * oi.price as revenue</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM orders o</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN customers c ON o.customer_id = c.id</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN order_items oi ON o.id = oi.order_id</span></span>
+<span class="line"><span style="color:#9ECBFF">      JOIN products p ON oi.product_id = p.id</span></span>
+<span class="line"><span style="color:#9ECBFF">      WHERE DATE(o.created_at) = CURRENT_DATE - INTERVAL 1 DAY</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.oltpDb.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> transformSalesData</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">salesData</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 转换数据以供分析</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> salesData.</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">row</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> ({</span></span>
+<span class="line"><span style="color:#E1E4E8">      sale_id: row.order_id,</span></span>
+<span class="line"><span style="color:#E1E4E8">      date_key: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">getDateKey</span><span style="color:#E1E4E8">(row.created_at),</span></span>
+<span class="line"><span style="color:#E1E4E8">      customer_key: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">getCustomerKey</span><span style="color:#E1E4E8">(row.customer_id),</span></span>
+<span class="line"><span style="color:#E1E4E8">      product_key: </span><span style="color:#79B8FF">this</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">getProductKey</span><span style="color:#E1E4E8">(row.product_id),</span></span>
+<span class="line"><span style="color:#E1E4E8">      quantity: row.quantity,</span></span>
+<span class="line"><span style="color:#E1E4E8">      unit_price: row.price,</span></span>
+<span class="line"><span style="color:#E1E4E8">      revenue: row.revenue,</span></span>
+<span class="line"><span style="color:#E1E4E8">      cost: row.revenue </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.6</span><span style="color:#E1E4E8">, </span><span style="color:#6A737D">// 简化的成本计算</span></span>
+<span class="line"><span style="color:#E1E4E8">      profit: row.revenue </span><span style="color:#F97583">*</span><span style="color:#79B8FF"> 0.4</span></span>
+<span class="line"><span style="color:#E1E4E8">    }));</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> loadToDataWarehouse</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">data</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 批量插入到 OLAP 数据库</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> batchSize</span><span style="color:#F97583"> =</span><span style="color:#79B8FF"> 1000</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">let</span><span style="color:#E1E4E8"> i </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">; i </span><span style="color:#F97583">&#x3C;</span><span style="color:#E1E4E8"> data.</span><span style="color:#79B8FF">length</span><span style="color:#E1E4E8">; i </span><span style="color:#F97583">+=</span><span style="color:#E1E4E8"> batchSize) {</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> batch</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> data.</span><span style="color:#B392F0">slice</span><span style="color:#E1E4E8">(i, i </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> batchSize);</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.dataWarehouse.</span><span style="color:#B392F0">batchInsert</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'fact_sales'</span><span style="color:#E1E4E8">, batch);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#B392F0">  getDateKey</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">date</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 将日期转换为整数键：YYYYMMDD</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#B392F0"> parseInt</span><span style="color:#E1E4E8">(date.</span><span style="color:#B392F0">toISOString</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">slice</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">0</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">).</span><span style="color:#B392F0">replace</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">/</span><span style="color:#DBEDFF">-</span><span style="color:#9ECBFF">/</span><span style="color:#F97583">g</span><span style="color:#E1E4E8">, </span><span style="color:#9ECBFF">''</span><span style="color:#E1E4E8">));</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#B392F0">  getCustomerKey</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">customerId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 将 OLTP 客户 ID 映射到 OLAP 客户键</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.customerKeyMap.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(customerId);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#B392F0">  getProductKey</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">productId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 将 OLTP 产品 ID 映射到 OLAP 产品键</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.productKeyMap.</span><span style="color:#B392F0">get</span><span style="color:#E1E4E8">(productId);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="选择正确的系统">选择正确的系统</h2>
+<h3 id="使用-oltp-的时机">使用 OLTP 的时机：</h3>
+<p>✅ <strong>高交易量</strong>：数千个并发用户
+✅ <strong>数据完整性至关重要</strong>：金融交易、库存管理
+✅ <strong>实时更新</strong>：当前数据必须立即可用
+✅ <strong>简单查询</strong>：按 ID 查询、插入、更新、删除
+✅ <strong>需要 ACID 合规性</strong>：银行、电子商务、订位系统</p>
+<h3 id="使用-olap-的时机">使用 OLAP 的时机：</h3>
+<p>✅ <strong>复杂分析</strong>：多维度分析、聚合
+✅ <strong>历史分析</strong>：趋势分析、预测
+✅ <strong>大数据量</strong>：分析数百万或数十亿行
+✅ <strong>商业智能</strong>：报表、仪表板、数据挖掘
+✅ <strong>读取密集工作负载</strong>：少量写入、大量复杂读取</p>
+<h3 id="混合方法htap">混合方法：HTAP</h3>
+<p>某些现代数据库支持混合交易/分析处理（HTAP）：</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// 示例：使用读取副本进行分析</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> HybridDataAccess</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  constructor</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.primaryDb </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Database</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'primary'</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// OLTP</span></span>
+<span class="line"><span style="color:#79B8FF">    this</span><span style="color:#E1E4E8">.replicaDb </span><span style="color:#F97583">=</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> Database</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'replica'</span><span style="color:#E1E4E8">); </span><span style="color:#6A737D">// OLAP 查询</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#6A737D">  // 写入操作到主数据库</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> createOrder</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">orderData</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.primaryDb.</span><span style="color:#B392F0">insert</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'orders'</span><span style="color:#E1E4E8">, orderData);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#6A737D">  // 简单读取从主数据库</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> getOrder</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">orderId</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.primaryDb.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#9ECBFF">      'SELECT * FROM orders WHERE id = ?'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      [orderId]</span></span>
+<span class="line"><span style="color:#E1E4E8">    );</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#6A737D">  // 复杂分析从副本</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> getSalesReport</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">startDate</span><span style="color:#E1E4E8">, </span><span style="color:#FFAB70">endDate</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.replicaDb.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">`</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        DATE(created_at) as date,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(*) as order_count,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(total) as revenue</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM orders</span></span>
+<span class="line"><span style="color:#9ECBFF">      WHERE created_at BETWEEN ? AND ?</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY DATE(created_at)</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">, [startDate, endDate]);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="现代-olap-技术">现代 OLAP 技术</h2>
+<h3 id="云端数据仓库">云端数据仓库</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="javascript"><code><span class="line"><span style="color:#6A737D">// 示例：使用 Amazon Redshift</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> RedshiftAnalytics</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> runAnalysis</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        date_trunc('month', sale_date) as month,</span></span>
+<span class="line"><span style="color:#9ECBFF">        product_category,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(revenue) as total_revenue,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(DISTINCT customer_id) as unique_customers</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM sales_fact</span></span>
+<span class="line"><span style="color:#9ECBFF">      WHERE sale_date >= '2020-01-01'</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY 1, 2</span></span>
+<span class="line"><span style="color:#9ECBFF">      ORDER BY 1, 3 DESC</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.redshift.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"><span style="color:#6A737D">// 示例：使用 Google BigQuery</span></span>
+<span class="line"><span style="color:#F97583">class</span><span style="color:#B392F0"> BigQueryAnalytics</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  async</span><span style="color:#B392F0"> runAnalysis</span><span style="color:#E1E4E8">() {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> query</span><span style="color:#F97583"> =</span><span style="color:#9ECBFF"> `</span></span>
+<span class="line"><span style="color:#9ECBFF">      SELECT </span></span>
+<span class="line"><span style="color:#9ECBFF">        FORMAT_DATE('%Y-%m', sale_date) as month,</span></span>
+<span class="line"><span style="color:#9ECBFF">        product_category,</span></span>
+<span class="line"><span style="color:#9ECBFF">        SUM(revenue) as total_revenue,</span></span>
+<span class="line"><span style="color:#9ECBFF">        COUNT(DISTINCT customer_id) as unique_customers</span></span>
+<span class="line"><span style="color:#9ECBFF">      FROM </span><span style="color:#79B8FF">\`</span><span style="color:#9ECBFF">project.dataset.sales_fact</span><span style="color:#79B8FF">\`</span></span>
+<span class="line"><span style="color:#9ECBFF">      WHERE sale_date >= '2020-01-01'</span></span>
+<span class="line"><span style="color:#9ECBFF">      GROUP BY month, product_category</span></span>
+<span class="line"><span style="color:#9ECBFF">      ORDER BY month, total_revenue DESC</span></span>
+<span class="line"><span style="color:#9ECBFF">    `</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#F97583"> await</span><span style="color:#79B8FF"> this</span><span style="color:#E1E4E8">.bigquery.</span><span style="color:#B392F0">query</span><span style="color:#E1E4E8">(query);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h2 id="性能优化">性能优化</h2>
+<h3 id="oltp-优化">OLTP 优化</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- 快速查询的索引</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> INDEX</span><span style="color:#B392F0"> idx_orders_customer</span><span style="color:#F97583"> ON</span><span style="color:#E1E4E8"> orders(customer_id);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> INDEX</span><span style="color:#B392F0"> idx_orders_status</span><span style="color:#F97583"> ON</span><span style="color:#E1E4E8"> orders(</span><span style="color:#F97583">status</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> INDEX</span><span style="color:#B392F0"> idx_orders_created</span><span style="color:#F97583"> ON</span><span style="color:#E1E4E8"> orders(created_at);</span></span>
+<span class="line"><span style="color:#6A737D">-- 大型数据表的分区</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> orders</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  customer_id </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  created_at </span><span style="color:#F97583">TIMESTAMP</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  ...</span></span>
+<span class="line"><span style="color:#E1E4E8">) </span><span style="color:#F97583">PARTITION</span><span style="color:#F97583"> BY</span><span style="color:#F97583"> RANGE</span><span style="color:#E1E4E8"> (</span><span style="color:#79B8FF">YEAR</span><span style="color:#E1E4E8">(created_at)) (</span></span>
+<span class="line"><span style="color:#F97583">  PARTITION</span><span style="color:#E1E4E8"> p2019 </span><span style="color:#F97583">VALUES</span><span style="color:#E1E4E8"> LESS THAN (</span><span style="color:#79B8FF">2020</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  PARTITION</span><span style="color:#E1E4E8"> p2020 </span><span style="color:#F97583">VALUES</span><span style="color:#E1E4E8"> LESS THAN (</span><span style="color:#79B8FF">2021</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#F97583">  PARTITION</span><span style="color:#E1E4E8"> p2021 </span><span style="color:#F97583">VALUES</span><span style="color:#E1E4E8"> LESS THAN (</span><span style="color:#79B8FF">2022</span><span style="color:#E1E4E8">)</span></span>
+<span class="line"><span style="color:#E1E4E8">);</span></span></code></pre>
+<h3 id="olap-优化">OLAP 优化</h3>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="sql"><code><span class="line"><span style="color:#6A737D">-- 分析用的列式存储</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#F97583"> TABLE</span><span style="color:#B392F0"> fact_sales</span><span style="color:#E1E4E8"> (</span></span>
+<span class="line"><span style="color:#E1E4E8">  sale_id </span><span style="color:#F97583">BIGINT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  date_key </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  customer_key </span><span style="color:#F97583">INT</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  revenue </span><span style="color:#F97583">DECIMAL</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">10</span><span style="color:#E1E4E8">,</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">),</span></span>
+<span class="line"><span style="color:#E1E4E8">  ...</span></span>
+<span class="line"><span style="color:#E1E4E8">) STORED </span><span style="color:#F97583">AS</span><span style="color:#F97583"> PARQUET</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">-- 常见查询的物化视图</span></span>
+<span class="line"><span style="color:#F97583">CREATE</span><span style="color:#E1E4E8"> MATERIALIZED VIEW monthly_sales_summary </span><span style="color:#F97583">AS</span></span>
+<span class="line"><span style="color:#F97583">SELECT</span><span style="color:#E1E4E8"> </span></span>
+<span class="line"><span style="color:#E1E4E8">  DATE_TRUNC(</span><span style="color:#9ECBFF">'month'</span><span style="color:#E1E4E8">, sale_date) </span><span style="color:#F97583">as</span><span style="color:#F97583"> month</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">  product_category,</span></span>
+<span class="line"><span style="color:#79B8FF">  SUM</span><span style="color:#E1E4E8">(revenue) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> total_revenue,</span></span>
+<span class="line"><span style="color:#79B8FF">  COUNT</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">as</span><span style="color:#E1E4E8"> transaction_count</span></span>
+<span class="line"><span style="color:#F97583">FROM</span><span style="color:#E1E4E8"> fact_sales</span></span>
+<span class="line"><span style="color:#F97583">GROUP BY</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#6A737D">-- 定期刷新</span></span>
+<span class="line"><span style="color:#E1E4E8">REFRESH MATERIALIZED VIEW monthly_sales_summary;</span></span></code></pre>
+<h2 id="总结">总结</h2>
+<p>理解 OLTP 和 OLAP 是设计有效数据系统的基础：
+<strong>OLTP 系统</strong>：</p>
+<ul>
+<li>通过快速、可靠的交易为日常运营提供动力</li>
+<li>针对写入和简单读取优化</li>
+<li>规范化架构确保数据完整性</li>
+<li>实时、当前数据
+<strong>OLAP 系统</strong>：</li>
+<li>启用商业智能和分析</li>
+<li>针对大型数据集上的复杂查询优化</li>
+<li>反规范化架构改善查询性能</li>
+<li>用于趋势分析的历史数据
+<strong>关键要点</strong>：大多数组织两者都需要——OLTP 用于运营，OLAP 用于分析。ETL 流程连接两者，将数据从交易系统移动到分析仓库，在那里可以进行分析而不影响运营性能。</li>
+</ul>
+<div class="admonition tip" data-admonition-type="tip" data-icon="💡" data-title="最佳实践"><div class="admonition-title"><span class="admonition-icon">💡</span>最佳实践</div><p>永远不要直接在 OLTP 数据库上执行复杂的分析查询。使用 ETL 将数据移动到专用的 OLAP 系统，保护您的运营数据库免受性能下降的影响。</p></div>
+<h2 id="参考资料">参考资料</h2>
+<ul>
+<li><a href="https://www.kimballgroup.com/">The Data Warehouse Toolkit by Ralph Kimball</a></li>
+<li><a href="https://aws.amazon.com/compare/the-difference-between-olap-and-oltp/">AWS: OLTP vs OLAP</a></li>
+<li><a href="https://cloud.google.com/learn/what-is-a-data-warehouse">Google Cloud: Data Warehouse Concepts</a></li>
+</ul> </article> </div>  </div> </div> </main> <footer id="footer" data-astro-cid-l3trhy4j> <div class="footer-inner" data-astro-cid-l3trhy4j> <div class="footer-top-row" data-astro-cid-l3trhy4j> <div class="footer-col footer-quick-links" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>快速链接</span> <div class="footer-quick-links-list" data-astro-cid-l3trhy4j> <a href="/zh-CN/about-me/" data-astro-cid-l3trhy4j>关于</a><a href="/zh-CN/tools/" data-astro-cid-l3trhy4j>工具</a> </div> </div> <div class="footer-col footer-qr-col" data-astro-cid-l3trhy4j> <div class="short-url-qr" data-url="https://neo01.com/zh-CN/2020/02/oltp-vs-olap/" data-size="80" data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-btn" aria-label="View QR code full size" data-astro-cid-av7zekv5> <img src="" alt="QR code" width="80" height="80" data-astro-cid-av7zekv5> </button> </div> <div class="short-url-qr-lightbox" id="short-url-qr-lightbox" hidden data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-lightbox-close" aria-label="Close" data-astro-cid-av7zekv5>×</button> <img src="" alt="QR code full size" class="short-url-qr-lightbox-img" data-astro-cid-av7zekv5> <a href="#" class="short-url-qr-lightbox-link" target="_blank" data-astro-cid-av7zekv5>Open short URL</a> </div> <script type="module" src="/_astro/QrInFooter.astro_astro_type_script_index_0_lang.DCVJWpeH.js"></script> </div> <div class="footer-col footer-connect" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>关注</span> <div class="footer-connect-icons" data-astro-cid-l3trhy4j> <a href="https://github.com/neoalienson" target="_blank" rel="noopener" aria-label="GitHub" data-astro-cid-l3trhy4j><i class="fab fa-github" data-astro-cid-l3trhy4j></i></a> <a href="https://linkedin.com/in/neoalienson" target="_blank" rel="noopener" aria-label="LinkedIn" data-astro-cid-l3trhy4j><i class="fab fa-linkedin" data-astro-cid-l3trhy4j></i></a> <a href="/rss.xml" aria-label="RSS" data-astro-cid-l3trhy4j><i class="fas fa-rss" data-astro-cid-l3trhy4j></i></a> </div> </div> </div> <div class="footer-bottom-row" data-astro-cid-l3trhy4j> <span class="footer-legal-links" data-astro-cid-l3trhy4j>  <a href="/zh-CN/terms-and-conditions/" data-astro-cid-l3trhy4j>条款</a> <span class="link-sep" data-astro-cid-l3trhy4j>|</span> <a href="/zh-CN/cookie-policy/" data-astro-cid-l3trhy4j>Cookie 政策</a>  </span> <span class="footer-copyright" data-astro-cid-l3trhy4j>&copy; 2026 Neo Alienson. 保留所有权利。</span> </div> </div> </footer> <button id="back-to-top" class="back-to-top" style="--btt-size: 48px; --btt-bottom: 60px; --btt-right: 30px; --btt-circumference: 131.94689145077132;" aria-label="Back to top" data-astro-cid-c4zgazz7> <svg class="back-to-top-ring" viewBox="0 0 48 48" aria-hidden="true" data-astro-cid-c4zgazz7> <circle class="back-to-top-track" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-c4zgazz7></circle> <circle id="back-to-top-progress" class="back-to-top-progress" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="131.94689145077132" stroke-dashoffset="131.94689145077132" data-astro-cid-c4zgazz7></circle> </svg> <span class="back-to-top-face" aria-hidden="true" data-astro-cid-c4zgazz7> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-c4zgazz7> <path d="m18 15-6-6-6 6" data-astro-cid-c4zgazz7></path> </svg> </span> </button> <script>(function(){const threshold = 400;
+const circumference = 131.94689145077132;
+
+  (function () {
+    const THRESHOLD = threshold;
+    const CIRCUMFERENCE = circumference;
+
+    let docMaxScrollY = 0;
+    function updateDocMaxScrollY() {
+      docMaxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+    }
+    window.addEventListener('resize', updateDocMaxScrollY, { passive: true });
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(updateDocMaxScrollY).observe(document.documentElement);
+    }
+
+    function initBackToTop() {
+      const btn = document.getElementById('back-to-top');
+      if (!btn || btn.dataset.bttInit) return;
+      btn.dataset.bttInit = 'true';
+
+      const ring = document.getElementById('back-to-top-progress');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let ticking = false;
+      let visible = false;
+
+      btn.style.opacity = '0';
+      btn.style.translate = '0 2rem';
+      btn.style.pointerEvents = 'none';
+
+      function show() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 250ms cubic-bezier(0,0,0.2,1), translate 250ms cubic-bezier(0,0,0.2,1)';
+        btn.style.opacity = '1';
+        btn.style.translate = '0 0';
+        btn.style.pointerEvents = 'auto';
+        visible = true;
+      }
+
+      function hide() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 300ms cubic-bezier(0.4,0,1,1), translate 300ms cubic-bezier(0.4,0,1,1)';
+        btn.style.opacity = '0';
+        btn.style.translate = '0 2rem';
+        btn.style.pointerEvents = 'none';
+        visible = false;
+      }
+
+      function updateFrame() {
+        const pct = docMaxScrollY > 0 ? Math.min(1, Math.max(0, window.scrollY / docMaxScrollY)) : 0;
+        if (ring) {
+          ring.style.strokeDashoffset = String(CIRCUMFERENCE * (1 - pct));
+        }
+        if (window.scrollY > THRESHOLD) {
+          if (!visible) show();
+        } else {
+          if (visible) hide();
+        }
+        ticking = false;
+      }
+
+      function onScroll() {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(updateFrame);
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+
+      btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+      });
+
+      document.addEventListener('astro:before-swap', function () {
+        window.removeEventListener('scroll', onScroll);
+      }, { once: true });
+
+      requestAnimationFrame(function () {
+        updateDocMaxScrollY();
+        updateFrame();
+      });
+    }
+
+    document.addEventListener('astro:page-load', initBackToTop);
+    initBackToTop();
+  })();
+})();</script> </div>  <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_0_lang.ByB3VsLC.js"></script> <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_1_lang.DT7tPFqy.js"></script> </body> </html>
