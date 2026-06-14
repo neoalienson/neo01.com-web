@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["_astro/mermaid.core.vV5AEW_o.js","_astro/preload-helper.CVfkMyKi.js","_astro/_commonjsHelpers.CE1G-McA.js"])))=>i.map(i=>d[i]);
+import{_ as t}from"./preload-helper.CVfkMyKi.js";document.querySelector(".mermaid")&&t(()=>import("./mermaid.core.vV5AEW_o.js").then(e=>e.bE),__vite__mapDeps([0,1,2])).then(e=>{e.default.initialize({startOnLoad:!0,theme:"default",logLevel:"error"}),e.default.run()});
