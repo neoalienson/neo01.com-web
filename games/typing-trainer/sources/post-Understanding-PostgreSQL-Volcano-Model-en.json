@@ -1,0 +1,705 @@
+{
+  "sourceId": "post-Understanding-PostgreSQL-Volcano-Model-en",
+  "locale": "en",
+  "source": {
+    "kind": "single-post",
+    "postId": "Understanding-PostgreSQL-Volcano-Model"
+  },
+  "sentences": [
+    {
+      "text": "Every SQL query you run in PostgreSQL—whether a simple SELECT * FROM users or a 20-table join with window functions—executes through the same elegant mechanism: **the Volcano Model** (also known as the Iterator Model).↵This 1980s architecture is why PostgreSQL can:↵Stream gigabytes of results without loading everything into memory↵Stop early on LIMIT queries without processing all rows↵Chain operators flexibly without custom code for each combination↵But it's also why PostgreSQL struggles with certain analytical workloads where **vectorized execution** shines.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Here's the deep dive: how the Volcano Model works, why PostgreSQL chose it, and where it breaks down.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "The **Volcano Model** is an execution architecture where queries are represented as **trees of operators**, each exposing a standard interface: Next() (or GetNext() in PostgreSQL's codebase).↵Each operator:↵Requests rows from its child(ren) by calling Next() ↵Processes one row at a time↵Returns one row to its parent↵This **pull-based** model means data flows up the tree, one row per call, until the top node returns results to the client.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "The Volcano Model is often described using different terms.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Here's the precise classification:↵| Term | Is Volcano This?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "| Why |↵|------|------------------|-----|↵| **Execution Model** | ✅ **Most accurate** | Defines *how* computation proceeds (row-by-row, pull-based) |↵| **Architectural Pattern** | ✅ **Also correct** | Defines high-level structure (operator trees with standard interface) |↵| **Design Pattern** | ⚠️ **Partially** | Built *on top of* the Iterator Pattern, but more than just one pattern |↵| **Software Architecture** | ❌ **Too broad** | It's *part of* a database's architecture, not the whole architecture |↵| **Algorithm** | ❌ **No** | It's a structural framework, not a specific computational procedure |↵**The Relationship:**↵ ↵**Why the Confusion?**↵| Source | Uses Term | Reason |↵|--------|-----------|--------|↵| **Academic papers** | \"Execution Model\" | Focuses on computational semantics |↵| **Database vendors** | \"Architecture\" | Marketing; sounds more substantial |↵| **Software engineers** | \"Pattern\" | Familiar from design pattern vocabulary |↵| **PostgreSQL docs** | \"Executor\" | Implementation-focused naming |↵**The Precise Answer:**↵The Volcano Model is best described as an **architectural pattern for query execution** that:↵Uses the **Iterator Pattern** as its foundation↵Defines an **execution model** (pull-based, row-at-a-time)↵Is **part of** a database's overall software architecture↵Think of it like this:↵**Iterator Pattern** = \"How do I traverse a collection?\"↵**Volcano Model** = \"How do I compose operators to execute a query?\"↵**PostgreSQL Executor** = \"The actual code that implements Volcano\"↵---↵**Simple Example:**↵ ↵Executes as:↵ ↵**Execution Flow:**↵ ↵Each operator is **independent**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "The Filter doesn't know if data comes from a Seq Scan, Index Scan, or Join.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "The Projection doesn't know if data is filtered or raw.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "This **modularity** is the Volcano Model's superpower.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "In PostgreSQL's codebase, every executor node implements the same core interface:↵ ↵**The Contract:**↵| Return Value | Meaning |↵|--------------|---------|↵| Valid TupleTableSlot | One row of data |↵| NULL | No more rows (end of stream) |↵**Generic Execution Loop:**↵ ↵This loop—**call Next() , process row, repeat**—is the entire Volcano Model.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Every query, no matter how complex, reduces to this pattern.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "When you run a query, PostgreSQL's planner builds an **operator tree**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Each node is an executor type with specific logic.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "| Operator | What It Does | Calls Child How Many Times?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "|↵|----------|--------------|----------------------------|↵| **Seq Scan** | Reads table pages from disk | N/A (leaf node) |↵| **Index Scan** | Reads index, fetches heap tuples | N/A (leaf node) |↵| **Filter** | Applies WHERE clause | 1+ (until row passes filter) |↵| **Projection** | Selects/computes columns | 1 |↵| **Nested Loop Join** | For each outer row, scan inner | 1 outer + N inner |↵| **Hash Join** | Build hash table, probe | N (build phase) + N (probe phase) |↵| **Merge Join** | Merge-sorted inputs | 1 from each sorted input |↵| **Aggregate** | Groups and computes aggregates | N (until group complete) |↵| **Sort** | Sorts input, returns in order | N (buffer all, then return) |↵| **Limit** | Stops after N rows | N (passes through) |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "↵**Execution Plan (Simplified):**↵ ↵**Execution Flow (First Row):**↵ ↵Notice: **Sort must consume all input before returning anything**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "This is a **blocking operator**—it breaks the pure streaming model.↵:::question{title=\"Why Does This Matter?\"}↵Blocking operators like Sort , Hash Aggregate , and Hash Join (build phase) force PostgreSQL to **buffer data** before producing results.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "This means:↵**Memory pressure** — Must fit in work_mem or spill to disk↵**No early termination** — Can't stop early even with LIMIT ↵**Latency impact** — First row takes longer to return↵When you see these in EXPLAIN ANALYZE , ask: *\"Can I reduce the input size before this operator?\"*↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**1.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Memory Efficiency**↵Non-blocking operators stream rows without buffering:↵ ↵PostgreSQL can stop after finding 10 matching rows—no need to scan the entire table if matches are found early.↵**Memory Usage:** O(1) per operator (just current row state)",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---↵**2.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Modularity**↵Operators compose freely.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "The same Filter works with:↵Seq Scan↵Index Scan↵Any Join type↵Subquery results↵No custom code needed for each combination.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---↵**3.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Early Termination**↵ ↵Stops at the first matching row.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "No need to find all matches.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---↵**4.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Simple Implementation**↵Each operator is a self-contained function:↵ ↵~30 lines of code.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Easy to reason about.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Easy to debug.↵:::tip{title=\"Key Insight: Simplicity Enables Extensibility\"}↵Because each operator is so simple (~30-100 lines), PostgreSQL can add new operator types without rewriting the entire executor.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "This is why extensions can add custom scan methods, join types, and aggregation strategies.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "The Volcano Model's **uniform interface** is what makes PostgreSQL extensible.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**1.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Function Call Overhead**↵Every row requires:↵Next() call to child↵Next() call from parent↵Virtual function dispatch (in some implementations)↵For 1 million rows: **2 million function calls** just for plumbing.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---↵**2.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "No Vectorization**↵Modern CPUs excel at **SIMD** (Single Instruction, Multiple Data):↵ ↵Volcano's row-by-row model can't exploit SIMD because:↵Each row is processed independently↵No batch context for vectorization↵State is per-row, not per-batch↵---↵**3.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Cache Inefficiency**↵ ↵Columnar/vectorized engines process all values of one column together:↵ ↵---↵**4.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Blocking Operators Break Streaming**↵Some operators must consume all input before producing output:↵| Blocking Operator | Why It Blocks |↵|-------------------|---------------|↵| **Sort** | Must see all rows to determine order |↵| **Hash Aggregate** | Must see all rows in a group before computing aggregate |↵| **Hash Join (build phase)** | Must build entire hash table before probing |↵| **Distinct** | Must see all rows to eliminate duplicates |↵When a blocking operator is in the plan, **upstream operators can't stream**—they must buffer.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "In PostgreSQL's source code, the Volcano interface is ExecProcNode() :↵ ↵Each node type implements its own ExecProcNode :↵| Node Type | Implementation Function |↵|-----------|------------------------|↵| Seq Scan | ExecSeqScan() |↵| Index Scan | ExecIndexScan() |↵| Hash Join | ExecHashJoin() |↵| Aggregate | ExecAggregate() |↵| Sort | ExecSort() |↵| Filter | ExecFilter() |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "↵**Key Observations:**↵**Infinite loop** until a row passes or no more rows↵**Single row in, single row out**↵**Stateless** between calls (except for stats)↵**Delegates to child** via ExecProcNode(outerPlan(node)) ↵This pattern repeats across ~50 executor node types.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "| Workload | Why |↵|----------|-----|↵| **OLTP** (short, selective queries) | Few rows processed; function call overhead negligible |↵| **Index scans with LIMIT** | Early termination; minimal I/O |↵| **Streaming large results** | No buffering; constant memory |↵| **Complex joins with selective filters** | Filters reduce rows before expensive joins |↵**Example: OLTP Query**↵ ↵Index Scan finds matching row in ~3 I/O operations↵Filter applies status = 'pending' ↵Limit stops after first match↵**Total rows processed:** 1-5↵**Volcano overhead:** Negligible↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "| Workload | Why |↵|----------|-----|↵| **Analytical** (scan millions of rows) | Function call overhead dominates |↵| **Columnar access patterns** | Row-by-row prevents column vectorization |↵| **Bulk aggregations** | No batch processing for SIMD |↵| **Full table scans with simple filters** | 90% of time in Next() plumbing |↵**Example: Analytical Query**↵ ↵Scans 100 million rows↵Each row: Next() call, filter check, date truncation, aggregation↵**Function calls:** 200+ million (2 per row)↵**Volcano overhead:** 20-40% of total time↵:::warning{title=\"The Hidden Cost: Not Just Function Calls\"}↵The function call overhead is only part of the problem.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Row-by-row processing also means:↵**Branch misprediction** — CPU can't predict which path each row takes↵**SIMD underutilization** — Modern CPUs can process 4-8 values in parallel, but Volcano uses scalar operations↵**Cache thrashing** — Each row may touch different memory locations↵For analytical queries, these CPU-level inefficiencies often matter more than the function call count itself.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**Vectorized engines** (ClickHouse, DuckDB, Snowflake) process rows in **batches** (typically 1024-8192 rows):↵ ↵**Execution:**↵ ↵**Benefits:**↵| Aspect | Volcano (Row) | Vectorized (Batch) |↵|--------|---------------|-------------------|↵| Function calls per row | 2+ | 2 / batch_size (~0.002) |↵| SIMD utilization | None | High (process 4-8 values per instruction) |↵| Cache efficiency | Poor (row layout) | High (column layout) |↵| Code complexity | Low | High (batch management, vectorization) |↵:::question{title=\"So Why Doesn't PostgreSQL Switch?\"}↵If vectorization is 5-10x faster for analytics, why not adopt it?↵**Backward compatibility** — Extensions rely on the current ExecProcNode() API↵**Code complexity** — Rewriting 50+ node types is a massive undertaking↵**OLTP trade-off** — Vectorization helps analytics but can hurt OLTP latency↵**Philosophy** — PostgreSQL prefers stable, incremental improvements↵The answer: **Extensions, not core changes**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "See the next section.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**1.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Historical Reasons**↵PostgreSQL's executor was designed in the 1980s-1990s, before SIMD and columnar storage were mainstream.↵**2.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Architecture Coupling**↵Vectorization requires:↵Columnar storage (or row-to-column conversion)↵Batch-aware operators (rewriting ~50 node types)↵Vectorized expression evaluation (rewriting expression engine)↵**3.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "OLTP Focus**↵PostgreSQL optimizes for mixed workloads, not just analytics.↵**4.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Extension Approach**↵Instead of rewriting the core, PostgreSQL supports extensions:↵**Columnar storage:** Citus Columnar, Hydra↵**Vectorized execution:** Experimental patches (not merged)↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Some databases blend Volcano with vectorization:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**Volcano-style** iterator interface↵**Vectorized readers** (Parquet, ORC)↵**Whole-stage code generation** (fuses operators, eliminates Next() calls)",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**Vectorized execution** as default↵**Volcano-style** operator trees↵**Chunk-based** processing (2048 rows per chunk)",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**Volcano model** throughout↵**Just-in-Time compilation** (LLVM) for expression evaluation↵**Parallel query** for some operations (parallel Seq Scan, Hash Join, Aggregate)↵**JIT Compilation Example:**↵ ↵PostgreSQL compiles the expression amount * 1.15 to native machine code, reducing interpretation overhead.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "This doesn't fix Volcano's row-by-row model, but it helps.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**1.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Push Filters Down**↵ ↵:::tip{title=\"Trust But Verify\"}↵PostgreSQL's planner is smart about pushing filters down, but **not always optimal**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Use EXPLAIN (ANALYZE, BUFFERS) to verify:↵Filter appears **before** expensive operations (Join, Sort, Aggregate)↵Rows Removed by Filter is reasonable (not scanning millions just to filter out 99%)↵If the planner gets it wrong, try:↵**CTEs** (in PG14+, they act as optimization fences)↵**Subqueries** to force evaluation order↵**Partial indexes** to make filtered scans cheaper↵:::↵---↵**2.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Use Indexes to Reduce Rows**↵ ↵**3.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Avoid Unnecessary Blocking Operators**↵ ↵**4.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Leverage Parallel Query**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**Short answer:** Not to the core, but extensions are experimenting.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "| Project | Approach | Status |↵|---------|----------|--------|↵| **Citus Columnar** | Columnar storage with row-by-row execution | Production |↵| **Hydra** | Columnar storage for analytics | Production |↵| **pg_vectorize** | Vectorized expression evaluation | Experimental |↵| **LLVM JIT** | Compiled expressions (not vectorized) | Production (PG11+) |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "**Backward compatibility** — Extensions rely on current executor API↵**Complexity** — Rewriting 50+ node types is a massive undertaking↵**Trade-offs** — Vectorization helps analytics, hurts OLTP latency↵**Philosophy** — PostgreSQL prefers stable, incremental improvements↵**Most likely path:** Vectorization via extensions, not core changes.↵:::info{title=\"What This Means for You\"}↵Don't wait for vectorization in PostgreSQL core.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Instead:↵**For OLTP:** Volcano works great—focus on indexing and query design↵**For Analytics:** Use extensions (Citus Columnar, Hydra) or purpose-built tools (DuckDB, ClickHouse)↵**For Mixed Workloads:** Leverage JIT compilation and parallel query↵The right tool depends on your query patterns, not just raw performance benchmarks.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "↵**Key Takeaways:**↵| Aspect | Volcano Model |↵|--------|---------------|↵| **Interface** | Next() / GetNext() — one row at a time |↵| **Structure** | Tree of operators |↵| **Data flow** | Pull-based (child → parent) |↵| **Memory** | O(1) for streaming, O(N) for blocking operators |↵| **Best for** | OLTP, selective queries, streaming |↵| **Worst for** | Analytical, full scans, bulk aggregations |↵| **PostgreSQL status** | Core execution model since inception |↵The Volcano Model isn't perfect—but after 40+ years, it's still the foundation of most SQL databases.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "Understanding it helps you write queries that work *with* PostgreSQL's architecture, not against it.↵:::success{title=\"Key Takeaway\"}↵The Volcano Model is a **trade-off**, not a mistake:↵**Gains:** Simplicity, extensibility, streaming, early termination↵**Losses:** Function call overhead, no SIMD, cache inefficiency↵For OLTP and mixed workloads, the gains outweigh the losses.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "For pure analytics, consider columnar/vectorized alternatives.↵**Your job as a PostgreSQL user:** Know which queries play to Volcano's strengths—and which ones fight against it.↵:::↵---↵**Further Reading:**↵Graefe, Goetz.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    },
+    {
+      "text": "\"Volcano—An Extensible and Parallel Query Evaluation System\" (1994) — The original paper↵PostgreSQL Source: src/backend/executor/ — Actual implementation↵\"PostgreSQL Internals\" by Egor Rogov — Deep dive into executor architecture↵DuckDB Documentation: \"Vectorized Execution\" — Alternative approach",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Volcano-Model",
+        "title": "Understanding PostgreSQL's Volcano Model: The Iterator Execution Architecture",
+        "url": "/blog/Understanding-PostgreSQL-Volcano-Model/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 77
+}

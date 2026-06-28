@@ -1,0 +1,381 @@
+{
+  "sourceId": "post-Database-Rust-B-Plus-Tree-Index-Concurrent-Access-en",
+  "locale": "en",
+  "source": {
+    "kind": "single-post",
+    "postId": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access"
+  },
+  "sentences": [
+    {
+      "text": "In Part 1, we built the foundation: page-based storage and a buffer pool.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "But there's a problem.↵**Finding a row requires a full table scan:**↵ ↵For a table with 1 million rows?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "That's 1 million comparisons.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "On disk?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Unacceptable.**↵Real databases use **indexes** to find rows in O(log n) time.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "PostgreSQL's default: **B+Tree**.↵Today: implementing a thread-safe B+Tree index in Rust, integrated with our buffer pool.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "And yes, concurrent access is as hard as it sounds.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "| Index Type | Lookup | Range Scan | Insert | Use Case |↵|------------|--------|------------|--------|----------|↵| **Hash Table** | O(1) | ❌ Not supported | O(1) | Exact match only |↵| **B+Tree** | O(log n) | ✅ Excellent | O(log n) | General purpose |↵| **LSM Tree** | O(log n) | ⚠️ Compaction needed | O(1) amortized | Write-heavy (RocksDB) |↵| **Skip List** | O(log n) | ✅ Good | O(log n) | In-memory (Redis) |↵**PostgreSQL chose B+Tree because:**↵| Reason | Why It Matters |↵|--------|----------------|↵| **Balanced** | All leaf nodes at same depth—predictable performance |↵| **Range queries** | Leaf nodes linked—efficient WHERE id BETWEEN 10 AND 100 |↵| **Disk-friendly** | High fanout (100s of keys per node)—shallow trees |↵| **Self-balancing** | No manual reorganization needed |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**Key properties:**↵| Property | Value in Vaultgres |↵|----------|-------------------|↵| **Order (fanout)** | ~500 keys per internal node (8KB page) |↵| **Height** | 3-4 levels for 1 billion keys |↵| **Leaf nodes** | Contain actual data pointers (TIDs) |↵| **Internal nodes** | Only keys + child pointers (routing) |↵| **Linked leaves** | Each leaf points to next—range scans without tree traversal |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "Each node fits in one 8KB page:↵ ↵**Key layout inside a page:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "For an index on users.id (integer):↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**Complexity:** O(log_f n) where f = fanout (~500).",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "For 1 billion keys: **~4 page accesses.**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "Insertion is where B+Trees get complicated:↵ ↵**Step-by-step example:**↵ ↵**Correct split:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Naive approach: lock the entire tree**↵ ↵**Result:** One operation at a time.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "Defeats the purpose of a database.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Lock coupling:** Hold locks on at most two adjacent nodes during traversal.↵ ↵**Rust implementation:**↵ ↵:::warning{title=\"Lock Upgrade Deadlock\"}↵**Problem:** Upgrading from read lock to write lock while holding other locks can deadlock.↵**Solution in Vaultgres:** Use parking_lot::RwLock with upgradable_read() or release and re-acquire (with optimistic retry).↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Scenario: Two threads split the same node**↵ ↵**Solution: Check conditions after acquiring locks**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "For SELECT * FROM users WHERE id BETWEEN 10 AND 100 :↵**Without leaf links:** Must traverse tree for each key.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "O(n log n).↵**With leaf links:** Find start key once, then scan leaves.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "O(log n + k).",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**Usage:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "The buffer pool now handles multiple page types:↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Problem:** Index scans can evict hot data pages.↵ ↵**Solution: Clock-sweep with usage hints**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Problem:** Nodes need to reference their parent/children, but Rust's borrow checker hates this.↵ ↵**Solution: Page IDs as indirect references**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Problem:** Deadlock if threads acquire locks in different order.↵ ↵**Solution: Always lock in consistent order (parent before child)**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**Problem:** A split touches multiple pages.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "How to make it atomic?↵ ↵**Solution: WAL before modifying pages**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "| Task | AI Contribution |↵|------|-----------------|↵| **Lock coupling algorithm** | Explained the pattern with pseudocode |↵| **Split logic** | Generated correct key redistribution |↵| **Rust patterns** | Suggested parking_lot over std::sync |↵| **Debugging help** | \"This deadlock happens because...\" |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "| Issue | What Happened |↵|-------|---------------|↵| **Initial lock upgrade** | Suggested RwLock::upgrade() which doesn't exist in std |↵| **Page layout** | First draft had keys and values interleaved (cache-unfriendly) |↵| **Split edge cases** | Missed the \"root split\" special case |↵**Pattern:** AI provides 80% of the solution.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "The remaining 20% requires deep understanding.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**My question to AI:**↵\"Two threads can split the same leaf simultaneously, causing duplicate keys.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "How does PostgreSQL prevent this?\"↵**What I learned:**↵PostgreSQL uses **latch-based synchronization** on buffer pins↵Before splitting, check if the split has already happened↵Use **short-term locks** released after each level↵**Result:** Added the re-check logic in split_leaf() :↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**Key Takeaways:**↵| Concept | Why It Matters |↵|---------|----------------|↵| **B+Tree** | O(log n) lookups, efficient range scans |↵| **Lock coupling** | Fine-grained locking without deadlocks |↵| **Leaf links** | Range scans without tree traversal |↵| **WAL integration** | Atomic splits, crash recovery |↵| **Rust challenges** | Borrow checker, lock ordering, self-referential structs |↵---↵**Further Reading:**↵PostgreSQL Source: src/backend/access/nbtree/ ↵\"The Art of Computer Programming, Vol.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "3\" by Knuth (B-Trees)↵\"Database Management Systems\" by Ramakrishnan (Ch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "10: Tree-Structured Indexing)↵\"Efficient and Safe B+Tree Implementation\" by PostgreSQL contributors↵Vaultgres Repository: github.com/neoalienson/Vaultgres",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Database in Rust: B+Tree Indexes with Concurrent Access",
+        "url": "/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 41
+}

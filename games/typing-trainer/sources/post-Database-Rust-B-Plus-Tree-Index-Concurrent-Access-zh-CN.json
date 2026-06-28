@@ -1,0 +1,372 @@
+{
+  "sourceId": "post-Database-Rust-B-Plus-Tree-Index-Concurrent-Access-zh-CN",
+  "locale": "zh-CN",
+  "source": {
+    "kind": "single-post",
+    "postId": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access"
+  },
+  "sentences": [
+    {
+      "text": "在 第一部分 中，我们建立了基础：页面式存储和缓冲池。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "但有个问题。↵**寻找一列需要完整表扫描：**↵ ↵对于有 100 万列的表？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "那是 100 万次比较。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "在磁盘上？**无法接受。**↵真正的数据库使用**索引**在 O(log n) 时间内找到列。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "PostgreSQL 的默认：**B+Tree**。↵今天：在 Rust 中实现线程安全的 B+Tree 索引，并与我们的缓冲池集成。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "是的，并发访问和听起来一样困难。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "| 索引类型 | 查询 | 范围扫描 | 插入 | 使用场景 |↵|------------|--------|------------|--------|----------|↵| **哈希表** | O(1) | ❌ 不支持 | O(1) | 仅精确匹配 |↵| **B+Tree** | O(log n) | ✅ 优秀 | O(log n) | 通用 |↵| **LSM Tree** | O(log n) | ⚠️ 需要压缩 | O(1) 平均 | 写入密集 (RocksDB) |↵| **跳跃表** | O(log n) | ✅ 良好 | O(log n) | 内存中 (Redis) |↵**PostgreSQL 选择 B+Tree 因为：**↵| 原因 | 为什么重要 |↵|--------|----------------|↵| **平衡** | 所有叶节点在同一深度——可预测的性能 |↵| **范围查询** | 叶节点链接——高效的 WHERE id BETWEEN 10 AND 100 |↵| **磁盘友好** | 高扇出（每个节点数百个键）——浅树 |↵| **自我平衡** | 不需要手动重组 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**关键属性：**↵| 属性 | Vaultgres 中的值 |↵|----------|-------------------|↵| **阶数 (扇出)** | 每个内部节点约 500 个键 (8KB 页面) |↵| **高度** | 10 亿个键需要 3-4 层 |↵| **叶节点** | 包含实际数据指针 (TID) |↵| **内部节点** | 仅键 + 子指针 (路由) |↵| **链接叶子** | 每个叶子指向下一个——无需树遍历的范围扫描 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "每个节点适合一个 8KB 页面：↵ ↵**页面内的关键布局：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "对于 users.id (整数) 的索引：↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**复杂度：** O(log_f n)，其中 f = 扇出 (~500)。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "对于 10 亿个键：**约 4 次页面访问。**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "插入是 B+Tree 变得复杂的地方：↵ ↵**逐步示例：**↵ ↵**正确的分裂：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**天真方法：锁定整棵树**↵ ↵**结果：** 一次一个操作。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "违背了数据库的目的。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**锁耦合：** 在遍历期间最多保持两个相邻节点的锁。↵ ↵**Rust 实现：**↵ ↵:::warning{title=\"锁升级死锁\"}↵**问题：** 在持有其他锁的同时从读锁升级到写锁可能会导致死锁。↵**Vaultgres 中的解决方案：** 使用 parking_lot::RwLock 搭配 upgradable_read() 或释放并重新获取（带有乐观重试）。↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**情景：两个线程分裂同一个节点**↵ ↵**解决方案：获取锁后检查条件**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "对于 SELECT * FROM users WHERE id BETWEEN 10 AND 100 ：↵**没有叶子链接：** 必须为每个键遍历树。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "O(n log n)。↵**有叶子链接：** 找到起始键一次，然后扫描叶子。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "O(log n + k)。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**使用：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "缓冲池现在处理多种页面类型：↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**问题：** 索引扫描可能会淘汰热门数据页面。↵ ↵**解决方案：带使用提示的时钟扫描**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**问题：** 节点需要引用其父节点/子节点，但 Rust 的借用检查器讨厌这个。↵ ↵**解决方案：页面 ID 作为间接引用**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**问题：** 如果线程以不同顺序获取锁则会死锁。↵ ↵**解决方案：始终以一致顺序锁定（父节点先于子节点）**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**问题：** 分裂会触及多个页面。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "如何使其原子化？↵ ↵**解决方案：在修改页面前写入 WAL**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "| 任务 | AI 贡献 |↵|------|-----------------|↵| **锁耦合算法** | 用伪代码解释模式 |↵| **分裂逻辑** | 生成正确的键重新分配 |↵| **Rust 模式** | 建议使用 parking_lot 而非 std::sync |↵| **调试协助** | “这个死锁发生是因为...” |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "| 问题 | 发生了什么 |↵|-------|---------------|↵| **初始锁升级** | 建议使用 RwLock::upgrade() 但在 std 中不存在 |↵| **页面布局** | 初稿将键和值交错（缓存不友好） |↵| **分裂边界情况** | 忽略了“根分裂”特殊情况 |↵**模式：** AI 提供 80% 的解决方案。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "剩余 20% 需要深入理解。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "**我问 AI 的问题：**↵\"两个线程可以同时分裂同一个叶子，导致重复键。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "PostgreSQL 如何防止这种情况？\"↵**我学到的：**↵PostgreSQL 在缓冲钉选上使用**基于闩锁的同步**↵分裂前，检查分裂是否已经发生↵使用**短期锁**，每层后释放↵**结果：** 在 split_leaf() 中添加了重新检查逻辑：↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "↵**关键要点：**↵| 概念 | 为什么重要 |↵|---------|----------------|↵| **B+Tree** | O(log n) 查询，高效范围扫描 |↵| **锁耦合** | 细粒度锁定无死锁 |↵| **叶子链接** | 无需树遍历的范围扫描 |↵| **WAL 集成** | 原子分裂，崩溃恢复 |↵| **Rust 挑战** | 借用检查器、锁顺序、自引用结构 |↵---↵**进一步阅读：**↵PostgreSQL Source: src/backend/access/nbtree/ ↵\"The Art of Computer Programming, Vol.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "3\" by Knuth (B-Trees)↵\"Database Management Systems\" by Ramakrishnan (Ch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    },
+    {
+      "text": "10: Tree-Structured Indexing)↵\"Efficient and Safe B+Tree Implementation\" by PostgreSQL contributors↵Vaultgres Repository: github.com/neoalienson/Vaultgres",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-B-Plus-Tree-Index-Concurrent-Access",
+        "title": "Rust 构建数据库：B+Tree 索引与并发访问",
+        "url": "/zh-CN/blog/Database-Rust-B-Plus-Tree-Index-Concurrent-Access/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 40
+}

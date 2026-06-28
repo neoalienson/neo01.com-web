@@ -1,0 +1,489 @@
+{
+  "sourceId": "post-Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool-en",
+  "locale": "en",
+  "source": {
+    "kind": "single-post",
+    "postId": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool"
+  },
+  "sentences": [
+    {
+      "text": "Simple websites no longer satisfy my hunger for knowledge.↵After years of building web applications—REST APIs, GraphQL services, microservices with AI and Agentic AI—I hit a wall.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "I could *use* databases fluently, but I couldn't *build* one.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "The internals remained a black box: How does PostgreSQL actually store data on disk?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "How does the buffer pool manage memory?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "How does WAL ensure durability?↵So I started building **Vaultgres**—a PostgreSQL-compatible database in Rust.↵This isn't another toy key-value store.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "The goal is PostgreSQL compatibility: wire protocol, query language, and eventually, storage format.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Why?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Because PostgreSQL's architecture is battle-tested, and compatibility means real applications could (theoretically) connect without modification.↵This series documents the journey: the design decisions, the bugs, the \"aha!\" moments, and how I'm leveraging AI to accelerate learning while still doing the hard work myself.↵Today: **page-based storage and buffer pool**—the foundation every database is built on.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Imagine storing data directly to disk as a continuous stream:↵ ↵**Problems:**↵| Issue | Why It Matters |↵|-------|----------------|↵| **No structure** | Can't find row N without scanning from the beginning |↵| **No concurrency** | One writer locks the entire file |↵| **No crash recovery** | Partial writes corrupt everything |↵| **No caching** | Must read entire file to access one row |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "PostgreSQL divides data into **fixed-size pages** (typically 8KB):↵ ↵**Each page contains:**↵ ↵**Benefits:**↵| Benefit | Why It Matters |↵|---------|----------------|↵| **Random access** | Read page N directly: seek(N * 8KB) |↵| **Fine-grained locking** | Lock individual pages, not entire tables |↵| **Efficient caching** | Cache hot pages in memory (buffer pool) |↵| **Crash recovery** | WAL records reference specific pages |↵| **Standardization** | All pages same size—simplifies memory management |↵:::info{title=\"Why 8KB?\"}↵PostgreSQL uses 8KB pages by default (configurable with BLCKSZ at compile time).↵**Trade-offs:**↵| Page Size | Pros | Cons |↵|-----------|------|------|↵| Small (4KB) | Less internal fragmentation, finer locking | More pages to manage, larger headers |↵| Medium (8KB) | Balanced | Default for good reason |↵| Large (32KB+) | Fewer pages, better sequential scan | More wasted space per page |↵Vaultgres uses 8KB to match PostgreSQL—compatibility over optimization.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Every page starts with a header:↵ ↵**Visual layout:**↵ ↵**Key insight:** Items grow **upward** from the bottom, ItemId array grows **downward** from the top.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Free space is between them.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "This maximizes space utilization.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Each ItemId is a 4-byte pointer:↵ ↵**Why indirection?**↵| Reason | Explanation |↵|--------|-------------|↵| **Move items without changing references** | Update lp_off when item moves |↵| **Mark items as deleted** | Set lp_len = 0 without overwriting data |↵| **Support HOT (Heap Only Tuple)** | Critical for PostgreSQL performance |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Here's how Vaultgres represents a page:↵ ↵:::warning{title=\"Unsafe Rust for Performance\"}↵Yes, this uses unsafe .",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Why?↵**Zero-copy access** to page data↵**Exact memory layout** matching PostgreSQL's on-disk format↵**Performance** critical—pages are accessed millions of times↵**Safety guarantees:**↵#[repr(C)] ensures predictable layout↵All accesses are within bounds (checked by free_space() )↵Page is always initialized before use↵This is the kind of code where AI assistance is invaluable: I can ask \"Is this unsafe block sound?\" and get a detailed analysis.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "| Storage | Latency | Relative Speed |↵|---------|---------|----------------|↵| CPU Cache (L1) | ~1ns | 1x |↵| RAM | ~100ns | 100x slower |↵| NVMe SSD | ~100μs | 100,000x slower |↵| HDD | ~10ms | 10,000,000x slower |↵**Without a buffer pool:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "A **buffer pool** caches frequently accessed pages in RAM:↵ ↵**With a buffer pool:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵**Components:**↵| Component | Purpose |↵|-----------|---------|↵| **Buffer Frames** | Fixed-size slots holding pages (e.g., 1024 frames × 8KB = 8MB) |↵| **Page Table** | Maps page ID → buffer frame (hash table) |↵| **LRU List** | Tracks access order for eviction |↵| **Dirty Bit** | Marks pages that need to be written back |↵| **Pin Count** | Prevents eviction of in-use pages |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵:::tip{title=\"Key Design Decisions\"}↵**1.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Fine-grained locking:** Each BufferFrame has its own Mutex , not one lock for the entire pool.↵**2.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "ARC for shared access:** Arc<Mutex<Page>> allows multiple threads to hold the same page.↵**3.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Pin count:** Prevents eviction while a thread is using the page.↵**4.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "LRU eviction:** Least recently used pages are evicted first.↵These decisions came from asking AI: \"How would you design a thread-safe buffer pool in Rust?\" and then iterating on the answer based on PostgreSQL's actual implementation.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "PostgreSQL stores each table/index in a separate file:↵ ↵Vaultgres follows the same pattern:↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Vaultgres encodes table ID and page number into a single u64 :↵ ↵**Why?**↵| Reason | Explanation |↵|--------|-------------|↵| **Single identifier** | Simplifies buffer pool and page table |↵| **Efficient hashing** | u64 is faster than (u32, u32) tuple |↵| **PostgreSQL compatible** | Similar to PostgreSQL's BlockId |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Without WAL:↵ ↵**Or worse:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**WAL Principle:** Before modifying a page, write the change to a log:↵ ↵**After crash:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵:::warning{title=\"WAL Is Hard\"}↵Implementing WAL correctly is one of the hardest parts of building a database:↵**Logical vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Physical WAL:** Log operations (INSERT row) or page changes (bytes X→Y)?↵**ARIES recovery:** Undo uncommitted, redo committed (PhD thesis territory)↵**Checkpointing:** How often?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Fuzzy or sharp?↵**Log truncation:** When can old WAL files be deleted?↵Vaultgres will start with a simple physical WAL (page images) and evolve from there.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "AI has been invaluable for understanding the trade-offs here.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**Problem:** Buffer pool needs to share pages across threads, but Rust's ownership system fights this.↵ ↵**Trade-offs:**↵| Approach | Pros | Cons |↵|----------|------|------|↵| Arc<Mutex<T>> | Safe, familiar | Lock contention |↵| RwLock<T> | Better for read-heavy | Write starvation |↵| Lock-free (unsafe) | Maximum performance | Complex, error-prone |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**Problem:** PostgreSQL uses raw pointers for page access.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Rust wants bounds checks.↵ ↵**Vaultgres approach:** Start safe, optimize hot paths with unsafe after profiling.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**Problem:** PostgreSQL uses elog(ERROR, ...) .",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Rust uses Result<T, E> .↵ ↵**Impact:** Every function signature changes.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Call chains become Result pyramids.↵**Solution:** Use ?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "operator liberally, define clear error types:↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "| Task | How I Use AI |↵|------|--------------|↵| **Explaining concepts** | \"Explain PostgreSQL's buffer pool replacement strategies\" |↵| **Code review** | \"Is this unsafe block sound?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "What could go wrong?\" |↵| **Generating boilerplate** | \"Generate a Rust struct for PostgreSQL PageHeader\" |↵| **Debugging help** | \"Why does this deadlock?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Here's my lock order...\" |↵| **Comparing approaches** | \"LRU vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Clock vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "FIFO for buffer pool eviction\" |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "| Skill | Why It's Still On Me |↵|-------|----------------------|↵| **System design** | AI can't decide overall architecture |↵| **Trade-off analysis** | \"Should I prioritize compatibility or performance?\" |↵| **Testing** | AI can't run benchmarks or find race conditions |↵| **Debugging** | AI can't attach gdb or read core dumps |↵| **Learning** | I still have to understand every line AI generates |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**My question to AI:**↵\"PostgreSQL uses a clock-sweep algorithm for buffer pool eviction, not pure LRU.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Why?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "What are the trade-offs?\"↵**What I learned:**↵**LRU problem:** Sequential scans evict everything (scan resistance)↵**Clock-sweep:** Approximates LRU but cheaper (no linked list updates)↵**Usage count:** Pages get multiple chances before eviction↵**PostgreSQL's variant:** Also considers pin count and dirty status↵**Result:** I implemented clock-sweep instead of LRU in Vaultgres:↵ ↵This is the pattern: AI explains, I implement, I test, I learn.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵**Key Takeaways:**↵| Concept | Why It Matters |↵|---------|----------------|↵| **Page-based storage** | Random access, fine-grained locking, efficient caching |↵| **Buffer pool** | 1000x faster than disk access for hot pages |↵| **LRU/Clock eviction** | Keep frequently used pages, evict cold ones |↵| **WAL** | Durability without sacrificing performance |↵| **Rust challenges** | Ownership, safety, zero-copy—trade-offs everywhere |↵---↵**Further Reading:**↵PostgreSQL Source: src/include/storage/bufpage.h ↵PostgreSQL Source: src/backend/storage/buffer/ ↵\"Database Management Systems\" by Ramakrishnan & Gehrke (Ch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "9: Storage and Indexing)↵\"Readings in Database Systems\" (Red Book) - Buffer Pool chapter↵Vaultgres Repository: github.com/neoalienson/Vaultgres",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "Building a PostgreSQL-Compatible Database in Rust: Page-Based Storage and Buffer Pool",
+        "url": "/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 53
+}

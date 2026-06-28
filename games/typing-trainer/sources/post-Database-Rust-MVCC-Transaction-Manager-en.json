@@ -1,0 +1,831 @@
+{
+  "sourceId": "post-Database-Rust-MVCC-Transaction-Manager-en",
+  "locale": "en",
+  "source": {
+    "kind": "single-post",
+    "postId": "Database-Rust-MVCC-Transaction-Manager"
+  },
+  "sentences": [
+    {
+      "text": "↵In Part 2, we built a concurrent B+Tree index.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "But there's a fundamental problem with our approach.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Readers block writers.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "Writers block readers.**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "This is unacceptable for a real database.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "PostgreSQL handles **thousands of concurrent transactions** with readers never blocking writers.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "How?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**MVCC: Multi-Version Concurrency Control.**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "Today: implementing MVCC in Rust with snapshot isolation, transaction management, and confronting the nightmare of transaction ID wraparound.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Traditional locking (2PL):**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**MVCC approach:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Every row has multiple versions:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Transaction metadata:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Field | Meaning |↵|-------|---------|↵| xmin | Transaction ID that created this version |↵| xmax | Transaction ID that deleted this version (NULL = still alive) |↵| cmin | Command ID within transaction (for statement-level visibility) |↵| cmax | Command ID that deleted this version |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Problem:** u32 wraps at 4 billion.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "What happens then?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Answer:** Catastrophe.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "We'll handle this later.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "A **snapshot** captures which transactions are visible:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Visual example:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Page layout with MVCC:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**WAL record for insert:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Update is actually delete + insert:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Example scenario:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Row State | Transaction State | Visible?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "|↵|-----------|-------------------|----------|↵| xmin < snapshot.xmin , xmax = 0 | Committed | ✅ Yes |↵| xmin < snapshot.xmin , xmax < snapshot.xmin | Committed | ❌ No (deleted) |↵| xmin < snapshot.xmin , xmin in active | In Progress | ❌ No |↵| xmin >= snapshot.xmax | Any | ❌ No (future) |↵| xmin = current_txn | Current | ✅ Yes (own changes) |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Without VACUUM:** Table grows forever.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "Performance degrades.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**VACUUM doesn't lock:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Operation | Lock Level |↵|-----------|------------|↵| Regular VACUUM | ShareUpdateExclusiveLock (allows reads/writes) |↵| VACUUM FULL | AccessExclusiveLock (blocks everything) |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**PostgreSQL's solution: 2-phase transaction IDs**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Vacuum freeze:** Mark very old transactions as \"frozen\"",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Frozen rows are always visible:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**PostgreSQL's default thresholds:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Parameter | Default | Meaning |↵|-----------|---------|---------|↵| autovacuum_vacuum_threshold | 50 | Min dead tuples before vacuum |↵| autovacuum_vacuum_scale_factor | 0.2 | +20% of table size |↵| autovacuum_freeze_max_age | 200M | Max transactions before forced freeze |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read |↵|-----------------|------------|---------------------|--------------|↵| Read Uncommitted | Possible | Possible | Possible |↵| Read Committed | ❌ Prevented | Possible | Possible |↵| Repeatable Read | ❌ Prevented | ❌ Prevented | Possible |↵| Serializable | ❌ Prevented | ❌ Prevented | ❌ Prevented |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**PostgreSQL uses MVCC for all isolation levels:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Isolation Level | Implementation |↵|-----------------|----------------|↵| Read Uncommitted | Same as Read Committed |↵| Read Committed | Fresh snapshot per statement |↵| Repeatable Read | Single snapshot per transaction |↵| Serializable | Single snapshot + predicate locking |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**On conflict:** Abort one transaction with serialization_failure error.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Problem:** Snapshots need to outlive the transaction that created them.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Solution: Owned snapshots**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Problem:** Multiple threads need to see consistent transaction state.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Solution: Atomic state with proper ordering**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Problem:** How to vacuum while transactions are reading?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Solution: Two-phase vacuum**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Task | AI Contribution |↵|------|-----------------|↵| **Visibility rules** | Generated correct xmin/xmax logic |↵| **Wraparound handling** | Explained 2's complement trick |↵| **Snapshot structure** | Suggested xmin/xmax/active pattern |↵| **VACUUM design** | Outlined two-phase approach |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Issue | What Happened |↵|-------|---------------|↵| **Initial visibility** | First draft didn't handle own uncommitted writes |↵| **Freeze logic** | Missed that frozen rows need special handling in visibility |↵| **Serializable isolation** | Suggested full serializability without predicate locking (wrong!) |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Pattern:** MVCC is subtle.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "AI gets the 80% case.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "Edge cases require deep understanding.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**My question to AI:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "\"Transaction A inserts a row, then selects it.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "But the select doesn't see the row.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "Why?\"",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**What I learned:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "Transactions must see their **own** uncommitted writes↵Need to track current_transaction_id in snapshot↵Visibility check needs special case for row_xmin == my_xid",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Result:** Fixed is_visible() :",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Key Takeaways:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "| Concept | Why It Matters |↵|---------|----------------|↵| **MVCC** | Readers don't block writers, writers don't block readers |↵| **Snapshots** | Consistent view of data at a point in time |↵| **Transaction IDs** | Track version creation/deletion |↵| **VACUUM** | Reclaim space from dead versions |↵| **Wraparound** | 4 billion transaction limit requires freezing |↵| **Isolation levels** | Trade-off between consistency and concurrency |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "**Further Reading:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "PostgreSQL Source: src/backend/access/heap/heapam_visibility.c ↵PostgreSQL Source: src/backend/access/transam/ ↵\"A Critique of ANSI SQL Isolation Levels\" by Berenson et al.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "(1995)↵\"Database Management Systems\" by Ramakrishnan (Ch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "16: Concurrency Control)↵\"The PostgreSQL Book\" by Worsley & Morin (Ch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    },
+    {
+      "text": "13: MVCC)↵Vaultgres Repository: github.com/neoalienson/Vaultgres↵",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-MVCC-Transaction-Manager",
+        "title": "Database in Rust: MVCC and Transaction Management",
+        "url": "/blog/Database-Rust-MVCC-Transaction-Manager/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 91
+}

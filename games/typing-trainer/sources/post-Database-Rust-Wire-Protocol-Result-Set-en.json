@@ -1,0 +1,705 @@
+{
+  "sourceId": "post-Database-Rust-Wire-Protocol-Result-Set-en",
+  "locale": "en",
+  "source": {
+    "kind": "single-post",
+    "postId": "Database-Rust-Wire-Protocol-Result-Set"
+  },
+  "sentences": [
+    {
+      "text": "↵In Part 4, we built WAL and crash recovery.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Our database can now survive power failures.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "But there's a problem.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**How do clients actually talk to our database?**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "We could invent our own protocol.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "But then we'd need to build a client from scratch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Better approach:** Speak PostgreSQL's wire protocol.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Then psql , JDBC, libpq—all existing tools—just work.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Today: implementing the PostgreSQL wire protocol in Rust, from startup handshake to result set serialization.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "PostgreSQL uses a **frontend/backend** architecture:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Every message has the same format:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Key insight:** Length is **big-endian** (network byte order) and **includes itself** (not the type byte).",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| Type | Code | Direction | Purpose |↵|------|------|-----------|---------|↵| **StartupMessage** | (none) | F→B | Initial connection (no type byte) |↵| **AuthenticationOk** | 'R' | B→F | Login successful |↵| **Query** | 'Q' | F→B | Simple query (SQL string) |↵| **RowDescription** | 'T' | B→F | Column metadata |↵| **DataRow** | 'D' | B→F | Actual row data |↵| **CommandComplete** | 'C' | B→F | Query finished |↵| **ReadyForQuery** | 'Z' | B→F | Server ready for next query |↵| **ErrorResponse** | 'E' | B→F | Something went wrong |↵| **Parse** | 'P' | F→B | Extended query: prepare |↵| **Bind** | 'B' | F→B | Extended query: bind parameters |↵| **Execute** | 'E' | F→B | Extended query: run |↵| **Sync** | 'S' | F→B | Extended query: finish batch |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "F→B = Frontend to Backend, B→F = Backend to Frontend",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "The first message is special—**no type byte**, just length:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Server sends these parameters:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| Parameter | Value | Purpose |↵|-----------|-------|---------|↵| server_version | 16.0 | PostgreSQL version we're emulating |↵| server_encoding | UTF8 | Character encoding |↵| client_encoding | UTF8 | Client's encoding |↵| integer_datetimes | on | 64-bit integer timestamps |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Example output:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Example:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Text format (format_code = 0):** Human-readable strings",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Binary format (format_code = 1):** Native representation",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Simple Query:** SQL injection risk, no prepared statements",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Extended Query:** Prepared statements, parameter binding",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Server response:** DataRow messages (no specific \"ExecuteComplete\" message)",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**What psql receives:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| Type Name | OID | Size | Description |↵|-----------|-----|------|-------------|↵| BOOL | 16 | 1 | Boolean |↵| INT2 (SMALLINT) | 21 | 2 | 2-byte integer |↵| INT4 (INTEGER) | 23 | 4 | 4-byte integer |↵| INT8 (BIGINT) | 20 | 8 | 8-byte integer |↵| TEXT | 25 | -1 | Variable-length text |↵| VARCHAR | 1043 | -1 | Variable-length char |↵| TIMESTAMP | 1114 | 8 | Timestamp without timezone |↵| TIMESTAMPTZ | 1184 | 8 | Timestamp with timezone |↵| FLOAT4 (REAL) | 700 | 4 | 4-byte float |↵| FLOAT8 (DOUBLE) | 701 | 8 | 8-byte float |↵| NUMERIC | 1700 | -1 | Arbitrary precision |↵| BYTEA | 17 | -1 | Binary data |↵| OID | 26 | 4 | Object identifier |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Problem:** tokio requires &mut self for async I/O, but we need to borrow from self.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Solution: Restructure to avoid concurrent borrows**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Problem:** Wire protocol messages need to be serialized.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Copying is expensive.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Solution: Reuse buffers**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Problem:** Wire protocol errors, query errors, storage errors—all different types.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Solution: Use thiserror and conversion traits**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| Task | AI Contribution |↵|------|-----------------|↵| **Message format** | Correct big-endian encoding |↵| **Extended query flow** | Parse → Bind → Execute sequence |↵| **Type OIDs** | Accurate PostgreSQL type OIDs |↵| **Null handling** | -1 length prefix for NULLs |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| Issue | What Happened |↵|-------|---------------|↵| **Length calculation** | First draft didn't include length bytes in length |↵| **Startup message** | Tried to add type byte (startup has none!) |↵| **Binary format** | Suggested little-endian (PostgreSQL uses big-endian) |↵| **Portal lifetime** | Missed that portals are destroyed after Execute |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Pattern:** Wire protocol is precise.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Off-by-one errors break everything.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**My question to AI:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "\"psql connects but immediately disconnects.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "What's wrong?\"",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**What I learned:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "psql expects specific ParameterStatus messages↵Missing server_version causes silent disconnect↵ReadyForQuery must be sent after authentication",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Result:** Added required parameters:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Now psql connects successfully!**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Key Takeaways:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| Concept | Why It Matters |↵|---------|----------------|↵| **Wire protocol** | Compatibility with existing PostgreSQL tools |↵| **Message framing** | Length-prefixed binary protocol |↵| **Simple vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "Extended** | Quick queries vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "prepared statements |↵| **RowDescription** | Column metadata for clients |↵| **DataRow** | Actual row data (text or binary) |↵| **Type OIDs** | PostgreSQL type identification |↵| **Null encoding** | -1 length prefix |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**Further Reading:**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "PostgreSQL Source: src/backend/tcop/postgres.c ↵PostgreSQL Source: src/include/libpq/pqformat.h ↵\"PostgreSQL Wire Protocol\" documentation: https://www.postgresql.org/docs/current/protocol.html↵libpq source: src/interfaces/libpq/ ↵Vaultgres Repository: github.com/neoalienson/Vaultgres",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "Database in Rust: Wire Protocol and Result Set Serialization",
+        "url": "/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 77
+}

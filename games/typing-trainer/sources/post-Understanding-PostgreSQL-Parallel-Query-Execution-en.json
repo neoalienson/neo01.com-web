@@ -1,0 +1,480 @@
+{
+  "sourceId": "post-Understanding-PostgreSQL-Parallel-Query-Execution-en",
+  "locale": "en",
+  "source": {
+    "kind": "single-post",
+    "postId": "Understanding-PostgreSQL-Parallel-Query-Execution"
+  },
+  "sentences": [
+    {
+      "text": "When PostgreSQL introduced **parallel query execution** in version 9.6, it unlocked a fundamental capability: leveraging multi-core CPUs to accelerate analytical workloads.↵Before parallel query, PostgreSQL was strictly **single-threaded**—one query, one CPU core.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "On a 32-core server, a full table scan used 1 core at 100%, leaving 31 cores idle.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "For OLTP workloads (short, selective queries), this was fine.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "For analytics (scanning millions of rows), it was a bottleneck.↵Parallel query changes this by allowing operations like **Seq Scan**, **Hash Join**, and **Aggregate** to split work across multiple **background worker processes**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "A **Gather** or **Gather Merge** node collects results from workers and returns them to the client.↵The result?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "**2x–4x speedup** (or more) on suitable workloads.↵But parallel query isn't free.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "It adds overhead, consumes resources, and can *slow down* queries if misused.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "This guide explains how it works, when to use it, and how to tune it.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Execution (single-threaded):**↵ ↵**The bottleneck:** Disk I/O and CPU-bound operations (filtering, aggregation) can't be parallelized.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "One core does all the work.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Execution (parallel):**↵ ↵**Key insight:** The table is divided into **ranges**, each worker scans a portion, and results are combined at the top.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Components:**↵| Component | Role |↵|-----------|------|↵| **Parallel Leader** | Main backend that coordinates workers |↵| **Parallel Workers** | Background processes that execute portions of the plan |↵| **Gather Node** | Collects results from workers and returns to client |↵| **Gather Merge Node** | Like Gather, but preserves sort order |↵| **Shared Memory** | Communication channel between leader and workers |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "The **Gather** node is the bridge between parallel workers and the client:↵ ↵**The Contract:**↵| Method | Purpose |↵|--------|---------|↵| InitializeParallelWorkers() | Launch worker processes |↵| FetchRowFromWorker() | Get next row from any worker (round-robin) |↵| all_workers_done() | Check if all workers finished |↵**Gather vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "Gather Merge:**↵| Node Type | Use Case | Preserves Order?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "|↵|-----------|----------|------------------|↵| **Gather** | General parallel execution | ❌ No |↵| **Gather Merge** | Parallel execution with ORDER BY | ✅ Yes (merge-sort) |↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "Workers are **separate PostgreSQL backend processes**:↵ ↵**Key properties:**↵| Property | Description |↵|----------|-------------|↵| **Separate processes** | Not threads—full OS processes with own memory |↵| **Shared memory** | Communicate via DSM (Dynamic Shared Memory) |↵| **Inherit transaction** | Workers see the same transaction snapshot |↵| **No direct client access** | Only the leader communicates with the client |↵| **Temporary** | Workers exit when query completes |↵:::warning{title=\"Process Overhead\"}↵Because workers are separate processes (not threads), there's overhead:↵**Process creation:** ~1-5ms per worker↵**DSM setup:** Shared memory allocation↵**Context switching:** OS must schedule multiple processes↵For queries that run in < 100ms, parallel overhead often exceeds the benefit.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "Not all operators can run in parallel.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "PostgreSQL supports parallelism for specific node types:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "| Operator | Parallel Strategy | Speedup Potential |↵|----------|-------------------|-------------------|↵| **Seq Scan** | Split table into ranges; each worker scans a range | ⭐⭐⭐ High |↵| **Hash Join** | Build phase: parallel hash; Probe phase: parallel probe | ⭐⭐⭐ High |↵| **Aggregate** | Each worker computes partial aggregate; leader combines | ⭐⭐⭐ High |↵| **Bitmap Heap Scan** | Split bitmap into ranges | ⭐⭐ Medium |↵| **Index Scan** | Limited support (index-only scans) | ⭐ Low |↵| **Sort** | Each worker sorts a chunk; Gather Merge combines | ⭐⭐ Medium |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "| Operator | Why Not Parallel?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "|↵|----------|-------------------|↵| **Nested Loop Join** | Inherently sequential (inner depends on outer) |↵| **Window Functions** | Require ordered input; hard to partition |↵| **CTEs (pre-PG15)** | Optimization fence; executed separately |↵| **Functions (most)** | Not marked PARALLEL SAFE |↵| **INSERT/UPDATE/DELETE** | Row-level locking conflicts |↵:::info{title=\"PARALLEL Safety Levels\"}↵Functions are marked with parallel safety:↵| Level | Meaning | Can Run in Parallel?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "|↵|-------|---------|---------------------|↵| PARALLEL UNSAFE | May modify state | ❌ No |↵| PARALLEL RESTRICTED | Read-only, but can't execute parallel plans | ⚠️ Leader only |↵| PARALLEL SAFE | Pure read-only | ✅ Yes |↵:::↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Plan:**↵ ↵**Key observations:**↵| Metric | Value | Meaning |↵|--------|-------|---------|↵| Workers Planned | 4 | Planner requested 4 workers |↵| Workers Launched | 4 | All 4 workers started (no resource limits hit) |↵| loops=4 | 4 | Each worker executed this node once |↵| rows=25000000 | 25M per worker | Total: 100M rows scanned |↵| Partial Aggregate | Per-worker | Each worker counts its portion |↵| Finalize Aggregate | Leader | Combines 4 partial counts |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Plan:**↵ ↵**Execution Flow:**↵ ↵**Key insight:** The hash table is built **once** (by the leader or workers collectively) and stored in **shared memory**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "All workers probe the same hash table.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "PostgreSQL provides several GUCs (Grand Unified Configuration) to control parallel query:",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "| Parameter | Default | Description |↵|-----------|---------|-------------|↵| max_parallel_workers_per_gather | 2 | Max workers per Gather node |↵| max_parallel_workers | 8 | Total workers available system-wide |↵| max_parallel_maintenance_workers | 2 | Workers for maintenance (VACUUM, CREATE INDEX) |↵| parallel_leader_participation | on | Whether leader also works |↵| min_parallel_table_scan_size | 8MB | Minimum table size for parallel scan |↵| min_parallel_index_scan_size | 512kB | Minimum index size for parallel scan |↵| parallel_setup_cost | 1000.0 | Planner cost estimate for parallel setup |↵| parallel_tuple_cost | 0.1 | Planner cost per tuple transferred |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Trade-off:**↵| Value | Pros | Cons |↵|-------|------|------|↵| Low (1-2) | Less overhead, more predictable | Limited speedup |↵| High (8+) | Maximum parallelism | Diminishing returns, resource contention |↵**Rule of thumb:** Start with 4, measure, adjust.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Relationship:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**When to disable:**↵| Scenario | Setting | Why |↵|----------|---------|-----|↵| Many concurrent queries | off | Leader handles coordination, workers do all scanning |↵| Small number of workers | on | Maximize parallelism (leader + workers) |↵| I/O-bound workloads | on | Leader can help with I/O |↵| CPU-bound workloads | off | Leader focuses on coordination |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Why it exists:** Parallel overhead (~5-10ms) exceeds benefit for small tables.↵**Tuning:**↵| Workload | Recommended Value |↵|----------|-------------------|↵| OLTP (small queries) | 32MB+ (discourage parallelism) |↵| Analytics (large scans) | 4-8MB (encourage parallelism) |↵| Mixed | 8-16MB (balance) |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "The planner uses cost estimates to decide whether parallelism is worthwhile:↵ ↵**How the planner decides:**↵ ↵**Tuning:**↵ ↵:::tip{title=\"Debugging Planner Decisions\"}↵Use EXPLAIN (VERBOSE, COSTS) to see why the planner chose (or rejected) parallelism:↵:::↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "| Workload | Characteristics | Expected Speedup |↵|----------|-----------------|------------------|↵| **Large table scans** | >100MB tables, selective filters | 2x-4x |↵| **Bulk aggregations** | COUNT, SUM, AVG over millions of rows | 3x-5x |↵| **Hash joins** | Large fact tables joining to dimensions | 2x-4x |↵| **Index-only scans** | Covering indexes on large tables | 2x-3x |↵| **Parallel CREATE INDEX** | CREATE INDEX CONCURRENTLY (PG11+) | 2x-3x |↵**Example: Large Aggregation**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "| Scenario | Why It Hurts | Alternative |↵|----------|--------------|-------------|↵| **Small tables (< 10MB)** | Overhead > benefit | Disable parallelism |↵| **OLTP queries (< 100ms)** | Setup time dominates | Keep max_parallel_workers_per_gather = 0 |↵| **Many concurrent queries** | Worker starvation | Limit max_parallel_workers |↵| **Memory-bound workloads** | Workers compete for cache | Reduce workers |↵| **Functions marked UNSAFE** | Falls back to serial | Mark functions SAFE if possible |↵**Example: Parallel Overhead**↵ ↵:::warning{title=\"The OLTP Trap\"}↵For OLTP workloads (short, frequent queries), parallel query often **degrades** performance:↵:::↵ ↵**Solution:** Disable parallelism for OLTP:↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Causes:**↵| Cause | Check | Fix |↵|-------|-------|-----|↵| Worker limit hit | SHOW max_parallel_workers; | Increase limit |↵| Memory pressure | Check work_mem × workers | Reduce max_parallel_workers |↵| Table too small | Check table size vs min_parallel_table_scan_size | Lower threshold or accept serial |↵| Function is UNSAFE | Check proparallel in pg_proc | Mark SAFE or rewrite |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Why:** The planner determined index scan is cheaper.↵**Force parallel scan (for testing):**↵ ↵:::warning{title=\"Don't Force in Production\"}↵Disabling index scans is for **debugging only**.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "The planner usually knows best.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "If parallel seq scan is truly better, adjust cost parameters instead.↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Why:** Data skew (workers scan different-sized ranges).↵**Impact:** Slowest worker determines total time (Amdahl's Law).↵**Mitigation:**↵| Strategy | How |↵|----------|-----|↵| Better data distribution | Reorganize table (PARTITION BY) |↵| More workers | More granular ranges |↵| Accept imbalance | Often not worth optimizing |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "Workers communicate via **Dynamic Shared Memory**:↵ ↵**What's stored in DSM:**↵| Data | Size | Purpose |↵|------|------|---------|↵| Query plan | ~10-100KB | Workers need to know what to execute |↵| Table scan ranges | ~1KB per worker | Which blocks each worker scans |↵| Hash tables | Variable (MBs) | Shared hash for parallel hash join |↵| Partial aggregates | ~1KB per worker | Intermediate results |↵| Tuple queues | Variable | Rows transferred from workers to leader |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Timeline:**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    },
+    {
+      "text": "↵**Key Takeaways:**↵| Aspect | Parallel Query |↵|--------|----------------|↵| **Architecture** | Leader + workers via DSM |↵| **Gather node** | Collects results from workers |↵| **Gather Merge** | Preserves sort order |↵| **Best for** | Large scans, aggregations, hash joins |↵| **Avoid for** | OLTP, small tables, sub-100ms queries |↵| **Speedup** | 2x-4x typical, up to 10x for ideal workloads |↵| **Overhead** | ~20-50ms setup time |↵---↵**Further Reading:**↵PostgreSQL Docs: \"Parallel Query\"↵Robert Haas: \"Parallel Query in PostgreSQL\" (2015)↵Andres Freund: \"Parallelism in PostgreSQL\"↵Source: src/backend/executor/nodeGather.c",
+      "sourceRef": {
+        "type": "post",
+        "id": "Understanding-PostgreSQL-Parallel-Query-Execution",
+        "title": "Understanding PostgreSQL Parallel Query Execution: Multi-Core Performance",
+        "url": "/blog/Understanding-PostgreSQL-Parallel-Query-Execution/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 52
+}

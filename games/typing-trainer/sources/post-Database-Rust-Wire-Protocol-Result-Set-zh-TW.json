@@ -1,0 +1,705 @@
+{
+  "sourceId": "post-Database-Rust-Wire-Protocol-Result-Set-zh-TW",
+  "locale": "zh-TW",
+  "source": {
+    "kind": "single-post",
+    "postId": "Database-Rust-Wire-Protocol-Result-Set"
+  },
+  "sentences": [
+    {
+      "text": "↵在 第四部分 中，我們建構了 WAL 和崩潰恢復。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "我們的資料庫現在可以在停電中存活。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "但有個問題。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**客戶端實際上如何與我們的資料庫對話？**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "我們可以發明自己的協定。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "但那樣我們就必須從頭建構客戶端。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**更好的方法：** 說 PostgreSQL 的通訊協定。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "然後 psql 、JDBC、libpq——所有現有工具——都能直接用。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "今天：在 Rust 中實作 PostgreSQL 通訊協定，從啟動握手到結果集序列化。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "PostgreSQL 使用 **frontend/backend** 架構：",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "每個訊息都有相同的格式：",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**關鍵洞察：** 長度是**大端序**（網路位元組順序）且**包含自身**（不包含類型位元組）。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| 類型 | 代碼 | 方向 | 目的 |↵|------|------|-----------|---------|↵| **StartupMessage** | (none) | F→B | 初始連接（無類型位元組） |↵| **AuthenticationOk** | 'R' | B→F | 登入成功 |↵| **Query** | 'Q' | F→B | 簡單查詢（SQL 字串） |↵| **RowDescription** | 'T' | B→F | 欄位元資料 |↵| **DataRow** | 'D' | B→F | 實際列資料 |↵| **CommandComplete** | 'C' | B→F | 查詢完成 |↵| **ReadyForQuery** | 'Z' | B→F | 伺服器準備好下一個查詢 |↵| **ErrorResponse** | 'E' | B→F | 出錯了 |↵| **Parse** | 'P' | F→B | 擴充查詢：準備 |↵| **Bind** | 'B' | F→B | 擴充查詢：綁定參數 |↵| **Execute** | 'E' | F→B | 擴充查詢：執行 |↵| **Sync** | 'S' | F→B | 擴充查詢：完成批次 |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "F→B = Frontend to Backend, B→F = Backend to Frontend",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "第一個訊息很特殊——**沒有類型位元組**，只有長度：",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**伺服器發送這些參數：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| 參數 | 值 | 目的 |↵|-----------|-------|---------|↵| server_version | 16.0 | 我們模擬的 PostgreSQL 版本 |↵| server_encoding | UTF8 | 字元編碼 |↵| client_encoding | UTF8 | 客戶端的編碼 |↵| integer_datetimes | on | 64 位元整數時間戳 |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**範例輸出：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**範例：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**文字格式（format_code = 0）：** 可讀字串",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**二進位格式（format_code = 1）：** 原生表示",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**簡單查詢：** SQL 注入風險，無預備語句",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**擴充查詢：** 預備語句，參數綁定",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**伺服器回應：** DataRow 訊息（沒有特定的 \"ExecuteComplete\" 訊息）",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**psql 接收的內容：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| 類型名稱 | OID | 大小 | 說明 |↵|-----------|-----|------|-------------|↵| BOOL | 16 | 1 | 布林值 |↵| INT2 (SMALLINT) | 21 | 2 | 2 位元組整數 |↵| INT4 (INTEGER) | 23 | 4 | 4 位元組整數 |↵| INT8 (BIGINT) | 20 | 8 | 8 位元組整數 |↵| TEXT | 25 | -1 | 可變長度文字 |↵| VARCHAR | 1043 | -1 | 可變長度字元 |↵| TIMESTAMP | 1114 | 8 | 無時區時間戳 |↵| TIMESTAMPTZ | 1184 | 8 | 有時區時間戳 |↵| FLOAT4 (REAL) | 700 | 4 | 4 位元組浮點數 |↵| FLOAT8 (DOUBLE) | 701 | 8 | 8 位元組浮點數 |↵| NUMERIC | 1700 | -1 | 任意精度 |↵| BYTEA | 17 | -1 | 二進位資料 |↵| OID | 26 | 4 | 物件識別符 |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**問題：** tokio 需要 &mut self 進行非同步 I/O，但我們需要從 self 借用。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**解決方案：重構以避免同時借用**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**問題：** 通訊協定訊息需要序列化。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "拷貝很昂貴。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**解決方案：重用緩衝區**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**問題：** 通訊協定錯誤、查詢錯誤、儲存錯誤——所有不同的類型。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**解決方案：使用 thiserror 和轉換特性**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| 任務 | AI 貢獻 |↵|------|-----------------|↵| **訊息格式** | 正確的大端序編碼 |↵| **擴充查詢流程** | Parse → Bind → Execute 順序 |↵| **類型 OID** | 準確的 PostgreSQL 類型 OID |↵| **NULL 處理** | NULL 的 -1 長度前綴 |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| 問題 | 發生什麼事 |↵|-------|---------------|↵| **長度計算** | 初稿沒有在長度中包含長度位元組 |↵| **啟動訊息** | 嘗試添加類型位元組（啟動沒有！） |↵| **二進位格式** | 建議小端序（PostgreSQL 使用大端序） |↵| **Portal 生命週期** | 忽略了 portal 在 Execute 後被銷毀 |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**模式：** 通訊協定很精確。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "差一錯誤會破壞一切。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**我問 AI 的問題：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "\"psql 連接但立即斷開。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "什麼錯了？\"",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**我學到的：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "psql 期望特定的 ParameterStatus 訊息↵缺少 server_version 會導致無聲斷開↵ReadyForQuery 必須在驗證後發送",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**結果：** 添加了必需的參數：",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**現在 psql 連接成功！**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**關鍵要點：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "| 概念 | 為什麼重要 |↵|---------|----------------|↵| **通訊協定** | 與現有 PostgreSQL 工具相容 |↵| **訊息框架** | 長度前綴二進位協定 |↵| **簡單 vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "擴充** | 快速查詢 vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "預備語句 |↵| **RowDescription** | 客戶端的欄位元資料 |↵| **DataRow** | 實際列資料（文字或二進位） |↵| **類型 OID** | PostgreSQL 類型識別 |↵| **NULL 編碼** | -1 長度前綴 |",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "**進一步閱讀：**",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    },
+    {
+      "text": "PostgreSQL Source: src/backend/tcop/postgres.c ↵PostgreSQL Source: src/include/libpq/pqformat.h ↵\"PostgreSQL Wire Protocol\" documentation: https://www.postgresql.org/docs/current/protocol.html↵libpq source: src/interfaces/libpq/ ↵Vaultgres Repository: github.com/neoalienson/Vaultgres",
+      "sourceRef": {
+        "type": "post",
+        "id": "Database-Rust-Wire-Protocol-Result-Set",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：通訊協定與結果集序列化",
+        "url": "/zh-TW/blog/Database-Rust-Wire-Protocol-Result-Set/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 77
+}

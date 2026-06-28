@@ -1,0 +1,498 @@
+{
+  "sourceId": "post-Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool-zh-TW",
+  "locale": "zh-TW",
+  "source": {
+    "kind": "single-post",
+    "postId": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool"
+  },
+  "sentences": [
+    {
+      "text": "簡單的網站已無法滿足我對知識的渴望。↵多年來，我一直在建構 Web 應用程式——REST API、GraphQL 服務、帶有 AI 和 Agentic AI 的微服務——但我遇到了瓶頸。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "我能流利地*使用*資料庫，卻無法*建構*一個。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "內部機制對我來說仍是個黑盒子：PostgreSQL 究竟如何將資料儲存在磁碟上？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "緩衝池如何管理記憶體？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "WAL 如何確保持久性？↵因此，我開始建構 **Vaultgres**——一個用 Rust 實作的 PostgreSQL 相容資料庫。↵這不是另一個玩具級的鍵值儲存。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "我們的目標是 PostgreSQL 相容性：通訊協定、查詢語言，最終還包括儲存格式。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "為什麼？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "因為 PostgreSQL 的架構經過實戰驗證，相容性意味著真正的應用程式可以（理論上）無需修改就能連接。↵這個系列記錄了這段旅程：設計決策、錯誤、那些「啊哈！」的頓悟時刻，以及我如何利用 AI 加速學習，同時仍然親自完成艱苦的工作。↵今天的主題：**頁面式儲存和緩衝池**——每個資料庫建立的基礎。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "想像一下將資料作為連續串流直接儲存到磁碟：↵ ↵**問題：**↵| 問題 | 為什麼重要 |↵|-------|----------------|↵| **沒有結構** | 無法找到第 N 列，必須從頭開始掃描 |↵| **沒有併發性** | 一個寫入者鎖定整個檔案 |↵| **沒有崩潰恢復** | 部分寫入會破壞所有內容 |↵| **沒有快取** | 必須讀取整個檔案才能存取一列 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "PostgreSQL 將資料劃分為**固定大小的頁面**（通常為 8KB）：↵ ↵**每個頁面包含：**↵ ↵**優勢：**↵| 優勢 | 為什麼重要 |↵|---------|----------------|↵| **隨機存取** | 直接讀取第 N 頁： seek(N * 8KB) |↵| **細粒度鎖定** | 鎖定單個頁面，而非整個表 |↵| **高效快取** | 將熱門頁面快取在記憶體中（緩衝池） |↵| **崩潰恢復** | WAL 記錄參考特定頁面 |↵| **標準化** | 所有頁面大小相同——簡化記憶體管理 |↵:::info{title=\"為什麼是 8KB？\"}↵PostgreSQL 預設使用 8KB 頁面（編譯時可用 BLCKSZ 配置）。↵**權衡：**↵| 頁面大小 | 優點 | 缺點 |↵|-----------|------|------|↵| 小 (4KB) | 較少內部碎片，更細的鎖定 | 更多頁面需管理，更大的標頭 |↵| 中 (8KB) | 平衡 | 預設值是有原因的 |↵| 大 (32KB+) | 更少頁面，更好的順序掃描 | 每個頁面浪費更多空間 |↵Vaultgres 使用 8KB 以匹配 PostgreSQL——相容性優先於最佳化。↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "每個頁面都以標頭開始：↵ ↵**視覺佈局：**↵ ↵**關鍵洞察：** 項目從底部**向上**增長，ItemId 陣列從頂部**向下**增長。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "空閒空間在中間。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "這最大化了空間利用率。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "每個 ItemId 是一個 4 位元組的指標：↵ ↵**為什麼需要間接？**↵| 原因 | 解釋 |↵|--------|-------------|↵| **移動項目而不改變參考** | 當項目移動時更新 lp_off |↵| **標記項目為已刪除** | 設定 lp_len = 0 而不覆蓋資料 |↵| **支援 HOT (Heap Only Tuple)** | 對 PostgreSQL 效能至關重要 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "以下是 Vaultgres 表示頁面的方式：↵ ↵:::warning{title=\"為了效能使用 Unsafe Rust\"}↵是的，這裡使用了 unsafe 。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "為什麼？↵**零拷貝存取** 頁面資料↵**精確的記憶體佈局** 匹配 PostgreSQL 的磁碟上格式↵**效能** 至關重要——頁面被存取數百萬次↵**安全保證：**↵#[repr(C)] 確保可預測的佈局↵所有存取都在範圍內（由 free_space() 檢查）↵頁面在使用前總是已初始化↵這就是 AI 輔助無價的地方：我可以問「這個 unsafe 區塊是否可靠？」並得到詳細分析。↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "| 儲存 | 延遲 | 相對速度 |↵|---------|---------|----------------|↵| CPU 快取 (L1) | ~1ns | 1x |↵| RAM | ~100ns | 100x 更慢 |↵| NVMe SSD | ~100μs | 100,000x 更慢 |↵| HDD | ~10ms | 10,000,000x 更慢 |↵**沒有緩衝池：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**緩衝池** 將經常存取的頁面快取在 RAM 中：↵ ↵**使用緩衝池：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵**元件：**↵| 元件 | 目的 |↵|-----------|---------|↵| **緩衝幀 (Buffer Frames)** | 固定大小的槽位持有頁面（例如 1024 幀 × 8KB = 8MB） |↵| **頁面表 (Page Table)** | 映射頁面 ID → 緩衝幀（雜湊表） |↵| **LRU 串列** | 追蹤存取順序以進行淘汰 |↵| **髒位元 (Dirty Bit)** | 標記需要寫回的頁面 |↵| **釘選計數 (Pin Count)** | 防止使用中頁面被淘汰 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵:::tip{title=\"關鍵設計決策\"}↵**1.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "細粒度鎖定：** 每個 BufferFrame 都有自己的 Mutex ，而不是整個池只有一把鎖。↵**2.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "ARC 用於共享存取：** Arc<Mutex<Page>> 允許多個執行緒持有同一頁面。↵**3.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "釘選計數：** 防止執行緒使用頁面時被淘汰。↵**4.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "LRU 淘汰：** 最近最少使用的頁面優先被淘汰。↵這些決策來自於詢問 AI：「如何在 Rust 中設計執行緒安全的緩衝池？」然後根據 PostgreSQL 的實際實作迭代答案。↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "PostgreSQL 將每個表/索引儲存在單獨的檔案中：↵ ↵Vaultgres 遵循相同的模式：↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Vaultgres 將表 ID 和頁面編號編碼為單個 u64 ：↵ ↵**為什麼？**↵| 原因 | 解釋 |↵|--------|-------------|↵| **單一識別符** | 簡化緩衝池和頁面表 |↵| **高效雜湊** | u64 比 (u32, u32) 元組更快 |↵| **PostgreSQL 相容** | 類似於 PostgreSQL 的 BlockId |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "沒有 WAL：↵ ↵**更糟的是：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**WAL 原則：** 在修改頁面之前，先將變更寫入日誌：↵ ↵**崩潰後：**↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵:::warning{title=\"WAL 很難\"}↵正確實作 WAL 是建構資料庫最困難的部分之一：↵**邏輯 vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "實體 WAL：** 記錄操作（INSERT 列）還是頁面變更（位元組 X→Y）？↵**AR...",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "[截斷]↵**檢查點：** 多久一次？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "模糊還是清晰？↵**日誌截斷：** 何時可以刪除舊的 WAL 檔案？↵Vaultgres 將從簡單的實體 WAL（頁面映像）開始，然後逐步演進。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "AI 對於理解這裡的權衡取捨非常有幫助。↵:::↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**問題：** 緩衝池需要在執行緒間共享頁面，但 Rust 的所有權系統與此相抗。↵ ↵**權衡：**↵| 方法 | 優點 | 缺點 |↵|----------|------|------|↵| Arc<Mutex<T>> | 安全、熟悉 | 鎖定競爭 |↵| RwLock<T> | 更適合讀取負載 | 寫入飢餓 |↵| Lock-free (unsafe) | 最大效能 | 複雜、易出錯 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**問題：** PostgreSQL 使用原始指標進行頁面存取。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Rust 想要邊界檢查。↵ ↵**Vaultgres 方法：** 從安全開始，在效能分析後用 unsafe 最佳化熱點路徑。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**問題：** PostgreSQL 使用 elog(ERROR, ...) 。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Rust 使用 Result<T, E> 。↵ ↵**影響：** 每個函數簽名都改變了。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "呼叫鏈變成 Result 金字塔。↵**解決方案：** 大量使用 ?",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "運算符，定義明確的錯誤類型：↵ ↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "| 任務 | 我如何使用 AI |↵|------|--------------|↵| **解釋概念** | 「解釋 PostgreSQL 的緩衝池替換策略」 |↵| **程式碼審查** | 「這個 unsafe 區塊是否可靠？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "什麼可能出錯？」 |↵| **產生樣板** | 「為 PostgreSQL PageHeader 產生 Rust 結構體」 |↵| **除錯協助** |「為什麼會死結？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "這是我的鎖定順序...」 |↵| **比較方法** | 「LRU vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "Clock vs.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "FIFO 用於緩衝池淘汰」 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "| 技能 | 為什麼仍取決於我 |↵|-------|----------------------|↵| **系統設計** | AI 無法決定整體架構 |↵| **權衡分析** | 「我應該優先考慮相容性還是效能？」 |↵| **測試** | AI 無法執行基準測試或尋找競爭條件 |↵| **除錯** | AI 無法附加 gdb 或讀取核心轉儲 |↵| **學習** | 我仍然必須理解 AI 產生的每一行程式碼 |↵---",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "**我問 AI 的問題：**↵\"PostgreSQL 使用 clock-sweep 演算法進行緩衝池淘汰，而不是純 LRU。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "為什麼？",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "有什麼權衡取捨？\"↵**我學到的：**↵**LRU 問題：** 順序掃描會淘汰所有內容（掃描抵抗）↵**Clock-sweep：** 近似 LRU 但更便宜（不需要鏈結串列更新）↵**使用計數：** 頁面在淘汰前獲得多次機會↵**PostgreSQL 的變體：** 還考慮釘選計數和髒頁狀態↵**結果：** 我在 Vaultgres 中實作了 clock-sweep 而不是 LRU：↵ ↵這就是模式：AI 解釋，我實作，我測試，我學習。",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "↵**關鍵要點：**↵| 概念 | 為什麼重要 |↵|---------|----------------|↵| **頁面式儲存** | 隨機存取、細粒度鎖定、高效快取 |↵| **緩衝池** | 熱門頁面比磁碟存取快 1000 倍 |↵| **LRU/Clock 淘汰** | 保留常用頁面，淘汰冷頁面 |↵| **WAL** | 不犧牲效能的持久性 |↵| **Rust 挑戰** | 所有權、安全、零拷貝——到處都是權衡取捨 |↵---↵**進一步閱讀：**↵PostgreSQL Source: src/include/storage/bufpage.h ↵PostgreSQL Source: src/backend/storage/buffer/ ↵\"Database Management Systems\" by Ramakrishnan & Gehrke (Ch.",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    },
+    {
+      "text": "9: Storage and Indexing)↵\"Readings in Database Systems\" (Red Book) - Buffer Pool chapter↵Vaultgres Repository: github.com/neoalienson/Vaultgres",
+      "sourceRef": {
+        "type": "post",
+        "id": "Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool",
+        "title": "使用 Rust 建構 PostgreSQL 相容資料庫：頁面式儲存與緩衝池",
+        "url": "/zh-TW/blog/Building-PostgreSQL-Compatible-Database-Rust-Page-Storage-Buffer-Pool/"
+      }
+    }
+  ],
+  "hasMore": false,
+  "totalCount": 54
+}
