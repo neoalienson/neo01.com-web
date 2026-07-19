@@ -1,0 +1,592 @@
+<!DOCTYPE html><html lang="zh-TW"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="Astro v6.2.1"><title>Saga 模式：跨微服務協調長生命週期事務 - Decoding Digital Anomalies</title><meta name="description" content="當一筆業務事務要跨五個服務、兩個資料庫時，沒有任何一個 ACID 邊界能罩住它。Saga 模式用一組本地事務加一份補償計劃，把原子性換掉；它有兩種截然不同的形態：編排，讓一個指揮者告訴每個服務做什麼；協同，讓每個服務對匯流排上的事件做出反應。一次航行類比、兩個並排實作、三種現實落地形態，以及一個指向 Saga 啟用模式的預告。"><meta property="og:title" content="Saga 模式：跨微服務協調長生命週期事務 - Decoding Digital Anomalies"><meta property="og:description" content="當一筆業務事務要跨五個服務、兩個資料庫時，沒有任何一個 ACID 邊界能罩住它。Saga 模式用一組本地事務加一份補償計劃，把原子性換掉；它有兩種截然不同的形態：編排，讓一個指揮者告訴每個服務做什麼；協同，讓每個服務對匯流排上的事件做出反應。一次航行類比、兩個並排實作、三種現實落地形態，以及一個指向 Saga 啟用模式的預告。"><meta property="og:type" content="website"><meta property="og:url" content="https://neo01.com"><link rel="icon" href="/assets/neo01.png" type="image/png"><link rel="manifest" href="/manifest.json"><link rel="canonical" href="https://neo01.com"><link rel="alternate" type="application/rss+xml" title="Decoding Digital Anomalies" href="/rss.xml"><link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css"><link rel="stylesheet" href="/libs/titillium-web/styles.css"><link rel="stylesheet" href="/pagefind/pagefind-component-ui.css"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Saga 模式：跨微服務協調長生命週期事務 - Decoding Digital Anomalies"><meta name="twitter:description" content="當一筆業務事務要跨五個服務、兩個資料庫時，沒有任何一個 ACID 邊界能罩住它。Saga 模式用一組本地事務加一份補償計劃，把原子性換掉；它有兩種截然不同的形態：編排，讓一個指揮者告訴每個服務做什麼；協同，讓每個服務對匯流排上的事件做出反應。一次航行類比、兩個並排實作、三種現實落地形態，以及一個指向 Saga 啟用模式的預告。"><script src="/pagefind/pagefind-component-ui.js" defer></script><!-- Google tag (gtag.js) — gated by vanilla-cookieconsent's `manageScriptTags`.
+         The script is delivered as `type="text/plain"` with a `data-category="analytics"`
+         marker; CookieConsent swaps it for a real <script> only after the visitor
+         accepts the analytics category. --><script type="text/plain" data-category="analytics" async src="https://www.googletagmanager.com/gtag/js?id=G-3DZR3TQYCY"></script><script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied'
+      });
+      gtag('js', new Date());
+      gtag('config', 'G-3DZR3TQYCY', { send_page_view: false });
+    </script><script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_0_lang.Bm7_K5UY.js"></script><script>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored || (prefersDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script><style>._tabbedWrapper_qdbud_1{display:none}._tabbedWrapper_qdbud_1._hasToc_qdbud_5,._tabbedWrapper_qdbud_1._hasSeries_qdbud_6{display:block}._tabbed_qdbud_1{background:var(--color-sidebar-bg);border-radius:var(--radius-md);margin:0;overflow:hidden}._tabHeader_qdbud_17{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:0 1rem}._tabBar_qdbud_25{display:flex;flex:1;border-bottom:1px solid var(--color-border);margin-bottom:0}._tab_qdbud_1{flex:1;padding:.625rem .5rem;text-align:center;cursor:pointer;background:none;border:none;font-size:.875rem;font-weight:500;color:var(--color-sidebar-text);transition:color var(--transition-fast);border-bottom:2px solid transparent;margin-bottom:-1px}._tab_qdbud_1:hover{color:var(--color-theme)}._tab_qdbud_1._active_qdbud_51{color:var(--color-theme);font-weight:600;border-bottom-color:var(--color-theme)}._tab_qdbud_1._singleTab_qdbud_57{flex:none;width:100%}._tabbedToggle_qdbud_62{margin-left:auto;display:flex;align-items:center;justify-content:center;width:24px;height:24px;transition:transform var(--transition-fast);color:var(--color-sidebar-text-dark)}._tabbedToggle_qdbud_62 svg{width:16px;height:16px}._tabbedToggle_qdbud_62._open_qdbud_78{transform:rotate(180deg)}._panels_qdbud_82{display:none;padding:1rem 1.25rem .5rem}._panels_qdbud_82._isOpen_qdbud_87{display:block}._panel_qdbud_82{display:none}._panel_qdbud_82._active_qdbud_51{display:block}[data-theme=dark] ._tabbed_qdbud_1{background:var(--color-surface)}[data-theme=dark] ._tabBar_qdbud_25{border-bottom-color:var(--color-border)}[data-theme=dark] ._tab_qdbud_1{color:var(--color-sidebar-text)}[data-theme=dark] ._tab_qdbud_1:hover{color:var(--color-theme-light)}[data-theme=dark] ._tab_qdbud_1._active_qdbud_51{color:var(--color-theme-light);border-bottom-color:var(--color-theme-light)}[data-theme=dark] ._tabbedToggle_qdbud_62{color:var(--color-default)}@media(min-width:1024px){._tabbedWrapper_qdbud_1{display:block;position:sticky;top:calc(var(--header-height) + 2rem);max-height:calc(100vh - var(--header-height) - 4rem);overflow-y:auto;align-self:start;z-index:1}._tabbedWrapper_qdbud_1._hasToc_qdbud_5,._tabbedWrapper_qdbud_1._hasSeries_qdbud_6{display:block}._tabbed_qdbud_1{background:transparent;border-radius:0;padding:0;margin:0}._tabHeader_qdbud_17{padding:0}._tabBar_qdbud_25{border-bottom-color:var(--color-border);margin-bottom:.75rem}._panels_qdbud_82{display:block;padding:0}._panels_qdbud_82._isOpen_qdbud_87{display:block}}@media(max-width:1023px){._tabbedWrapper_qdbud_1{display:block!important;position:fixed;top:var(--header-height);left:0;right:0;width:100%;z-index:10;max-height:60vh;overflow-y:auto}._tabbed_qdbud_1{background:var(--color-sidebar-bg);border-radius:0 0 var(--radius-md) var(--radius-md);padding:0}._tabbed_qdbud_1._isOpen_qdbud_87{max-height:60vh;overflow-y:auto}._tabHeader_qdbud_17{padding:.75rem 1rem}[data-theme=dark] ._tabbed_qdbud_1{background:var(--color-surface)}[data-theme=dark] ._tabbedToggle_qdbud_62 svg{color:var(--color-default)}}
+._wrapper_1xuxq_1{display:contents}._header_1xuxq_5,._chevron_1xuxq_9{display:none}._panel_1xuxq_13{display:block}@media(max-width:1023px){._wrapper_1xuxq_1{display:block;position:fixed;top:var(--header-height);left:0;right:0;z-index:150;background:var(--color-sidebar-bg);border-radius:0;margin:0;box-shadow:0 2px 8px #00000014}._header_1xuxq_5{display:flex;align-items:center;justify-content:space-between;width:100%;padding:.75rem 1rem;background:transparent;border:none;border-bottom:1px solid var(--color-border);cursor:pointer;font:inherit;color:var(--color-sidebar-text-dark)}._headerLabel_1xuxq_45{font-size:.875rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}._chevron_1xuxq_9{display:flex;align-items:center;justify-content:center;width:24px;height:24px;color:var(--color-sidebar-text-dark);transition:transform var(--transition-fast)}._chevron_1xuxq_9._open_1xuxq_62{transform:rotate(180deg)}._chevron_1xuxq_9 svg{width:16px;height:16px}._panel_1xuxq_13{display:none;padding:1rem 1.25rem .5rem;max-height:calc(100vh - var(--header-height) - 48px);overflow-y:auto;box-shadow:0 8px 16px #0000001f}._panel_1xuxq_13._isOpen_1xuxq_79{display:block}}[data-theme=dark] ._wrapper_1xuxq_1{background:var(--color-surface)}[data-theme=dark] ._chevron_1xuxq_9{color:var(--color-default)}
+</style>
+<link rel="stylesheet" href="/_astro/CookieConsent.CpXrOrr9.css">
+<link rel="stylesheet" href="/_astro/BaseLayout.DlJ-J4Rg.css">
+<style>._postMeta_yeftz_1{display:flex;flex-wrap:wrap;gap:var(--space-lg);align-items:center;color:var(--color-text-muted);font-size:var(--font-size-base)}._metaItem_yeftz_10{display:flex;align-items:center;gap:var(--space-xs);font-size:1em}._metaItem_yeftz_10 svg{width:16px;height:16px;opacity:.7}._metaItem_yeftz_10 a{color:var(--color-theme)}._metaItem_yeftz_10 a:hover{text-decoration:underline}._categories_yeftz_31{display:flex;flex-wrap:wrap;gap:var(--space-xs)}._categoryTag_yeftz_37{background:var(--color-theme-subtle);color:var(--color-theme);padding:.25em .75em;border-radius:var(--radius-full);font-size:1em;transition:all var(--transition-fast)}._categoryTag_yeftz_37:hover{background:var(--color-theme);color:#fff}._tags_yeftz_51{display:flex;flex-wrap:wrap;gap:var(--space-xs)}._tag_yeftz_51{background:var(--color-border-light);color:var(--color-text-muted);padding:.25em .75em .25em calc(.75em + 10px);font-size:1em;transition:all var(--transition-fast);clip-path:polygon(12px 0,100% 0,100% 100%,12px 100%,4px 50%)}._tag_yeftz_51:hover{background:var(--color-theme);color:#fff}@media(max-width:480px){._postMeta_yeftz_1{flex-direction:column;align-items:flex-start;gap:var(--space-sm)}}.post-layout[data-astro-cid-fzx4jmue]{display:grid;grid-template-columns:1fr;gap:2rem;padding:0 1rem;max-width:1200px;margin:0 auto}.post-toc-sidebar[data-astro-cid-fzx4jmue]{order:-1}.article-content[data-astro-cid-fzx4jmue]{min-width:0}@media(min-width:1024px){.post-layout[data-astro-cid-fzx4jmue]{grid-template-columns:1fr 280px;gap:3rem;padding:0 2rem}.post-toc-sidebar[data-astro-cid-fzx4jmue]{order:1}}@media(max-width:1023px){.post-toc-sidebar[data-astro-cid-fzx4jmue]{width:100%}}
+</style>
+<link rel="stylesheet" href="/_astro/diagram-manifest.CafyeIXZ.css"><script>(function() {
+  function init() {
+    var header = document.querySelector('#header');
+    if (!header) {
+      console.log('[scroll-shrink-header] ERROR: header not found');
+      return;
+    }
+    header.setAttribute('data-header-scroll-shrink', '');
+    var lastScrollY = window.scrollY;
+    var ticking = false;
+    var threshold = 50;
+    var buffer = 5;
+
+    function updateHeader() {
+      var currentScrollY = window.scrollY;
+      if (currentScrollY > threshold) {
+        if (currentScrollY > lastScrollY + buffer) {
+          header.classList.add('header-shrunk');
+        }
+      } else {
+        header.classList.remove('header-shrunk');
+        console.log('[scroll-shrink-header] Expand: scrollY=' + currentScrollY + ' (at top)');
+      }
+      lastScrollY = currentScrollY;
+      ticking = false;
+    }
+
+    function onScroll() {
+      if (!ticking) {
+        requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    console.log('[scroll-shrink-header] Initialized, threshold=' + threshold);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();</script></head> <body> <div id="wrap"> <header id="header" class="header-glass" data-pagefind-ignore data-astro-cid-qmpwvs2w> <div class="header-main" data-astro-cid-qmpwvs2w> <button class="header-nav-mobile-toggle md:hidden" aria-label="Open navigation menu" aria-expanded="false" id="main-nav-toggle" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M4 5h16" data-astro-cid-qmpwvs2w></path><path d="M4 12h16" data-astro-cid-qmpwvs2w></path><path d="M4 19h16" data-astro-cid-qmpwvs2w></path></svg> </button> <div class="header-brand" data-astro-cid-qmpwvs2w> <a href="/" class="logo-link" data-astro-cid-qmpwvs2w> <div class="logo" data-astro-cid-qmpwvs2w></div> </a> <div class="header-title-group" data-astro-cid-qmpwvs2w> <span class="header-title-text" data-astro-cid-qmpwvs2w>neo01.com</span> <span class="header-subtitle-text" data-astro-cid-qmpwvs2w>解碼數位異象</span> </div> </div> <nav class="header-nav" aria-label="Main navigation" data-astro-cid-qmpwvs2w> <ul class="header-nav-list" role="menubar" data-astro-cid-qmpwvs2w> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/" class="header-nav-link active" role="menuitem" data-astro-cid-qmpwvs2w>Blog</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/tools/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>工具</a> </li> <li role="none" data-astro-cid-qmpwvs2w> <a href="/zh-TW/about/" class="header-nav-link" role="menuitem" data-astro-cid-qmpwvs2w>關於</a> </li> </ul> </nav> <div class="header-actions" data-astro-cid-qmpwvs2w> <div class="header-search-wrapper" data-astro-cid-qmpwvs2w> <pagefind-searchbox placeholder="搜索" show-sub-results="true" show-keyboard-hints="false" hide-shortcut="true" max-results="5" class="header-search-box" data-astro-cid-qmpwvs2w="true"></pagefind-searchbox> </div> <button class="theme-toggle" aria-label="Toggle theme" title="Toggle theme" data-astro-cid-qmpwvs2w> <span class="sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal" data-pagefind-ignore data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2026/07/saga-pattern/" class="lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-CN/2026/07/saga-pattern/" class="lang-link" data-lang="zh-CN" data-astro-cid-crzgpmpb>简</a> </div> </div> </div> <div class="header-categories" data-astro-cid-qmpwvs2w> <nav class="header-categories-nav" aria-label="分類" data-astro-cid-lrerzbzz> <a href="/zh-TW/categories/ai/" class="header-category-link" title="AI" data-astro-cid-lrerzbzz>AI</a><a href="/zh-TW/categories/architecture/" class="header-category-link" title="架構" data-astro-cid-lrerzbzz>架構</a><a href="/zh-TW/categories/cybersecurity/" class="header-category-link" title="網路安全" data-astro-cid-lrerzbzz>網路安全</a><a href="/zh-TW/categories/development/" class="header-category-link" title="開發" data-astro-cid-lrerzbzz>開發</a><a href="/zh-TW/categories/misc/" class="header-category-link" title="其他" data-astro-cid-lrerzbzz>其他</a> </nav>   </div> </header> <div class="drawer-overlay" id="drawerOverlay" data-astro-cid-qmpwvs2w></div> <aside class="drawer" id="mobileDrawer" aria-label="Mobile navigation" data-pagefind-ignore data-astro-cid-qmpwvs2w> <div class="drawer-header" data-astro-cid-qmpwvs2w> <button class="close-btn" aria-label="Close menu" id="closeBtn" data-astro-cid-qmpwvs2w> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-qmpwvs2w> <line x1="18" y1="6" x2="6" y2="18" data-astro-cid-qmpwvs2w></line> <line x1="6" y1="6" x2="18" y2="18" data-astro-cid-qmpwvs2w></line> </svg> </button> </div> <nav class="drawer-nav" data-astro-cid-qmpwvs2w> <a href="/zh-TW/" class="drawer-nav-link active" data-astro-cid-qmpwvs2w>Blog</a> <a href="/zh-TW/tools/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>工具</a> <a href="/zh-TW/about/" class="drawer-nav-link" data-astro-cid-qmpwvs2w>關於</a> <div class="drawer-nav-divider" data-astro-cid-qmpwvs2w>分類</div> <nav class="header-categories-nav" aria-label="分類" data-astro-cid-lrerzbzz> <a href="/zh-TW/categories/ai/" class="drawer-nav-link" title="AI" data-astro-cid-lrerzbzz>AI</a><a href="/zh-TW/categories/architecture/" class="drawer-nav-link" title="架構" data-astro-cid-lrerzbzz>架構</a><a href="/zh-TW/categories/cybersecurity/" class="drawer-nav-link" title="網路安全" data-astro-cid-lrerzbzz>網路安全</a><a href="/zh-TW/categories/development/" class="drawer-nav-link" title="開發" data-astro-cid-lrerzbzz>開發</a><a href="/zh-TW/categories/misc/" class="drawer-nav-link" title="其他" data-astro-cid-lrerzbzz>其他</a> </nav>   </nav> <div class="drawer-actions" data-astro-cid-qmpwvs2w> <button class="drawer-theme-toggle" aria-label="Toggle theme" data-astro-cid-qmpwvs2w> <span class="drawer-sun-icon" style="display: none;" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><circle cx="12" cy="12" r="4" data-astro-cid-qmpwvs2w></circle><path d="M12 2v2" data-astro-cid-qmpwvs2w></path><path d="M12 20v2" data-astro-cid-qmpwvs2w></path><path d="m4.93 4.93 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m17.66 17.66 1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="M2 12h2" data-astro-cid-qmpwvs2w></path><path d="M20 12h2" data-astro-cid-qmpwvs2w></path><path d="m6.34 17.66-1.41 1.41" data-astro-cid-qmpwvs2w></path><path d="m19.07 4.93-1.41 1.41" data-astro-cid-qmpwvs2w></path></svg> </span> <span class="drawer-moon-icon" data-astro-cid-qmpwvs2w> <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-qmpwvs2w><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" data-astro-cid-qmpwvs2w></path></svg> </span> </button> <div class="lang-switcher lang-switcher-horizontal drawer-lang-switcher" data-pagefind-ignore data-astro-cid-crzgpmpb> <span class="lang-icon" data-astro-cid-crzgpmpb>🌐</span> <a href="/2026/07/saga-pattern/" class="drawer-lang-link" data-lang="en" data-astro-cid-crzgpmpb>English</a><span class="drawer-lang-sep" data-astro-cid-crzgpmpb>|</span><a href="/zh-CN/2026/07/saga-pattern/" class="drawer-lang-link" data-lang="zh-CN" data-astro-cid-crzgpmpb>简</a> </div> </div> </aside> <script type="module">const d=document.getElementById("main-nav-toggle"),l=document.getElementById("closeBtn"),n=document.getElementById("drawerOverlay"),o=document.getElementById("mobileDrawer");function m(){o?.classList.add("open"),n?.classList.add("open"),document.body.style.overflow="hidden"}function r(){o?.classList.remove("open"),n?.classList.remove("open"),document.body.style.overflow=""}d?.addEventListener("click",m);l?.addEventListener("click",r);n?.addEventListener("click",r);function c(e){document.documentElement.setAttribute("data-theme",e),localStorage.setItem("theme",e),a();const t=document.querySelector("pagefind-searchbox");t&&(e==="dark"?t.setAttribute("data-pf-theme","dark"):t.removeAttribute("data-pf-theme"))}function a(){const e=document.documentElement.getAttribute("data-theme"),t=document.querySelector(".drawer-theme-value");t&&(t.textContent=e==="dark"?"Dark":"Light")}function s(){const t=document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark";c(t)}document.querySelectorAll(".theme-toggle, .drawer-theme-toggle").forEach(e=>{e.addEventListener("click",s)});window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change",e=>{localStorage.getItem("theme")||c(e.matches?"dark":"light")});a();</script> <main class="home"> <div class="container"> <div class="main-body"> <div class="main-body-header"> <h1 class="header">Saga 模式：跨微服務協調長生命週期事務</h1> </div>     <div class="_postMeta_yeftz_1"> <div class="_metaItem_yeftz_10"> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"> <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect> <line x1="16" y1="2" x2="16" y2="6"></line> <line x1="8" y1="2" x2="8" y2="6"></line> <line x1="3" y1="10" x2="21" y2="10"></line> </svg> <time datetime="2026-07-18T00:00:00.000Z">7/18/2026</time> </div> <div class="_categories_yeftz_31"> <a href="/categories/architecture" class="_categoryTag_yeftz_37"> Architecture </a> </div> <div class="_tags_yeftz_51"> <a href="/zh-TW/tags/design-patterns/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Design Patterns </a><a href="/zh-TW/tags/microservices/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Microservices </a><a href="/zh-TW/tags/distributed-systems/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Distributed Systems </a><a href="/zh-TW/tags/resilience/" class="px-3 py-1 font-medium border _tag_yeftz_51 bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/70 dark:text-gray-300 dark:border-gray-500/40">
+#Resilience </a> </div> </div> <div class="post-layout" data-astro-cid-fzx4jmue> <aside class="post-toc-sidebar" data-astro-cid-fzx4jmue> <div class="_tabbedWrapper_qdbud_1" data-tabbed-wrapper><div class="_tabbed_qdbud_1"><div class="_tabHeader_qdbud_17" data-tabbed-toggle><div class="_tabBar_qdbud_25" data-tab-bar><button class="_tab_qdbud_1  _active_qdbud_51" data-tab="toc" aria-pressed="true">目錄</button><button class="_tab_qdbud_1 " data-tab="series" aria-pressed="false">本系列文章</button></div><span class="_tabbedToggle_qdbud_62"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span></div><div class="_panels_qdbud_82" data-tabbed-panels><div class="_panel_qdbud_82 _active_qdbud_51" data-panel="toc"><div class="_tocWrapper_ms9sd_1"><div class="_toc_ms9sd_1"><ul class="_tocContent_ms9sd_9"><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#問題一筆業務事務五個服務沒有-acid" data-toc-link="問題一筆業務事務五個服務沒有-acid">問題：一筆業務事務、五個服務、沒有 ACID</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#解決方案預覽saga-是一次有回程計劃的航行" data-toc-link="解決方案預覽saga-是一次有回程計劃的航行">解決方案預覽：Saga 是一次有回程計劃的航行</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#兩種變體編排-vs-協同" data-toc-link="兩種變體編排-vs-協同">兩種變體：編排 vs 協同</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#沒有-saga-vs-有-saga問題框架" data-toc-link="沒有-saga-vs-有-saga問題框架">沒有 Saga vs 有 Saga（問題框架）</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#編排一條有向序列" data-toc-link="編排一條有向序列">編排：一條有向序列</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#協同一次事件級聯" data-toc-link="協同一次事件級聯">協同：一次事件級聯</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#補償事務saga-的真正工作" data-toc-link="補償事務saga-的真正工作">補償事務：Saga 的真正工作</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#補償對戰的難題" data-toc-link="補償對戰的難題">補償對戰的難題</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#實作策略三種形態" data-toc-link="實作策略三種形態">實作策略：三種形態</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#形態-1手寫編排器" data-toc-link="形態-1手寫編排器">形態 1：手寫編排器</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#形態-2事件驅動的協同" data-toc-link="形態-2事件驅動的協同">形態 2：事件驅動的協同</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#形態-3工作流引擎temporalcamundastep-functions" data-toc-link="形態-3工作流引擎temporalcamundastep-functions">形態 3：工作流引擎（Temporal、Camunda、Step Functions）</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#權衡與可觀測性" data-toc-link="權衡與可觀測性">權衡與可觀測性</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#權衡" data-toc-link="權衡">權衡</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#可觀測性" data-toc-link="可觀測性">可觀測性</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#決策矩陣" data-toc-link="決策矩陣">決策矩陣</a></li><li class="_tocItem_ms9sd_15 _tocDepth3_ms9sd_36"><a href="#決策的兩軸圖" data-toc-link="決策的兩軸圖">決策的兩軸圖</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#結語" data-toc-link="結語">結語</a></li><li class="_tocItem_ms9sd_15 _tocDepth2_ms9sd_32"><a href="#相關模式" data-toc-link="相關模式">相關模式</a></li></ul></div></div><script type="module">function l(){const n=document.querySelectorAll("article h2[id], article h3[id]"),o=document.querySelectorAll("[data-toc-link]");if(n.length===0||o.length===0)return;const i=new IntersectionObserver(e=>{let c=null;e.forEach(t=>{t.isIntersecting&&(c=t.target.id)}),o.forEach(t=>{const r=t.getAttribute("data-toc-link");t.classList.toggle("active",r===c)})},{rootMargin:"-80px 0px -70% 0px",threshold:0});n.forEach(e=>i.observe(e))}document.addEventListener("DOMContentLoaded",l);</script></div><div class="_panel_qdbud_82" data-panel="series"><div class="_seriesWrapper_1diyu_1"><div class="_series_1diyu_1"><div class="_seriesTitle_1diyu_9"><span class="_seriesIcon_1diyu_21" data-series-icon>🏛️</span><span data-series-title>架構模式系列</span></div><ul class="_seriesContent_1diyu_26"><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2020/05/architecture-patterns-quick-reference/" class="_seriesLink_1diyu_36">架構模式快速參考</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/01/rate-limiting-pattern/" class="_seriesLink_1diyu_36">速率限制模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/02/anti-corruption-layer-pattern/" class="_seriesLink_1diyu_36">防腐層模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/03/retry-pattern/" class="_seriesLink_1diyu_36">重試模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/04/claim-check-pattern/" class="_seriesLink_1diyu_36">憑證檢查模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/05/materialized-view-pattern/" class="_seriesLink_1diyu_36">具體化檢視模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/06/strangler-fig-pattern/" class="_seriesLink_1diyu_36">絞殺者無花果模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/07/sidecar-pattern/" class="_seriesLink_1diyu_36">邊車模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/08/sharding-pattern/" class="_seriesLink_1diyu_36">分片模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/09/gateway-aggregation-pattern/" class="_seriesLink_1diyu_36">閘道聚合模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/10/publisher-subscriber-pattern/" class="_seriesLink_1diyu_36">發布者-訂閱者模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/11/health-endpoint-monitoring-pattern/" class="_seriesLink_1diyu_36">健康端點監控模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2019/12/federated-identity-pattern/" class="_seriesLink_1diyu_36">聯合身份模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2020/01/circuit-breaker-pattern/" class="_seriesLink_1diyu_36">斷路器模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2020/03/bulkhead-pattern/" class="_seriesLink_1diyu_36">艙壁模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2026/07/saga-pattern/" class="_seriesLink_1diyu_36 _current_1diyu_48">Saga 模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2020/04/asynchronous-request-reply-pattern/" class="_seriesLink_1diyu_36">非同步請求-回覆模式</a></li><li class="_seriesItem_1diyu_32"><a href="/zh-TW/2026/06/the-hands-and-the-head-mcp-servers-vs-agent-skills/" class="_seriesLink_1diyu_36">MCP 伺服器與代理技能</a></li></ul></div></div></div></div></div></div><script type="module">const g="_active_qdbud_51",O="_open_qdbud_78",h="_isOpen_qdbud_87",e={active:g,open:O,isOpen:h};function w(){const s=document.querySelector("[data-tabbed-wrapper]");if(!s)return;const n=s.querySelector("[data-tabbed-toggle]"),i=s.querySelector("[data-tabbed-panels]"),d=s.querySelectorAll("[data-tab]"),l=s.querySelector('[data-panel="toc"]'),p=s.querySelector('[data-panel="series"]');if(!n||!i)return;const c=document.getElementById("header");if(!c)return;function v(){return c.getBoundingClientRect().height}function a(){if(window.innerWidth>=1024){s.style.top="";return}const t=v();s.style.top=`${t}px`}function L(t){const o=s.querySelector("[data-tab]."+e.active)?.getAttribute("data-tab")===t,f=window.innerWidth>=1024;if(o){if(f)return;i.classList.contains(e.isOpen)?(i.classList.remove(e.isOpen),n.classList.remove(e.open)):(i.classList.add(e.isOpen),n.classList.add(e.open))}else d.forEach(r=>{const b=r.getAttribute("data-tab")===t;r.classList.toggle(e.active,b),r.setAttribute("aria-pressed",b?"true":"false")}),l&&l.classList.toggle(e.active,t==="toc"),p&&p.classList.toggle(e.active,t==="series"),i.classList.add(e.isOpen),n.classList.add(e.open)}d.forEach(t=>{t.addEventListener("click",u=>{u.stopPropagation();const o=t.getAttribute("data-tab");L(o)})}),n.addEventListener("click",()=>{i.classList.contains(e.isOpen)?(i.classList.remove(e.isOpen),n.classList.remove(e.open)):(i.classList.add(e.isOpen),n.classList.add(e.open))}),new ResizeObserver(()=>a()).observe(c),a(),window.addEventListener("resize",a),window.addEventListener("load",a)}document.addEventListener("DOMContentLoaded",w);</script> </aside> <article class="article-content" data-astro-cid-fzx4jmue> <h2 id="問題一筆業務事務五個服務沒有-acid">問題：一筆業務事務、五個服務、沒有 ACID</h2>
+<p>一位旅客預訂一次旅行。航班、飯店、租車、機場接送、旅行保險這五項，分別住在不同的服務裡、不同的資料庫裡、不同的歸屬下。從旅客的視角看，這是一筆事務：要么這五段全都訂到了，否則這筆訂單不存在。從資料庫的視角看，沒有任何原子事務能跨過五個連線集區。</p>
+<p>這不是疏漏。這是把單體拆成微服務之後的結構性後果。ACID 保證只在一個資料庫、一次連線、一個信任邊界內有效。一筆工作只要跨過服務邊界——哪怕是非常小的邊界——全域 ACID 事務就崩了。兩階段提交能讓多個資料庫保持步調一致，但沒法讓多個服務保持步調一致：對第三方航空公司 API 發一次 <code>PREPARE</code> 是一個盡力而為的非同步事件，不是一張事務性的投票。</p>
+<div class="admonition warning"><p class="admonition-title"><span class="admonition-icon">⚠️</span>雙寫問題</p><div class="admonition-content"><p>一種樸素的做法是寫兩次：一次寫進每個服務的本地事務，一次寫到一個「全域」反正規化儲存。每次寫入翻倍，第二次寫入可能獨立失敗，兩次寫入還會賽跑。這份反正規化成了記錄系統，意味著真相的來源被劈成了兩半，意味著之後每一次查詢都要協調兩條時間線。這比當初想要解決的問題還要糟。</p></div></div>
+<p>於是 Saga 模式回答的問題就變得很務實：**當單一 ACID 事務不可能時，對這個問題做最小的改動，使得一筆業務結果仍然可能？**答案是：把業務事務拆成一連串本地事務，每一筆都 <em>能</em> 被撤銷，並接受「撤銷」本身也是一筆本地事務。</p>
+<p>這個模式最早由 Hector Garcia-Molina 和 Kenneth Salem 在他們 1987 年的論文 <em>Sagas</em> 中形式化，背景是長執行資料庫事務。微服務時代的復興——本文要講的——來自 Chris Richardson 的 <code>microservices.io</code> 以及那些在生產裡把它真用起來的系統：AWS Step Functions、Camunda、Temporal。模式本身有四十歲了，應用場景是新的。</p>
+<h2 id="解決方案預覽saga-是一次有回程計劃的航行">解決方案預覽：Saga 是一次有回程計劃的航行</h2>
+<p>一次航行有幾段航程。每一段都是一個有目的地的動作——一次航班、一次飯店、一次租車——而每一段都有一份 <em>回程</em>：如果後面任何一段失敗，把這次旅行撥回原點的對應動作。Saga 模式把這種航行的結構，作為業務工作的單元。</p>
+<blockquote>
+<p><strong>如果說 <a href="/zh-TW/2020/03/bulkhead-pattern/">艙壁模式</a> 是透過把資源分到獨立的池來隔離故障，那麼 Saga 模式就是在沒有共同資料庫的服務之間協調恢復。艙壁擋住爆炸，Saga 寫出把碎片拼回去的劇本。</strong></p>
+</blockquote>
+<p>形式上，Saga 是一連串 <strong>本地事務</strong> <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.3669em;"></span><span class="minner">⋯</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">→</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">n</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>，每一筆都配一個 <strong>補償事務</strong> <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0715em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>。前向進度從左到右進行；在第一次失敗時，Saga 對每一筆已經完成的 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> 反向執行對應的補償。補償 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0715em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span> 是一項真實的動作——<code>CancelFlight</code>、<code>RefundPayment</code>、<code>ReleaseSeat</code>——不是資料庫回滾。Saga 協調的是資料庫事務做不到的事。</p>
+<p>本文覆蓋兩種頂層變體——<strong>編排</strong>（由一個中央協調器告訴每個服務做什麼）和<strong>協同</strong>（每個服務對匯流排上的事件做出反應）——外加三種實作形態、一節權衡討論、一個決策矩陣。文末的相關模式一節會指向 <strong>Circuit Breaker（斷路器）</strong> 和 <strong>Outbox Pattern（發件箱模式）</strong>——這是每一個真正在用的 Saga 最終都需要的兩個模式。</p>
+<h2 id="兩種變體編排-vs-協同">兩種變體：編排 vs 協同</h2>
+<p>同一種形狀，兩種控制邏輯。</p>
+<p><strong>編排式 Saga。</strong> 有一個服務——<em>編排器</em>——知道 Saga 的步驟。它依序呼叫 <code>flight.reserve</code>、<code>hotel.reserve</code>、<code>car.reserve</code>。每一步向編排器返回成功或失敗，編排器決定下一步。任何失敗發生時，編排器對已經完成的步驟反向發出補償呼叫。編排器維護一份 <strong>Saga 日誌</strong>：一份 per-Saga 的、僅追加的日誌，記錄哪些步驟已經完成、哪些已經補償；這樣一旦崩潰，可以重播日誌來恢復。</p>
+<p><strong>協同式 Saga。</strong> 沒有編排器。每個服務在訊息代理上發出事件（<code>FlightReserved</code>、<code>HotelReserved</code>），並監聽其它服務的事件。Saga 的前向進度，就是事件在系統中走過的路徑；補償則是監聽 <code>TripBookingFailed</code> 並做出反應的那些服務。Saga 的狀態住在代理的 offset 和每個參與者自己的本地儲存裡。沒有單一日誌；每個參與者擁有自己那一段。</p>
+<h3 id="沒有-saga-vs-有-saga問題框架">沒有 Saga vs 有 Saga（問題框架）</h3>
+<div class="mermaid">flowchart TB
+    subgraph "沒有 Saga"
+        U1[旅客] --> M[單體&#x3C;br/>單一 ACID 事務&#x3C;br/>覆蓋五段航程]
+        M --> R1[(DB)]
+    end
+    subgraph "有 Saga"
+        U2[旅客] --> API[預訂 API]
+        API --> O[編排器&#x3C;br/>或&#x3C;br/>事件流]
+        O --> F[航班服務]
+        O --> H[飯店服務]
+        O --> C[租車服務]
+        O --> T[接送服務]
+        O --> I[保險服務]
+        F --> DB1[(航班 DB)]
+        H --> DB2[(飯店 DB)]
+        C --> DB3[(租車 DB)]
+    end
+    style M fill:#c8e6c9
+    style R1 fill:#c8e6c9
+    style O fill:#fff9c4
+    style API fill:#fff9c4
+    style DB1 fill:#e1f5ff
+    style DB2 fill:#e1f5ff
+    style DB3 fill:#e1f5ff
+</div>
+<p>單體是沒問題的。微服務版本是把單體拆分之後才會出現的情況——拆分的理由很充分：獨立部署、團隊邊界、擴縮策略。Saga 不是一筆更糟糕的交易，它是一種不同形狀的工作，有不同的失敗模式和不同的運維面。</p>
+<h3 id="編排一條有向序列">編排：一條有向序列</h3>
+<div class="mermaid">sequenceDiagram
+    participant U as 旅客
+    participant O as 編排器
+    participant F as 航班服務
+    participant H as 飯店服務
+    participant C as 租車服務
+
+    U->>O: bookTrip(legs)
+    activate O
+    O->>F: ReserveFlight(leg1)
+    activate F
+    F-->>O: Reserved / Conf#
+    deactivate F
+    O->>H: ReserveHotel(leg2)
+    activate H
+    H-->>O: Reserved / Conf#
+    deactivate H
+    O->>C: ReserveCar(leg3)
+    activate C
+    C--xO: 503 OutOfCars
+    deactivate C
+    Note over O: 步驟失敗。&#x3C;br/>補償已完成的步驟。
+    O->>H: CancelHotelReservation(leg2)
+    activate H
+    H-->>O: Cancelled
+    deactivate H
+    O->>F: CancelFlightReservation(leg1)
+    activate F
+    F-->>O: Cancelled
+    deactivate F
+    O-->>U: Booking Failed（補償已完成）
+    deactivate O
+</div>
+<p>編排器是 <strong>Saga 狀態的唯一所有者</strong>。每一步、每一次補償、每一次重試、每一次逾時，都是它的職責。參與服務對更大的 Saga 一無所知——<code>flight.reserve</code> 和從任何呼叫者那裡收到的請求是同一個呼叫。從參與者一側解耦，是編排器的好處。</p>
+<h3 id="協同一次事件級聯">協同：一次事件級聯</h3>
+<div class="mermaid">sequenceDiagram
+    participant U as 旅客
+    participant API as 預訂 API
+    participant B as 代理
+    participant F as 航班服務
+    participant H as 飯店服務
+    participant C as 租車服務
+
+    U->>API: bookTrip(legs)
+    API->>B: emit TripBookingRequested
+    B-->>F: 投遞 TripBookingRequested
+    F->>B: emit FlightReserved / Conf#
+    B-->>H: 投遞 FlightReserved
+    H->>B: emit HotelReserved / Conf#
+    B-->>C: 投遞 HotelReserved
+    C->>B: emit CarReservationFailed
+    Note over B: 補償流：&#x3C;br/>每個消費者各自反應。
+    B-->>H: 投遞 CarReservationFailed
+    H->>B: emit HotelReservationCancelled
+    B-->>F: 投遞 HotelReservationCancelled
+    F->>B: emit FlightReservationCancelled
+    API->>U: 通知最終狀態
+</div>
+<p>沒有中心服務擁有任何東西。Saga 的前向進度，就是代理投遞出來的事件序列。補償流是 <em>另一串</em> 事件，往回走。脆弱之處藏在跨服務的事件契約裡：<code>TripBookingRequested</code> 一改 schema，下游的三個消費者就要同步遷移。</p>
+<div class="admonition tip"><p class="admonition-title"><span class="admonition-icon">💡</span>「誰擁有這個 Saga？」是正確的問題</p><div class="admonition-content"><p>編排式 Saga 由編排器擁有。協同式 Saga 由 <em>每一個處理相關事件的消費者</em> 擁有——等團隊圖全了，「擁有者」就是代理掛掉那一刻恰好還醒著的那位工程師。挑那個你能撐到凌晨三點的歸屬故事的變體。</p></div></div>
+<h2 id="補償事務saga-的真正工作">補償事務：Saga 的真正工作</h2>
+<p>模式的名字暗示的是前向進度。真正的工作是 <em>按需的反向進度</em>。對每筆前向事務 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>，Saga 必須定義一個補償事務 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0715em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>，在語意上撤銷 <span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>——不是資料庫回滾，是一項動作。</p>
+<p>在 <code>microservices.io</code> 經典的旅行預訂例子中，Saga 是這樣的：</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>步驟</th><th>前向 (<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.1389em;">T</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.1389em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>)</th><th>補償 (<span class="katex"><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.8333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.0715em;">C</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3117em;"><span style="top:-2.55em;margin-left:-0.0715em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span>)</th></tr></thead><tbody><tr><td>1</td><td><code>ReserveFlight</code></td><td><code>CancelFlightReservation</code></td></tr><tr><td>2</td><td><code>ReserveHotel</code></td><td><code>CancelHotelReservation</code></td></tr><tr><td>3</td><td><code>ReserveCar</code></td><td><code>CancelCarReservation</code></td></tr><tr><td>4</td><td><code>ReserveAirportTransfer</code></td><td><code>CancelAirportTransfer</code></td></tr><tr><td>5</td><td><code>ActivateTravelInsurance</code></td><td><code>CancelTravelInsurance</code></td></tr></tbody></table>
+<p>這些補償不是 <code>DELETE FROM booking WHERE id = ?</code>。它們是 <strong>業務動作</strong>，用來撤銷前向步驟的業務效果：對航空公司 API 取消訂座，把房間歸還飯店的庫存，把車重新標記為可訂。一筆補償本身也會失敗——這是 Saga 最被忽視的失敗模式。</p>
+<h3 id="補償對戰的難題">補償對戰的難題</h3>
+<p>想像 <code>CancelFlightReservation</code> 本身也失敗了。Saga 正在清理時，航空公司 API 返回 503。這時 Saga 卡在半補償狀態：航空公司系統裡航班訂座還在（錢已付），飯店和租車都取消了（OK），編排器（或協同的消費者）在補償上死循環重試。</p>
+<p>應對這個問題的模式是：</p>
+<ul>
+<li><strong>冪等補償。</strong> 每一筆補償都帶一個 <code>idempotency_key</code>，由 <code>(saga_id, step_id, "compensation")</code> 衍生。第一次呼叫有效；後續用同一 key 的重試都是 no-op。補償的效果，無論是第一次就成功，還是第一百零一次才成功，都一樣。</li>
+<li><strong>Saga 層的退避重試。</strong> 編排器（或協同的消費者）按計劃重試失敗的補償——指數退避加一個最大間隔，一直重試到補償成功，或人為逾時中止 Saga。</li>
+<li><strong>為 Saga 的日誌再套一層 Saga。</strong> 當連補償日誌都不靠譜時，升級到一個 <em>meta-saga</em>，監控主 Saga 的卡死補償並施加運維干預（人工補償、部分退款），把自動化解決不了的案例暴露給人。</li>
+<li><strong>參與者層面的冪等。</strong> 參與者服務是最後一道防線：如果它收到兩次帶相同冪等 key 的 <code>CancelFlightReservation</code>，第二次就是 no-op。Saga 沒有參與者層面的冪等就玩不轉。</li>
+</ul>
+<div class="admonition anote"><p class="admonition-title"><span class="admonition-icon">📝</span>一筆沒有補償的前向步驟，是一種設計異味</p><div class="admonition-content"><p>如果你在 Saga 裡發現一筆前向步驟沒有乾淨的補償，那這步大概不屬於這個 Saga——「我們沒法撤銷」對應的失敗模式不是「加大力度補償」，而是「在不可逆不再是問題之前，不要執行那個不可逆的動作」。真實例子：<code>ActivateInsurancePolicy</code> 步驟有一個補償（<code>CancelPolicy</code>），但前提是啟動之後還有一個 <code>pending</code> 視窗。過了視窗就沒有補償。修法是把啟動保持在一個有受控延遲的狀態機裡，而不是圍繞不可逆的情形寫一段聰明的 Saga。</p></div></div>
+<p>部分補償的邊界情況——退款減去取消費、部分反轉、不可逆副作用步驟——本身就是一個豐富的話題，有不能乾淨歸入上述「完全撤銷」模型的失敗模式。<strong>本系列會有後續文章專門講補償語意</strong>——具體的位置見文末相關模式一節。完全撤銷假設是當下理解 Saga 實作的承重假設；部分補償是它的嚴格超集，需要更豐富的狀態模型。</p>
+<h2 id="實作策略三種形態">實作策略：三種形態</h2>
+<p>模式是形狀，不是產品。下面這三種形態是生產程式碼裡會看到的——Temporal、Camunda、AWS Step Functions 都落在第三種；前兩種是手寫的。</p>
+<h3 id="形態-1手寫編排器">形態 1：手寫編排器</h3>
+<p>最簡單、能上生產的實作是一個編排器服務，它把 Saga 的步驟圖跑在真實的參與者服務之上。Saga 日誌是編排器資料庫裡的一張表。步驟失敗觸發反向執行的補償。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// saga/orchestrator.ts —— 一個 90 行的 Saga 編排器，含重試、退避、</span></span>
+<span class="line"><span style="color:#6A737D">// 冪等和 Saga 日誌。生產程式碼會把 saga_log 持久化到資料庫；這裡的</span></span>
+<span class="line"><span style="color:#6A737D">// 形狀是承重的部分，不是線纜格式。</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> SagaStep</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  readonly</span><span style="color:#FFAB70"> id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#B392F0">  execute</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;{ </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">result</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> unknown</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">reason</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> }>;</span></span>
+<span class="line"><span style="color:#B392F0">  compensate</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> () </span><span style="color:#F97583">=></span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;{ </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">reason</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> }>;</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> SagaLog</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">  saga_id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">  completed</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">[];        </span><span style="color:#6A737D">// 依完成順序排列的步驟 id</span></span>
+<span class="line"><span style="color:#FFAB70">  compensations_run</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">[];</span></span>
+<span class="line"><span style="color:#FFAB70">  state</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> 'started'</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> 'forward'</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> 'compensating'</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> 'completed'</span><span style="color:#F97583"> |</span><span style="color:#9ECBFF"> 'failed'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> runSaga</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  steps</span><span style="color:#F97583">:</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> SagaStep</span><span style="color:#E1E4E8">[],</span></span>
+<span class="line"><span style="color:#FFAB70">  log</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SagaLog</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  retry</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">maxAttempts</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">; </span><span style="color:#B392F0">backoffMs</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">n</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#79B8FF"> number</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    maxAttempts: </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#B392F0">    backoffMs</span><span style="color:#E1E4E8">: </span><span style="color:#FFAB70">n</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> Math.</span><span style="color:#B392F0">min</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">30_000</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">500</span><span style="color:#F97583"> *</span><span style="color:#79B8FF"> 2</span><span style="color:#F97583"> **</span><span style="color:#E1E4E8"> n),</span></span>
+<span class="line"><span style="color:#E1E4E8">  },</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;{ </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> true</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">ok</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> false</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">failedStep</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> }> {</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> step</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> steps) {</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#E1E4E8"> attempt </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#E1E4E8"> result</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Awaited</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">ReturnType</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">SagaStep</span><span style="color:#E1E4E8">[</span><span style="color:#9ECBFF">'execute'</span><span style="color:#E1E4E8">]>>;</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> (;;) {</span></span>
+<span class="line"><span style="color:#E1E4E8">      result </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> step.</span><span style="color:#B392F0">execute</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (result.ok) </span><span style="color:#F97583">break</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">      attempt</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (attempt </span><span style="color:#F97583">>=</span><span style="color:#E1E4E8"> retry.maxAttempts) {</span></span>
+<span class="line"><span style="color:#6A737D">        // 標記進入補償並落穿。</span></span>
+<span class="line"><span style="color:#E1E4E8">        log.state </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'compensating'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        await</span><span style="color:#B392F0"> compensateInReverse</span><span style="color:#E1E4E8">(steps, log, retry);</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8"> { ok: </span><span style="color:#79B8FF">false</span><span style="color:#E1E4E8">, failedStep: step.id };</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#F97583"> new</span><span style="color:#79B8FF"> Promise</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">r</span><span style="color:#F97583"> =></span><span style="color:#B392F0"> setTimeout</span><span style="color:#E1E4E8">(r, retry.</span><span style="color:#B392F0">backoffMs</span><span style="color:#E1E4E8">(attempt)));</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">    log.completed.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">(step.id);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">  log.state </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'completed'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  return</span><span style="color:#E1E4E8"> { ok: </span><span style="color:#79B8FF">true</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> compensateInReverse</span><span style="color:#E1E4E8">(</span></span>
+<span class="line"><span style="color:#FFAB70">  steps</span><span style="color:#F97583">:</span><span style="color:#F97583"> readonly</span><span style="color:#B392F0"> SagaStep</span><span style="color:#E1E4E8">[],</span></span>
+<span class="line"><span style="color:#FFAB70">  log</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SagaLog</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#FFAB70">  retry</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SagaParameters</span><span style="color:#E1E4E8">[</span><span style="color:#9ECBFF">'retry'</span><span style="color:#E1E4E8">],</span></span>
+<span class="line"><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#79B8FF">void</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">  for</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">const</span><span style="color:#79B8FF"> step</span><span style="color:#F97583"> of</span><span style="color:#E1E4E8"> [</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">log.completed].</span><span style="color:#B392F0">reverse</span><span style="color:#E1E4E8">().</span><span style="color:#B392F0">map</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">id</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> steps.</span><span style="color:#B392F0">find</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">s</span><span style="color:#F97583"> =></span><span style="color:#E1E4E8"> s.id </span><span style="color:#F97583">===</span><span style="color:#E1E4E8"> id)</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#F97583">    let</span><span style="color:#E1E4E8"> attempt </span><span style="color:#F97583">=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">    for</span><span style="color:#E1E4E8"> (;;) {</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> r</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> step.</span><span style="color:#B392F0">compensate</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (r.ok) { log.compensations_run.</span><span style="color:#B392F0">push</span><span style="color:#E1E4E8">(step.id); </span><span style="color:#F97583">break</span><span style="color:#E1E4E8">; }</span></span>
+<span class="line"><span style="color:#E1E4E8">      attempt</span><span style="color:#F97583">++</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">      if</span><span style="color:#E1E4E8"> (attempt </span><span style="color:#F97583">>=</span><span style="color:#E1E4E8"> retry.maxAttempts) {</span></span>
+<span class="line"><span style="color:#E1E4E8">        log.state </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'failed'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">        return</span><span style="color:#E1E4E8">; </span><span style="color:#6A737D">// saga-for-the-saga</span></span>
+<span class="line"><span style="color:#E1E4E8">      }</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#F97583"> new</span><span style="color:#79B8FF"> Promise</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">r</span><span style="color:#F97583"> =></span><span style="color:#B392F0"> setTimeout</span><span style="color:#E1E4E8">(r, retry.</span><span style="color:#B392F0">backoffMs</span><span style="color:#E1E4E8">(attempt)));</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">  log.state </span><span style="color:#F97583">=</span><span style="color:#9ECBFF"> 'failed'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> SagaParameters</span><span style="color:#F97583"> =</span><span style="color:#B392F0"> Parameters</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">typeof</span><span style="color:#E1E4E8"> runSaga>[</span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8">];</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#6A737D">// 用法：</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> steps</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SagaStep</span><span style="color:#E1E4E8">[] </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> [</span></span>
+<span class="line"><span style="color:#E1E4E8">  { id: </span><span style="color:#9ECBFF">'flight'</span><span style="color:#E1E4E8">, </span><span style="color:#B392F0">execute</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> flight.</span><span style="color:#B392F0">reserve</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">), </span><span style="color:#B392F0">compensate</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> flight.</span><span style="color:#B392F0">cancel</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">) },</span></span>
+<span class="line"><span style="color:#E1E4E8">  { id: </span><span style="color:#9ECBFF">'hotel'</span><span style="color:#E1E4E8">,  </span><span style="color:#B392F0">execute</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> hotel.</span><span style="color:#B392F0">reserve</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">),  </span><span style="color:#B392F0">compensate</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> hotel.</span><span style="color:#B392F0">cancel</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">) },</span></span>
+<span class="line"><span style="color:#E1E4E8">  { id: </span><span style="color:#9ECBFF">'car'</span><span style="color:#E1E4E8">,    </span><span style="color:#B392F0">execute</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> car.</span><span style="color:#B392F0">reserve</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">),    </span><span style="color:#B392F0">compensate</span><span style="color:#E1E4E8">: () </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> car.</span><span style="color:#B392F0">cancel</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">...</span><span style="color:#E1E4E8">) },</span></span>
+<span class="line"><span style="color:#E1E4E8">];</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> log</span><span style="color:#F97583">:</span><span style="color:#B392F0"> SagaLog</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> { saga_id: </span><span style="color:#9ECBFF">'trip-001'</span><span style="color:#E1E4E8">, completed: [], compensations_run: [], state: </span><span style="color:#9ECBFF">'started'</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> result</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> runSaga</span><span style="color:#E1E4E8">(steps, log);</span></span></code></pre>
+<p>形狀是：一個步驟迭代器、每步一個重試/退避迴圈、一份由 Saga 日誌驅動的補償迴圈，以及日誌本身的一台狀態機。真正的實作會把 <code>log</code> 放進有樂觀並發的資料庫行；這段程式碼是概念骨架，不是生產檔案。加上 Saga 日誌持久化、錯誤落到死信佇列、再加一層給卡死補償的 meta-Saga，你就有一個能上生產的手寫編排器。</p>
+<h3 id="形態-2事件驅動的協同">形態 2：事件驅動的協同</h3>
+<p>協同這種形態是 <em>沒有編排器</em>。每個參與者服務擁有 Saga 的自己那段，對訊息代理上的事件做出反應。Saga 的狀態是分散式的。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// flight-service.ts —— 協同式預訂 Saga 中的航班參與者。</span></span>
+<span class="line"><span style="color:#6A737D">// 訂閱 TripBookingRequested；發出 FlightReserved 或</span></span>
+<span class="line"><span style="color:#6A737D">// FlightReservationFailed。</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { EventEmitter } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> 'node:events'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> TripBookingRequested</span><span style="color:#F97583"> =</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#FFAB70">  saga_id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">  leg_id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#FFAB70">  flight_offer</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">airline</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">flight_no</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">iso</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> };</span></span>
+<span class="line"><span style="color:#FFAB70">  trace</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">;          </span><span style="color:#6A737D">// 用於分散式追蹤的關聯 id</span></span>
+<span class="line"><span style="color:#E1E4E8">};</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">type</span><span style="color:#B392F0"> SagaEvent</span><span style="color:#F97583"> =</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">type</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> 'TripBookingRequested'</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">payload</span><span style="color:#F97583">:</span><span style="color:#B392F0"> TripBookingRequested</span><span style="color:#E1E4E8"> }</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">type</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> 'FlightReserved'</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">payload</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">saga_id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">conf</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> } }</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">type</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> 'FlightReservationFailed'</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">payload</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">saga_id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">reason</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> } }</span></span>
+<span class="line"><span style="color:#F97583">  |</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">type</span><span style="color:#F97583">:</span><span style="color:#9ECBFF"> 'TripBookingCancelled'</span><span style="color:#E1E4E8">; </span><span style="color:#FFAB70">payload</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> { </span><span style="color:#FFAB70">saga_id</span><span style="color:#F97583">:</span><span style="color:#79B8FF"> string</span><span style="color:#E1E4E8"> } };</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#79B8FF"> bus</span><span style="color:#F97583"> =</span><span style="color:#F97583"> new</span><span style="color:#B392F0"> EventEmitter</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">bus.</span><span style="color:#B392F0">on</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'TripBookingRequested'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">evt</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (evt.payload.leg_id </span><span style="color:#F97583">!==</span><span style="color:#9ECBFF"> 'flight'</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    const</span><span style="color:#79B8FF"> conf</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> flightProvider.</span><span style="color:#B392F0">reserve</span><span style="color:#E1E4E8">(evt.payload.flight_offer, evt.payload.trace);</span></span>
+<span class="line"><span style="color:#E1E4E8">    bus.</span><span style="color:#B392F0">emit</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'saga'</span><span style="color:#E1E4E8">, { type: </span><span style="color:#9ECBFF">'FlightReserved'</span><span style="color:#E1E4E8">, payload: { saga_id: evt.payload.saga_id, conf } } </span><span style="color:#F97583">satisfies</span><span style="color:#B392F0"> SagaEvent</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#E1E4E8">    bus.</span><span style="color:#B392F0">emit</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'saga'</span><span style="color:#E1E4E8">, {</span></span>
+<span class="line"><span style="color:#E1E4E8">      type: </span><span style="color:#9ECBFF">'FlightReservationFailed'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">      payload: { saga_id: evt.payload.saga_id, reason: </span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(err) },</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">satisfies</span><span style="color:#B392F0"> SagaEvent</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">bus.</span><span style="color:#B392F0">on</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'TripBookingCancelled'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">evt</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> log</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> readCompensationLog</span><span style="color:#E1E4E8">(evt.payload.saga_id);</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (</span><span style="color:#F97583">!</span><span style="color:#E1E4E8">log.flightReserved) </span><span style="color:#F97583">return</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">    await</span><span style="color:#E1E4E8"> flightProvider.</span><span style="color:#B392F0">cancel</span><span style="color:#E1E4E8">(log.conf, evt.payload.saga_id </span><span style="color:#6A737D">/* idempotency key */</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    bus.</span><span style="color:#B392F0">emit</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'saga'</span><span style="color:#E1E4E8">, { type: </span><span style="color:#9ECBFF">'FlightReservationCancelled'</span><span style="color:#E1E4E8">, payload: { saga_id: evt.payload.saga_id } } </span><span style="color:#F97583">satisfies</span><span style="color:#B392F0"> SagaEvent</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#6A737D">    // 重試由代理的 redelivery + 死信佇列處理。</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#E1E4E8"> err;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#B392F0">emit</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'FlightReserved'</span><span style="color:#E1E4E8">, { saga_id, conf });</span></span></code></pre>
+<p>這裡的承重形狀是：<strong>事件先向前流動，然後補償事件向回流動</strong>。每個消費者有自己一套冪等故事。所謂「Saga 狀態」，是任何一個消費者能從自己看到的事件裡推算出來的部分；不存在全域視圖。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// hotel-service.ts —— 對 FlightReserved 和 CarReservationFailed</span></span>
+<span class="line"><span style="color:#6A737D">// 做出反應的飯店參與者。這是從第二步內部看到的協同式 Saga 長這樣。</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#E1E4E8">bus.</span><span style="color:#B392F0">on</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'FlightReserved'</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">async</span><span style="color:#E1E4E8"> (</span><span style="color:#FFAB70">evt</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">=></span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> saga</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> readSaga</span><span style="color:#E1E4E8">(evt.payload.saga_id);</span></span>
+<span class="line"><span style="color:#F97583">  if</span><span style="color:#E1E4E8"> (saga.legs.</span><span style="color:#B392F0">includes</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'hotel'</span><span style="color:#E1E4E8">) </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#F97583"> !</span><span style="color:#E1E4E8">saga.hotelReserved) {</span></span>
+<span class="line"><span style="color:#F97583">    try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#F97583">      const</span><span style="color:#79B8FF"> conf</span><span style="color:#F97583"> =</span><span style="color:#F97583"> await</span><span style="color:#E1E4E8"> hotelProvider.</span><span style="color:#B392F0">reserve</span><span style="color:#E1E4E8">(saga.hotelOffer, evt.payload.saga_id);</span></span>
+<span class="line"><span style="color:#E1E4E8">      bus.</span><span style="color:#B392F0">emit</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'saga'</span><span style="color:#E1E4E8">, { type: </span><span style="color:#9ECBFF">'HotelReserved'</span><span style="color:#E1E4E8">, payload: { saga_id: evt.payload.saga_id, conf } } </span><span style="color:#F97583">satisfies</span><span style="color:#B392F0"> SagaEvent</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#E1E4E8">    } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#E1E4E8">      bus.</span><span style="color:#B392F0">emit</span><span style="color:#E1E4E8">(</span><span style="color:#9ECBFF">'TripBookingCancelled'</span><span style="color:#E1E4E8">, { payload: { saga_id: evt.payload.saga_id, reason: </span><span style="color:#B392F0">String</span><span style="color:#E1E4E8">(err) } } </span><span style="color:#F97583">satisfies</span><span style="color:#79B8FF"> never</span><span style="color:#F97583"> as</span><span style="color:#79B8FF"> never</span><span style="color:#F97583"> as</span><span style="color:#79B8FF"> any</span><span style="color:#E1E4E8">);</span></span>
+<span class="line"><span style="color:#6A737D">      // 生產裡還要發 FlightReservationFailed，讓航班補償器也能跑。</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">});</span></span></code></pre>
+<p>協同的人體工學代價恰好就在這裡：每個參與者都要知道要對哪些事件反應、對哪些事件忽略，而 Saga 裡每加一步，都要改其它每個消費者的邏輯。編排器把這表達成一個清單；協同把它表達成一張圖。</p>
+<h3 id="形態-3工作流引擎temporalcamundastep-functions">形態 3：工作流引擎（Temporal、Camunda、Step Functions）</h3>
+<p>工作流引擎把編排器外化出來。引擎持久化 Saga 日誌、排程重試、並開箱即用地提供對執行中 Saga 的可觀測性。團隊寫 Saga 的邏輯；引擎負責跑。</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="typescript"><code><span class="line"><span style="color:#6A737D">// saga.workflow.ts —— 同一個預訂 Saga 的 Temporal workflow。</span></span>
+<span class="line"><span style="color:#6A737D">// 注意：函式體就是一個普通的 async；workflow 拋出時，</span></span>
+<span class="line"><span style="color:#6A737D">// Temporal 會自動處理重試、Saga 日誌、逾時和補償呼叫。</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#E1E4E8"> { proxyActivities, ApplicationFailure } </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> '@temporalio/workflow'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#F97583">import</span><span style="color:#F97583"> type</span><span style="color:#79B8FF"> *</span><span style="color:#F97583"> as</span><span style="color:#E1E4E8"> acts </span><span style="color:#F97583">from</span><span style="color:#9ECBFF"> './activities'</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">const</span><span style="color:#E1E4E8"> { </span><span style="color:#79B8FF">reserveFlight</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">cancelFlight</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">reserveHotel</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">cancelHotel</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">reserveCar</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">cancelCar</span><span style="color:#E1E4E8"> } </span><span style="color:#F97583">=</span></span>
+<span class="line"><span style="color:#B392F0">  proxyActivities</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#F97583">typeof</span><span style="color:#E1E4E8"> acts>({</span></span>
+<span class="line"><span style="color:#E1E4E8">    startToCloseTimeout: </span><span style="color:#9ECBFF">'30s'</span><span style="color:#E1E4E8">,</span></span>
+<span class="line"><span style="color:#E1E4E8">    retry: { maximumAttempts: </span><span style="color:#79B8FF">5</span><span style="color:#E1E4E8">, backoffCoefficient: </span><span style="color:#79B8FF">2</span><span style="color:#E1E4E8"> },</span></span>
+<span class="line"><span style="color:#E1E4E8">  });</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#F97583">export</span><span style="color:#F97583"> async</span><span style="color:#F97583"> function</span><span style="color:#B392F0"> bookTripSaga</span><span style="color:#E1E4E8">(</span><span style="color:#FFAB70">legs</span><span style="color:#F97583">:</span><span style="color:#B392F0"> TripLegs</span><span style="color:#E1E4E8">)</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Promise</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Trip</span><span style="color:#E1E4E8">> {</span></span>
+<span class="line"><span style="color:#F97583">  const</span><span style="color:#79B8FF"> conf</span><span style="color:#F97583">:</span><span style="color:#B392F0"> Partial</span><span style="color:#E1E4E8">&#x3C;</span><span style="color:#B392F0">Trip</span><span style="color:#E1E4E8">> </span><span style="color:#F97583">=</span><span style="color:#E1E4E8"> {};</span></span>
+<span class="line"><span style="color:#F97583">  try</span><span style="color:#E1E4E8"> {</span></span>
+<span class="line"><span style="color:#E1E4E8">    conf.flight </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> reserveFlight</span><span style="color:#E1E4E8">(legs.flight);</span></span>
+<span class="line"><span style="color:#E1E4E8">    conf.hotel  </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> reserveHotel</span><span style="color:#E1E4E8">(legs.hotel);</span></span>
+<span class="line"><span style="color:#E1E4E8">    conf.car    </span><span style="color:#F97583">=</span><span style="color:#F97583"> await</span><span style="color:#B392F0"> reserveCar</span><span style="color:#E1E4E8">(legs.car);</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> conf </span><span style="color:#F97583">as</span><span style="color:#B392F0"> Trip</span><span style="color:#E1E4E8">;</span></span>
+<span class="line"><span style="color:#E1E4E8">  } </span><span style="color:#F97583">catch</span><span style="color:#E1E4E8"> (err) {</span></span>
+<span class="line"><span style="color:#6A737D">    // Temporal 的 Saga 補償 API 負責反向呼叫。</span></span>
+<span class="line"><span style="color:#6A737D">    // 在補償模式下，fail() 不會被重試——引擎</span></span>
+<span class="line"><span style="color:#6A737D">    // 把這次補償記成 Saga 的一步。</span></span>
+<span class="line"><span style="color:#F97583">    if</span><span style="color:#E1E4E8"> (ApplicationFailure.</span><span style="color:#B392F0">hasType</span><span style="color:#E1E4E8">(err, </span><span style="color:#9ECBFF">'CarReservationFailed'</span><span style="color:#E1E4E8">)) {</span></span>
+<span class="line"><span style="color:#F97583">      await</span><span style="color:#79B8FF"> Promise</span><span style="color:#E1E4E8">.</span><span style="color:#B392F0">allSettled</span><span style="color:#E1E4E8">([</span></span>
+<span class="line"><span style="color:#E1E4E8">        conf.hotel  </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#B392F0"> cancelHotel</span><span style="color:#E1E4E8">(conf.hotel),</span></span>
+<span class="line"><span style="color:#E1E4E8">        conf.flight </span><span style="color:#F97583">&#x26;&#x26;</span><span style="color:#B392F0"> cancelFlight</span><span style="color:#E1E4E8">(conf.flight),</span></span>
+<span class="line"><span style="color:#E1E4E8">      ]);</span></span>
+<span class="line"><span style="color:#E1E4E8">    }</span></span>
+<span class="line"><span style="color:#F97583">    throw</span><span style="color:#E1E4E8"> err;</span></span>
+<span class="line"><span style="color:#E1E4E8">  }</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>這是和形態 1 一樣的形狀，只是編排器的「Saga 日誌」是 Temporal 的狀態儲存，「重試」是 activity 的重試策略，「補償」是 workflow 的 catch 塊。生產團隊在發現手寫版本那些失敗模式（Saga 日誌持久化、可觀測性、跨部署存活的長 Saga）開始比引擎本身還貴時，就會轉向引擎。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th>形態</th><th>什麼時候伸手拿它</th><th>權衡</th></tr></thead><tbody><tr><td>手寫編排器</td><td>一個團隊，流程簡單，並且想讀懂 Saga 程式碼的每一行</td><td>Saga 日誌的持久化、可觀測性、恢復故事都得自己扛</td></tr><tr><td>協同</td><td>參與者由不同團隊擁有；Saga 天生就是鬆耦合</td><td>可觀測性成本；跨團隊的事件 schema 協調</td></tr><tr><td>工作流引擎</td><td>長執行 Saga（數小時到數天）、Saga 變體數量大、需要扛過部署的持久執行</td><td>增加一個供應商 / 自架設依賴；引擎特定概念</td></tr></tbody></table>
+<h2 id="權衡與可觀測性">權衡與可觀測性</h2>
+<p>Saga 模式不是免費的。三條權衡、三個可觀測面。</p>
+<h3 id="權衡">權衡</h3>
+<ul>
+<li><strong>運維複雜度。</strong> Saga 每一步要監控三件事（前向成功、補償成功、卡死補償）、每一步要有一份重試策略、Saga 日誌還得扛住進程重啟和資料庫遷移。單體有一筆事務；Saga 有一套運維流程。</li>
+<li><strong>最終一致性視窗。</strong> 在 Saga 前向步驟成功的那一刻，到所有下游服務看到結果狀態之間，Saga 是 <em>不一致的</em>。視窗可以短到毫秒級（同步編排器、快的代理），也可以長到分鐘級（協同、人工介入）。業務必須能對橫跨視窗的查詢進行推理——<em>「航班訂上了嗎？」</em> 這個問題的答案，要看飯店服務是否已經看到這次 Saga。</li>
+<li><strong>耦合權衡。</strong> 編排把 <em>編排器</em> 跟每個參與者的契約耦合在一起；協同把 <em>每個參與者</em> 跟其它每個參與者的事件 schema 耦合在一起。挑你想站的那一邊。</li>
+</ul>
+<h3 id="可觀測性">可觀測性</h3>
+<p>決定 Saga 在生產裡生死的三個觀測面：</p>
+<ul>
+<li><strong>每一步的冪等 key。</strong> 每次前向呼叫和每次補償都帶 <code>idempotency_key = hash(saga_id, step_id, "compensation"|"forward")</code>。按冪等 key 搜尋就能看到完整的 Saga 狀態，即使 Saga 日誌殘缺不全。</li>
+<li><strong>關聯 ID。</strong> Saga 步驟的每一條日誌、追蹤和指標，都帶 <code>saga_id</code> 和 <code>trace_id</code>。單一查詢應該能從日誌和追蹤裡重建出 Saga 的歷史，不需要去查 Saga 日誌。</li>
+<li><strong>Saga 狀態儀表板。</strong> 按狀態（<code>started</code>、<code>forward</code>、<code>compensating</code>、<code>completed</code>、<code>failed</code>、<code>stuck</code>）對 Saga 計數，看時間趨勢。卡死補償是最重要的指標——它就是需要人介入的那種。</li>
+</ul>
+<div class="admonition success"><p class="admonition-title"><span class="admonition-icon">✅</span>如果你的監控裡看不到卡死 Saga 狀態計數，你就沒有 Saga 可觀測性</p><div class="admonition-content"><p>一份沒暴露在 Runbook 裡的 Saga 日誌是不可見的。最簡單的儀表板是兩個計數器：前向進度（最近一小時 <code>started → completed</code>）和補償進度（最近一小時 <code>compensating → compensated</code>）。第二個數字飆起來說明有問題；第一個數字走平說明有更大的問題。</p></div></div>
+<h2 id="決策矩陣">決策矩陣</h2>
+<p>伸手拿那個形狀合得上的變體。八條規則，每條一條試金石。</p>
+<div class="admonition anote"><p class="admonition-title"><span class="admonition-icon">🧭</span>決策矩陣——編排 vs 協同，八條規則</p><div class="admonition-content"><p><strong>規則 1 —— 當 Saga 的邏輯歸一個團隊所有時，伸手拿編排。</strong>
+如果有一個團隊同時擁有工作流的所有步驟 <em>和</em> 每一個參與者服務，編排器把 Saga 表達成一個清單，團隊能讀懂它。耦合成本是局部的；可觀測性在一處。</p><p><strong>規則 2 —— 當參與者歸多個團隊所有時，伸手拿協同。</strong>
+如果航班服務、飯店服務、租車服務由各自獨立部署節奏的不同團隊所有，沒有編排器屬於它們中的任何一個。協同的事件契約是唯一誠實的 API 表面。</p><p><strong>規則 3 —— 當 Saga 狀態必須全域可觀測時，伸手拿編排。</strong>
+如果你需要用一次儀表板查詢回答 <em>「現在有多少 Saga 卡在補償？」</em>，編排的 Saga 日誌免費送你這個答案。協同給你的是一道分散式拼裝題。</p><p><strong>規則 4 —— 當 Saga 沒有天然的「指揮者」服務時，伸手拿協同。</strong>
+有些 Saga 沒有明顯的編排器候選——加一個就得寫一個新服務並負責運維。協同起步便宜，讓參與者各自獨立演進。</p><p><strong>規則 5 —— 當 Saga 跑數小時到數天時，伸手拿工作流引擎。</strong>
+手寫編排器扛不住部署。引擎（Temporal、Camunda、Step Functions）把 Saga 日誌持久化過部署、叢集故障、操作失誤；引擎成本靠你不用再處理的事故賺回來。</p><p><strong>規則 6 —— 只有當你的事件帶全狀態時，才伸手拿協同。</strong>
+協同式 Saga 的 <code>FlightReserved</code> 事件必須帶足飯店服務做它的事 <em>而不回呼航班服務</em> 所需的資訊。協同 + 多回呼 = 換了皮的編排，而且更糟。</p><p><strong>規則 7 —— 當補償很常見時，伸手拿編排。</strong>
+如果補償路徑在生產裡跑得比前向路徑還多，「每個消費者對事件做出反應」的成本就會變成每次改動的稅。編排把補償路徑變成一次函式呼叫。</p><p><strong>規則 8 —— 當你的團隊已經在事件溯源上投入時，伸手拿協同。</strong>
+協同 <em>天然</em> 建立在事件溯源系統之上——每一個狀態變化都已經是事件，每個消費者從同一份日誌讀。在沒有事件的有狀態資料庫上做協同，是彆扭且慢的。</p><p><strong>規則 0（承重的那條）—— 當單一 ACID 事務能罩住時，兩個都不要拿。</strong>
+如果一筆預訂的五段都能住在一個資料庫、一次連線裡，那 Saga 就是過度設計。Saga 給你換一種能力；用不到的時候別為它付費。</p></div></div>
+<p>讀一遍，存到團隊的 wiki 裡，你下一次範圍裡的 Saga 特性就能一眼找到它該走的變體。</p>
+<h3 id="決策的兩軸圖">決策的兩軸圖</h3>
+<div class="mermaid">flowchart LR
+    Q1{一個團隊&#x3C;br/>擁有所有&#x3C;br/>服務？}
+    Q2{Saga 跑&#x3C;br/>數小時&#x3C;br/>或數天？}
+    Q3{需要&#x3C;br/>Saga 狀態&#x3C;br/>可觀測？}
+    Q4{多個團隊&#x3C;br/>擁有&#x3C;br/>參與者？}
+
+    Q1 -->|是| ORC[編排器]
+    Q1 -->|否| Q4
+    Q4 -->|是| CHORE[協同]
+    Q4 -->|否| Q2
+    Q2 -->|是| ENGINE[工作流引擎]
+    Q2 -->|否| Q3
+    Q3 -->|是| ORC
+    Q3 -->|否| BOTH{兩種都行}
+
+    style ORC fill:#c8e6c9,stroke:#2f9e44
+    style CHORE fill:#fff9c4,stroke:#f59f00
+    style ENGINE fill:#e1f5ff,stroke:#1971c2
+    style BOTH fill:#f5f5f5,stroke:#757575
+</div>
+<p>流程圖先看前三個問題向下讀；如果沒有清晰訊號就預設「兩種都行」。單團隊訊號是最強的；Saga 時長訊號壓過可觀測性，因為沒有哪個手寫編排器能跨部署活過一筆多日 Saga。</p>
+<h2 id="結語">結語</h2>
+<p>Saga 模式就是當 ACID 跨不過服務邊界時協調工作長成的樣子。兩個變體——編排和協同——是同一種形狀的兩種控制邏輯：一個說「做這個，做這個，再做這個」；另一個說「對這個反應，對那個反應」。它們承擔相同的重量：前向事務配上補償，持久化在一份能恢復的 Saga 日誌裡，靠關聯 ID 和卡死 Saga 計數器觀測，前面接一套根據約束挑變體的決策程序。</p>
+<p>和 <a href="/zh-TW/2020/03/bulkhead-pattern/">艙壁模式</a> 合在一起——它隔離故障——Saga 模式協調恢復。兩個模式是同一道答案的兩半：艙壁擋住爆炸，Saga 寫出劇本。<strong>本系列會有後續文章專門講補償語意</strong>，包括部分補償和不可逆副作用步驟；留意 saga-compensation-semantics 這一篇。</p>
+<h2 id="相關模式">相關模式</h2>
+<p>每一個真正在用的 Saga，最終都至少還需要本系列裡的另外兩個模式。艙壁是架構上的前置條件；<strong>Circuit Breaker（斷路器）</strong> 和 <strong>Outbox Pattern（發件箱模式）</strong> 是運維原語。</p>
+<ul>
+<li><strong><a href="/zh-TW/2020/03/bulkhead-pattern/">艙壁模式</a></strong> —— 反向引用。艙壁隔離故障，Saga 協調恢復。把它們配對：艙壁放在每個 Saga 步驟的執行緒池裡；Saga 跨 Saga 的各個服務。</li>
+<li><strong><a href="/zh-TW/2020/01/circuit-breaker-pattern/">Circuit Breaker 模式（斷路器模式）</a></strong> —— 每一個呼叫外部服務的 Saga 步驟都需要斷路器，這樣某個壞掉的參與者不會把 Saga 的重試拖入死亡螺旋。</li>
+<li><strong><a href="#">Outbox Pattern（發件箱模式）</a></strong> <em>(向前引用)</em> —— 每一個協同式 Saga 的事件發佈都需要發件箱，這樣本地事務和事件發佈不會失同步。</li>
+<li><strong><a href="#">saga-compensation-semantics（Saga 補償語意）</a></strong> <em>(向前引用)</em> —— 部分補償、退款視窗、不可逆副作用步驟——經典「完全撤銷」模型沒能覆蓋的情況。留給另一篇單獨的文章。</li>
+</ul> <section class="post-comments" data-testid="giscus-section" data-giscus-configured="true" data-astro-cid-kyga3fkk> <h2 class="post-comments-heading" data-astro-cid-kyga3fkk>留言</h2>  <div class="post-comments-placeholder" data-testid="giscus-placeholder" data-state="no-consent" data-astro-cid-kyga3fkk> <p data-astro-cid-kyga3fkk> 請接受「功能性」Cookie 類別以查看和發表留言。  <button type="button" class="post-comments-action" data-testid="giscus-open-preferences" data-astro-cid-kyga3fkk>更新 Cookie 偏好</button> </p> </div> <div data-giscus-container class="post-comments-container" data-astro-cid-kyga3fkk></div> <script>window.__GISCUS_CONFIG__ = {"repo":"neoalienson/neo01.com","repoId":"R_kgDOLzrTHQ","category":"Comments","categoryId":"DIC_kwDOLzrTHc4C-5G8","mapping":"pathname","lang":"en","strict":"0","reactionsEnabled":"1"};</script> <template data-giscus-fallback-template data-astro-cid-kyga3fkk> <div class="post-comments-fallback" data-testid="giscus-fallback" hidden data-astro-cid-kyga3fkk> <p data-testid="giscus-fallback-message" data-astro-cid-kyga3fkk>留言載入失敗。您可以重試，或前往 GitHub 查看討論。</p> <a href="https://github.com/neoalienson/neo01.com/discussions" target="_blank" rel="noopener noreferrer" data-testid="giscus-fallback-link" data-default-href="https://github.com/neoalienson/neo01.com/discussions" data-astro-cid-kyga3fkk>在 GitHub 上查看</a> </div> </template><a href="https://github.com/neoalienson/neo01.com/discussions" target="_blank" rel="noopener noreferrer" data-testid="giscus-fallback-link" data-default-href="https://github.com/neoalienson/neo01.com/discussions" data-astro-cid-kyga3fkk> <noscript> <p class="post-comments-noscript" data-astro-cid-kyga3fkk>請啟用 JavaScript 以查看留言。</p> </noscript> </a></section> <script type="module" src="/_astro/GiscusComments.astro_astro_type_script_index_0_lang.BLhKKzds.js"></script> </article> </div>   </div> </div> </main> <footer id="footer" data-astro-cid-l3trhy4j> <div class="footer-inner" data-astro-cid-l3trhy4j> <div class="footer-top-row" data-astro-cid-l3trhy4j> <div class="footer-col footer-quick-links" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>快速連結</span> <div class="footer-quick-links-list" data-astro-cid-l3trhy4j> <a href="/zh-TW/about/" data-astro-cid-l3trhy4j>關於</a><a href="/zh-TW/tools/" data-astro-cid-l3trhy4j>工具</a> </div> </div> <div class="footer-col footer-qr-col" data-astro-cid-l3trhy4j> <div class="short-url-qr" data-url="https://neo01.com/zh-TW/2026/07/saga-pattern/" data-size="80" data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-btn" aria-label="View QR code full size" data-astro-cid-av7zekv5> <img src="" alt="QR code" width="80" height="80" data-astro-cid-av7zekv5> </button> </div> <div class="short-url-qr-lightbox" id="short-url-qr-lightbox" hidden data-astro-cid-av7zekv5> <button type="button" class="short-url-qr-lightbox-close" aria-label="Close" data-astro-cid-av7zekv5>×</button> <img src="" alt="QR code full size" class="short-url-qr-lightbox-img" data-astro-cid-av7zekv5> <a href="#" class="short-url-qr-lightbox-link" target="_blank" data-astro-cid-av7zekv5>Open short URL</a> </div> <script type="module" src="/_astro/QrInFooter.astro_astro_type_script_index_0_lang.DCVJWpeH.js"></script> </div> <div class="footer-col footer-connect" data-astro-cid-l3trhy4j> <span class="footer-col-title" data-astro-cid-l3trhy4j>關注</span> <div class="footer-connect-icons" data-astro-cid-l3trhy4j> <a href="https://github.com/neoalienson" target="_blank" rel="noopener" aria-label="GitHub" data-astro-cid-l3trhy4j><i class="fab fa-github" data-astro-cid-l3trhy4j></i></a> <a href="https://linkedin.com/in/neoalienson" target="_blank" rel="noopener" aria-label="LinkedIn" data-astro-cid-l3trhy4j><i class="fab fa-linkedin" data-astro-cid-l3trhy4j></i></a> <a href="https://stackexchange.com/users/2122053/neo?tab=accounts" target="_blank" rel="noopener" aria-label="Stack Exchange" data-astro-cid-l3trhy4j><i class="fab fa-stack-exchange" data-astro-cid-l3trhy4j></i></a> <a href="https://stackoverflow.com/users/1885105/neo" target="_blank" rel="noopener" aria-label="Stack Overflow" data-astro-cid-l3trhy4j><i class="fab fa-stack-overflow" data-astro-cid-l3trhy4j></i></a> <a href="/rss.xml" aria-label="RSS" data-astro-cid-l3trhy4j><i class="fas fa-rss" data-astro-cid-l3trhy4j></i></a> </div> </div> </div> <div class="footer-bottom-row" data-astro-cid-l3trhy4j> <span class="footer-legal-links" data-astro-cid-l3trhy4j>  <a href="/zh-TW/terms-and-conditions/" data-astro-cid-l3trhy4j>條款</a> <span class="link-sep" data-astro-cid-l3trhy4j>|</span> <a href="/zh-TW/cookie-policy/" data-astro-cid-l3trhy4j>Cookie 政策</a>  </span> <span class="footer-copyright" data-astro-cid-l3trhy4j>&copy; 2026 Neo Alienson. 保留所有權利。</span> </div> </div> </footer> <button id="back-to-top" class="back-to-top" style="--btt-size: 48px; --btt-bottom: 60px; --btt-right: 30px; --btt-circumference: 131.94689145077132;" aria-label="Back to top" data-astro-cid-c4zgazz7> <svg class="back-to-top-ring" viewBox="0 0 48 48" aria-hidden="true" data-astro-cid-c4zgazz7> <circle class="back-to-top-track" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2" data-astro-cid-c4zgazz7></circle> <circle id="back-to-top-progress" class="back-to-top-progress" cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="131.94689145077132" stroke-dashoffset="131.94689145077132" data-astro-cid-c4zgazz7></circle> </svg> <span class="back-to-top-face" aria-hidden="true" data-astro-cid-c4zgazz7> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" data-astro-cid-c4zgazz7> <path d="m18 15-6-6-6 6" data-astro-cid-c4zgazz7></path> </svg> </span> </button> <script>(function(){const threshold = 400;
+const circumference = 131.94689145077132;
+
+  (function () {
+    const THRESHOLD = threshold;
+    const CIRCUMFERENCE = circumference;
+
+    let docMaxScrollY = 0;
+    function updateDocMaxScrollY() {
+      docMaxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+    }
+    window.addEventListener('resize', updateDocMaxScrollY, { passive: true });
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(updateDocMaxScrollY).observe(document.documentElement);
+    }
+
+    function initBackToTop() {
+      const btn = document.getElementById('back-to-top');
+      if (!btn || btn.dataset.bttInit) return;
+      btn.dataset.bttInit = 'true';
+
+      const ring = document.getElementById('back-to-top-progress');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let ticking = false;
+      let visible = false;
+
+      btn.style.opacity = '0';
+      btn.style.translate = '0 2rem';
+      btn.style.pointerEvents = 'none';
+
+      function show() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 250ms cubic-bezier(0,0,0.2,1), translate 250ms cubic-bezier(0,0,0.2,1)';
+        btn.style.opacity = '1';
+        btn.style.translate = '0 0';
+        btn.style.pointerEvents = 'auto';
+        visible = true;
+      }
+
+      function hide() {
+        btn.style.transition = reducedMotion
+          ? 'none'
+          : 'opacity 300ms cubic-bezier(0.4,0,1,1), translate 300ms cubic-bezier(0.4,0,1,1)';
+        btn.style.opacity = '0';
+        btn.style.translate = '0 2rem';
+        btn.style.pointerEvents = 'none';
+        visible = false;
+      }
+
+      function updateFrame() {
+        const pct = docMaxScrollY > 0 ? Math.min(1, Math.max(0, window.scrollY / docMaxScrollY)) : 0;
+        if (ring) {
+          ring.style.strokeDashoffset = String(CIRCUMFERENCE * (1 - pct));
+        }
+        if (window.scrollY > THRESHOLD) {
+          if (!visible) show();
+        } else {
+          if (visible) hide();
+        }
+        ticking = false;
+      }
+
+      function onScroll() {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(updateFrame);
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+
+      btn.addEventListener('click', function () {
+        window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+      });
+
+      document.addEventListener('astro:before-swap', function () {
+        window.removeEventListener('scroll', onScroll);
+      }, { once: true });
+
+      requestAnimationFrame(function () {
+        updateDocMaxScrollY();
+        updateFrame();
+      });
+    }
+
+    document.addEventListener('astro:page-load', initBackToTop);
+    initBackToTop();
+  })();
+})();</script> </div>  <script type="module" src="/_astro/GitHubCardScript.astro_astro_type_script_index_0_lang.BA_bcjj9.js"></script> <script type="module" src="/_astro/CookieConsent.astro_astro_type_script_index_0_lang.C7InX0DZ.js"></script>  <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_1_lang.D4SFgxuw.js"></script> <script type="module">(function(){function n(){if(document.querySelector(".katex")){const t=document.createElement("link");return t.rel="stylesheet",t.href="/katex/katex.min.css",document.head.appendChild(t),!0}return!1}if(n())return;const e=new MutationObserver(()=>{n()&&e.disconnect()});e.observe(document.body,{childList:!0,subtree:!0}),setTimeout(()=>e.disconnect(),5e3)})();</script> <script type="module" src="/_astro/BaseLayout.astro_astro_type_script_index_3_lang.bcDSCgCW.js"></script> </body> </html>
